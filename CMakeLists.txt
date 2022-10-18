@@ -5,3 +5,4 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 
 add_subdirectory(TGEngine)
+add_library(tc::TGEngine ALIAS TGEngine)

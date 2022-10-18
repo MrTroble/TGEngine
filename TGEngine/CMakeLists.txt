@@ -78,9 +78,18 @@ set(ENGINE_DATA
 	"${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp"
     "${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.h"
 )
+
+add_library (TGEngine STATIC ${ENGINE_DATA})
+target_link_libraries(TGEngine PUBLIC glslang shaderc_combined SPIRV glm)
 if(WIN32)
-include_directories("${vulkansdk_SOURCE_DIR}/Include" "${imgui_SOURCE_DIR}")
-link_directories("${vulkansdk_SOURCE_DIR}/Lib")
+target_link_libraries(TGEngine PUBLIC vulkan-1)
+else()
+target_link_libraries(TGEngine PUBLIC glslang-default-resource-limits vulkan m ${X11_X11_LIB})
+endif()
+
+if(WIN32)
+target_include_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Include" "${imgui_SOURCE_DIR}")
+target_link_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Lib")
 list(APPEND ENGINE_DATA
     "${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp"
 	"${imgui_SOURCE_DIR}/backends/imgui_impl_win32.h"
@@ -90,13 +99,8 @@ list(APPEND ENGINE_DATA
     "private/imgui/imgui_impl_x11.cpp"
 	"public/imgui/imgui_impl_x11.h"
 )
-include_directories("usr/include" "${imgui_SOURCE_DIR}")
+target_include_directories(TGEngine PUBLIC "usr/include" "${imgui_SOURCE_DIR}")
 endif()
-
-add_library (TGEngine STATIC ${ENGINE_DATA})
-target_link_libraries(TGEngine PUBLIC glslang shaderc_combined SPIRV glm)
-if(WIN32)
-target_link_libraries(TGEngine PUBLIC vulkan-1)
-else()
-target_link_libraries(TGEngine PUBLIC glslang-default-resource-limits vulkan m ${X11_X11_LIB})
-endif()
+install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>)
+install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>/..)
+install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>/../..)
