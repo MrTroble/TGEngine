@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Cache
-        uses: actions/cache@v3.0.6
+        uses: actions/cache@v3
         with:
            path: ${{github.workspace}}\build\_deps
            key: wincache
@@ -27,7 +27,7 @@ jobs:
         with:
           name: libTGEngineWindows
           path: |
-            ${{github.workspace}}\build\Release\TGEngine.lib
+            ${{github.workspace}}\build\Release\TGEngine\TGEngine.lib
           if-no-files-found: error
           
   build_linux:
@@ -43,7 +43,7 @@ jobs:
         run: sudo apt install clang-14 --install-suggests
       - uses: actions/checkout@v3
       - name: Cache
-        uses: actions/cache@v3.0.6
+        uses: actions/cache@v3
         with:
            path: ${{github.workspace}}/build/_deps
            key: linuxcache
@@ -56,5 +56,5 @@ jobs:
         with:
           name: libTGEngineLinux
           path: |
-            ${{github.workspace}}/build/TGEngine
+            ${{github.workspace}}/build/TGEngine/TGEngine
           if-no-files-found: error
