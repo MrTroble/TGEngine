@@ -22,19 +22,12 @@ jobs:
         run: cmake ./ -B ${{github.workspace}}\build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
       - name: Build
         run: cmake --build ${{github.workspace}}\build --config ${{env.BUILD_TYPE}}
-      - name: Copy
-        run: |
-          xcopy ${{github.workspace}}\TGEngine\application\assets\ ${{github.workspace}}\build\Release\assets\ /S/I/Y
-          xcopy ${{github.workspace}}\TGEngine\test\assets\*.* ${{github.workspace}}\build\Release\assets\ /S/I/Y
-          copy ${{github.workspace}}\TGEngine\application\assets\degree5.dcplt ${{github.workspace}}\build\Release\degree5.dcplt
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3.1.0
         with:
-          name: TGAppWindows
+          name: libTGEngineWindows
           path: |
-            ${{github.workspace}}\build\Release\TGApp.exe
-            ${{github.workspace}}\build\Release\assets
-            ${{github.workspace}}\build\Release\degree5.dcplt
+            ${{github.workspace}}\build\Release\TGEngine.lib
           if-no-files-found: error
           
   build_linux:
@@ -58,17 +51,10 @@ jobs:
         run: cmake ./TGEngine -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CXX_COMPILER=clang++
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-      - name: Copy
-        run: |
-          cp -r ${{github.workspace}}/TGEngine/application/assets/ ${{github.workspace}}/build/
-          cp -r ${{github.workspace}}/TGEngine/test/assets/*.* ${{github.workspace}}/build/assets/
-          cp -r ${{github.workspace}}/TGEngine/application/assets/degree5.dcplt ${{github.workspace}}/build/degree5.dcplt
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3.1.0
         with:
-          name: TGAppLinux
+          name: libTGEngineLinux
           path: |
-            ${{github.workspace}}/build/TGApp
-            ${{github.workspace}}/build/assets
-            ${{github.workspace}}/build/degree5.dcplt
+            ${{github.workspace}}/build/TGEngine
           if-no-files-found: error
