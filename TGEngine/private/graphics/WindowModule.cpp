@@ -3,6 +3,14 @@
 #include <string>
 #include "../../public/Util.hpp"
 
+#ifndef APPLICATION_NAME
+#define APPLICATION_NAME "unknown"
+#endif
+
+#ifndef APPLICATION_VERSION
+#define APPLICATION_VERSION VK_MAKE_VERSION(1, 0, 0)
+#endif
+
 #ifdef WIN32
 #include <Windows.h>
 #endif

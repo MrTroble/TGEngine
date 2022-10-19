@@ -9,6 +9,7 @@
 #include "../../../public/graphics/vulkan/VulkanModuleDef.hpp"
 #include <unordered_set>
 #include "../../../public/TGEngine.hpp"
+#include "../../../public/Error.hpp"
 
 namespace tge::graphics
 {

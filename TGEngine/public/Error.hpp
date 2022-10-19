@@ -26,6 +26,7 @@ constexpr auto forceSemicolon = 0;
   forceSemicolon
 #else
 #define TGE_EXPECT(statement, message, rv) forceSemicolon
+#define TGE_EXPECT_N(statement, message) forceSemicolon
 #endif // DEBUG
 
 namespace tge::main {
