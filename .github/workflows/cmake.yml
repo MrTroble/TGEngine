@@ -51,14 +51,10 @@ jobs:
         run: cmake ./TGEngine -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CXX_COMPILER=clang++
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-      - name: test
-        run: |
-           ls ${{github.workspace}}/build/
-           ls ${{github.workspace}}/build/TGEngine
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3.1.0
         with:
           name: libTGEngineLinux
           path: |
-            ${{github.workspace}}/build/TGEngine/TGEngine
+            ${{github.workspace}}/build/libTGEngine.a
           if-no-files-found: error
