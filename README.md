@@ -1,9 +1,9 @@
-# Project-Lagrange
+# TGEngine
 
-[![GitHub](https://img.shields.io/github/license/MrTroble/Project-Lagrange?style=for-the-badge)](https://github.com/MrTroble/Project-Lagrange/blob/master/LICENSE)
+[![GitHub](https://img.shields.io/github/license/MrTroble/TGEngine?style=for-the-badge)](https://github.com/MrTroble/TGEngine/blob/master/LICENSE)
 ![Cpp Version 20](https://img.shields.io/badge/C++%20Version-20-red?style=for-the-badge&logo=cplusplus)
 ![Compiler support](https://img.shields.io/badge/Compiler-clang%2014%20|%20msvc%2019%20|%20gcc%2010-blue?style=for-the-badge&logo=cplusplus)
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/MrTroble/Project-Lagrange/CMake?style=for-the-badge)](https://github.com/MrTroble/Project-Lagrange/actions)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/MrTroble/TGEngine/CMake?style=for-the-badge)](https://github.com/MrTroble/TGEngine/actions)
 
 
 ## Build
@@ -17,7 +17,7 @@ On Linux you need the Vulkan SDK package [https://vulkan.lunarg.com/sdk/home#lin
 
 #### Cmake
 
-* cmake ./TGEngine -B ./build -DCMAKE_BUILD_TYPE=Debug
+* cmake ./ -B ./build -DCMAKE_BUILD_TYPE=Debug
 
 * cmake --build ./build --config Debug
 
