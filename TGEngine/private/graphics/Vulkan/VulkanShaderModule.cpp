@@ -849,9 +849,11 @@ namespace tge::shader
         sets.push_back(descSet);
       }
     }
-    ((CommandBuffer *)customData)
-        ->bindDescriptorSets(PipelineBindPoint::eGraphics, pipeLayout, 0, sets,
-                             {});
+    if (!sets.empty()) {
+        ((CommandBuffer*)customData)
+            ->bindDescriptorSets(PipelineBindPoint::eGraphics, pipeLayout, 0, sets,
+                {});
+    }
   }
 
   void VulkanShaderModule::addToMaterial(const graphics::Material *material,
