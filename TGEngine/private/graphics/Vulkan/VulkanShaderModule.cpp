@@ -19,12 +19,25 @@ namespace tge::shader
 
   using namespace vk;
 
-  inline EShLanguage getLang(const std::string &str)
+  inline EShLanguage getLangFromShaderLang(const ShaderType type)
+  {
+      switch (type)
+      {
+      case ShaderType::FRAGMENT:
+          return EShLangFragment;
+      case ShaderType::VERTEX:
+          return EShLangVertex;
+      default:
+          throw std::runtime_error("Not implemented!");
+      };
+  }
+
+  inline ShaderType getLang(const std::string &str)
   {
     if (str.compare("vert") == 0)
-      return EShLanguage::EShLangVertex;
+      return ShaderType::VERTEX;
     if (str.compare("frag") == 0)
-      return EShLanguage::EShLangFragment;
+      return ShaderType::FRAGMENT;
     throw std::runtime_error(std::string("Couldn't find EShLanguage for ") + str);
   }
 
@@ -242,15 +255,7 @@ namespace tge::shader
 
     shaderPipe->shader.push_back(std::pair(std::vector<uint32_t>(), flags));
     glslang::GlslangToSpv(*interm, shaderPipe->shader.back().first);
-    // glslang::SpirvToolsDisassemble(std::cout, shaderPipe->shader.back().first);
   }
-
-  struct ShaderInfo
-  {
-    EShLanguage language;
-    std::vector<char> code;
-    std::vector<std::string> additionalCode;
-  };
 
   constexpr TBuiltInResource DefaultTBuiltInResource = {
       /* .MaxLights = */ 32,
@@ -438,10 +443,18 @@ namespace tge::shader
         return nullptr;
       }
       __implIntermToVulkanPipe(shaderPipe, shader->getIntermediate(),
-                               pair.language);
+                               getLangFromShaderLang(pair.language));
     }
 
     return shaderPipe;
+  }
+
+  ShaderPipe VulkanShaderModule::compile(
+      const std::vector<ShaderInfo>& vector)
+  {
+      const auto loadedPipes = __implLoadShaderPipeAndCompile(vector);
+      __implCreateDescSets(loadedPipes, this);
+      return loadedPipes;
   }
 
   ShaderPipe VulkanShaderModule::loadShaderPipeAndCompile(
@@ -456,9 +469,7 @@ namespace tge::shader
       std::cout << path << std::endl;
       vector.push_back({getLang(abrivation), util::wholeFile(path)});
     }
-    const auto loadedPipes = __implLoadShaderPipeAndCompile(vector);
-    __implCreateDescSets(loadedPipes, this);
-    return (uint8_t *)loadedPipes;
+    return compile(vector);
   }
 
   inline std::string getStringFromIOType(const IOType t)
@@ -495,19 +506,6 @@ namespace tge::shader
     default:
       throw std::runtime_error("Couldn't find string to type!");
     }
-  }
-
-  inline EShLanguage getLangFromShaderLang(const ShaderType type)
-  {
-    switch (type)
-    {
-    case ShaderType::FRAGMENT:
-      return EShLangFragment;
-    case ShaderType::VERTEX:
-      return EShLangVertex;
-    default:
-      throw std::runtime_error("Not implemented!");
-    };
   }
 
   inline void function(const Instruction &ins,
@@ -623,8 +621,7 @@ namespace tge::shader
     for (size_t i = 0; i < shaderCount; i++)
     {
       const ShaderCreateInfo &createInfo = shaderCreateInfo[i];
-      const auto lang = getLangFromShaderLang(createInfo.shaderType);
-      ShaderInfo info = {lang};
+      ShaderInfo info = { createInfo.shaderType };
       std::ostringstream codebuff;
       codebuff << "#version 450" << std::endl
                << std::endl;
@@ -665,7 +662,7 @@ namespace tge::shader
         codebuff << ";" << std::endl;
       }
       codebuff << std::endl;
-      if (lang == EShLangVertex)
+      if (createInfo.shaderType == ShaderType::VERTEX)
       {
         codebuff << "out gl_PerVertex { vec4 gl_Position; };" << std::endl;
       }
@@ -679,7 +676,7 @@ namespace tge::shader
       info.code.push_back('\0');
       const auto shader = __implGenerateIntermediate(info);
       glslang::TIntermediate *tint = shader->getIntermediate();
-      __implIntermToVulkanPipe(shaderPipe, tint, lang);
+      __implIntermToVulkanPipe(shaderPipe, tint, getLangFromShaderLang(createInfo.shaderType));
       if (createInfo.shaderType == ShaderType::VERTEX)
       {
         std::sort(shaderPipe->vertexInputAttributes.begin(),

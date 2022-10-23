@@ -6,49 +6,52 @@
 
 namespace tge::shader {
 
-struct BindingPipeInfo {
-  size_t descSet;
-  size_t pipeline;
-};
+	struct BindingPipeInfo {
+		size_t descSet;
+		size_t pipeline;
+	};
 
-class VulkanShaderModule : public tge::shader::ShaderAPI {
+	class VulkanShaderModule : public tge::shader::ShaderAPI {
 
-public:
-  explicit VulkanShaderModule(void *vgm) : vgm(vgm) {}
+	public:
+		explicit VulkanShaderModule(void* vgm) : vgm(vgm) {}
 
-  void *vgm;
-  std::vector<vk::DescriptorPool> descPools;
-  std::vector<vk::PipelineLayout> pipeLayouts;
-  std::vector<vk::DescriptorSetLayout> setLayouts;
-  std::vector<vk::DescriptorSet> descSets;
-  std::vector<BindingPipeInfo> pipeInfos;
-  std::vector<tge::shader::VulkanShaderPipe *> shaderPipes;
-  DescriptorSetLayout defaultDescLayout;
-  PipelineLayout defaultLayout;
-  // Legacy support
-  std::vector<std::vector<BindingInfo>> defaultbindings;
+		void* vgm;
+		std::vector<vk::DescriptorPool> descPools;
+		std::vector<vk::PipelineLayout> pipeLayouts;
+		std::vector<vk::DescriptorSetLayout> setLayouts;
+		std::vector<vk::DescriptorSet> descSets;
+		std::vector<BindingPipeInfo> pipeInfos;
+		std::vector<tge::shader::VulkanShaderPipe*> shaderPipes;
+		DescriptorSetLayout defaultDescLayout;
+		PipelineLayout defaultLayout;
+		// Legacy support
+		std::vector<std::vector<BindingInfo>> defaultbindings;
 
-  ShaderPipe loadShaderPipeAndCompile(
-      const std::vector<std::string> &shadernames) override;
+		ShaderPipe loadShaderPipeAndCompile(
+			const std::vector<std::string>& shadernames) override;
 
-  ShaderPipe createShaderPipe(const ShaderCreateInfo *shaderCreateInfo,
-                              const size_t shaderCount) override;
+		ShaderPipe compile(
+			const std::vector<ShaderInfo>& shadernames) override;
 
-  size_t createBindings(ShaderPipe pipe, const size_t count = 1) override;
+		ShaderPipe createShaderPipe(const ShaderCreateInfo* shaderCreateInfo,
+			const size_t shaderCount) override;
 
-  void changeInputBindings(const ShaderPipe pipe, const size_t bindingID,
-                           const size_t buffer) override;
+		size_t createBindings(ShaderPipe pipe, const size_t count = 1) override;
 
-  void bindData(const BindingInfo *info, const size_t count) override;
+		void changeInputBindings(const ShaderPipe pipe, const size_t bindingID,
+			const size_t buffer) override;
 
-  void addToRender(const size_t* bindingID, const size_t size, void *customData) override;
+		void bindData(const BindingInfo* info, const size_t count) override;
 
-  void addToMaterial(const graphics::Material *material,
-                     void *customData) override;
+		void addToRender(const size_t* bindingID, const size_t size, void* customData) override;
 
-  void init() override;
+		void addToMaterial(const graphics::Material* material,
+			void* customData) override;
 
-  void destroy() override;
-};
+		void init() override;
+
+		void destroy() override;
+	};
 
 } // namespace tge::shader
