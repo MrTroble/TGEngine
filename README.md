@@ -32,3 +32,4 @@ On Linux you need the Vulkan SDK package [https://vulkan.lunarg.com/sdk/home#lin
 * Shaderpermute
 * glm
 * gtest
+* ddspp

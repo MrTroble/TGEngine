@@ -79,7 +79,7 @@ set(ENGINE_DATA
 	"${imgui_SOURCE_DIR}/imstb_truetype.h"
 	"${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp"
     "${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.h"
-)
+ "public/headerlibs/ddspp.h")
 
 if(WIN32)
 list(APPEND ENGINE_DATA

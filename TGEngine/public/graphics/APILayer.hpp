@@ -35,6 +35,7 @@ struct TextureInfo {
   uint32_t width;
   uint32_t height;
   uint32_t channel;
+  size_t internalFormatOverride = 37;
 };
 
 enum class FilterSetting { NEAREST, LINEAR };

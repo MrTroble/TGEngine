@@ -7,6 +7,7 @@
 #include "../../public/graphics/GameShaderModule.hpp"
 #include "../../public/graphics/vulkan/VulkanShaderPipe.hpp"
 #include "../../public/headerlibs/tiny_gltf.h"
+#include "../../public/headerlibs/ddspp.h"
 #include <array>
 #include <glm/gtx/transform.hpp>
 #include <iostream>
@@ -513,8 +514,376 @@ void GameGraphicsModule::tick(double time) {
 
 void GameGraphicsModule::destroy() {}
 
+std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>>& data) {
+    std::vector<TextureInfo> textureInfos;
+    textureInfos.reserve(data.size());
+    for (const auto& dataIn : data) {
+        TextureInfo info;
+        info.data = stbi_load_from_memory((stbi_uc*)dataIn.data(), dataIn.size(),
+            (int*)&info.width, (int*)&info.height,
+            (int*)&info.channel, 0);
+        info.size = info.width * info.height * info.channel;
+        textureInfos.push_back(info);
+        if (info.channel == 3)
+            throw std::runtime_error("Texture with 3 channels not supported!");
+    }
+    return textureInfos;
+}
+
+inline size_t fromDXGI(ddspp::DXGIFormat format) {
+    switch (format)
+    {
+    case ddspp::UNKNOWN:
+        return (size_t)vk::Format::eUndefined;
+    case ddspp::R32G32B32A32_TYPELESS:
+        break;
+    case ddspp::R32G32B32A32_FLOAT:
+        break;
+    case ddspp::R32G32B32A32_UINT:
+        break;
+    case ddspp::R32G32B32A32_SINT:
+        break;
+    case ddspp::R32G32B32_TYPELESS:
+        break;
+    case ddspp::R32G32B32_FLOAT:
+        break;
+    case ddspp::R32G32B32_UINT:
+        break;
+    case ddspp::R32G32B32_SINT:
+        break;
+    case ddspp::R16G16B16A16_TYPELESS:
+        break;
+    case ddspp::R16G16B16A16_FLOAT:
+        break;
+    case ddspp::R16G16B16A16_UNORM:
+        break;
+    case ddspp::R16G16B16A16_UINT:
+        break;
+    case ddspp::R16G16B16A16_SNORM:
+        break;
+    case ddspp::R16G16B16A16_SINT:
+        break;
+    case ddspp::R32G32_TYPELESS:
+        break;
+    case ddspp::R32G32_FLOAT:
+        break;
+    case ddspp::R32G32_UINT:
+        break;
+    case ddspp::R32G32_SINT:
+        break;
+    case ddspp::R32G8X24_TYPELESS:
+        break;
+    case ddspp::D32_FLOAT_S8X24_UINT:
+        break;
+    case ddspp::R32_FLOAT_X8X24_TYPELESS:
+        break;
+    case ddspp::X32_TYPELESS_G8X24_UINT:
+        break;
+    case ddspp::R10G10B10A2_TYPELESS:
+        break;
+    case ddspp::R10G10B10A2_UNORM:
+        break;
+    case ddspp::R10G10B10A2_UINT:
+        break;
+    case ddspp::R11G11B10_FLOAT:
+        break;
+    case ddspp::R8G8B8A8_TYPELESS:
+        break;
+    case ddspp::R8G8B8A8_UNORM:
+        break;
+    case ddspp::R8G8B8A8_UNORM_SRGB:
+        break;
+    case ddspp::R8G8B8A8_UINT:
+        break;
+    case ddspp::R8G8B8A8_SNORM:
+        break;
+    case ddspp::R8G8B8A8_SINT:
+        break;
+    case ddspp::R16G16_TYPELESS:
+        break;
+    case ddspp::R16G16_FLOAT:
+        break;
+    case ddspp::R16G16_UNORM:
+        break;
+    case ddspp::R16G16_UINT:
+        break;
+    case ddspp::R16G16_SNORM:
+        break;
+    case ddspp::R16G16_SINT:
+        break;
+    case ddspp::R32_TYPELESS:
+        break;
+    case ddspp::D32_FLOAT:
+        break;
+    case ddspp::R32_FLOAT:
+        break;
+    case ddspp::R32_UINT:
+        break;
+    case ddspp::R32_SINT:
+        break;
+    case ddspp::R24G8_TYPELESS:
+        break;
+    case ddspp::D24_UNORM_S8_UINT:
+        break;
+    case ddspp::R24_UNORM_X8_TYPELESS:
+        break;
+    case ddspp::X24_TYPELESS_G8_UINT:
+        break;
+    case ddspp::R8G8_TYPELESS:
+        break;
+    case ddspp::R8G8_UNORM:
+        break;
+    case ddspp::R8G8_UINT:
+        break;
+    case ddspp::R8G8_SNORM:
+        break;
+    case ddspp::R8G8_SINT:
+        break;
+    case ddspp::R16_TYPELESS:
+        break;
+    case ddspp::R16_FLOAT:
+        break;
+    case ddspp::D16_UNORM:
+        break;
+    case ddspp::R16_UNORM:
+        break;
+    case ddspp::R16_UINT:
+        break;
+    case ddspp::R16_SNORM:
+        break;
+    case ddspp::R16_SINT:
+        break;
+    case ddspp::R8_TYPELESS:
+        break;
+    case ddspp::R8_UNORM:
+        break;
+    case ddspp::R8_UINT:
+        break;
+    case ddspp::R8_SNORM:
+        break;
+    case ddspp::R8_SINT:
+        break;
+    case ddspp::A8_UNORM:
+        break;
+    case ddspp::R1_UNORM:
+        break;
+    case ddspp::R9G9B9E5_SHAREDEXP:
+        break;
+    case ddspp::R8G8_B8G8_UNORM:
+        break;
+    case ddspp::G8R8_G8B8_UNORM:
+        break;
+    case ddspp::BC1_TYPELESS:
+        break;
+    case ddspp::BC1_UNORM:
+        break;
+    case ddspp::BC1_UNORM_SRGB:
+        break;
+    case ddspp::BC2_TYPELESS:
+        break;
+    case ddspp::BC2_UNORM:
+        break;
+    case ddspp::BC2_UNORM_SRGB:
+        break;
+    case ddspp::BC3_TYPELESS:
+        break;
+    case ddspp::BC3_UNORM:
+        break;
+    case ddspp::BC3_UNORM_SRGB:
+        break;
+    case ddspp::BC4_TYPELESS:
+        break;
+    case ddspp::BC4_UNORM:
+        break;
+    case ddspp::BC4_SNORM:
+        break;
+    case ddspp::BC5_TYPELESS:
+        break;
+    case ddspp::BC5_UNORM:
+        break;
+    case ddspp::BC5_SNORM:
+        break;
+    case ddspp::B5G6R5_UNORM:
+        break;
+    case ddspp::B5G5R5A1_UNORM:
+        break;
+    case ddspp::B8G8R8A8_UNORM:
+        break;
+    case ddspp::B8G8R8X8_UNORM:
+        break;
+    case ddspp::R10G10B10_XR_BIAS_A2_UNORM:
+        break;
+    case ddspp::B8G8R8A8_TYPELESS:
+        break;
+    case ddspp::B8G8R8A8_UNORM_SRGB:
+        break;
+    case ddspp::B8G8R8X8_TYPELESS:
+        break;
+    case ddspp::B8G8R8X8_UNORM_SRGB:
+        break;
+    case ddspp::BC6H_TYPELESS:
+        break;
+    case ddspp::BC6H_UF16:
+        break;
+    case ddspp::BC6H_SF16:
+        break;
+    case ddspp::BC7_TYPELESS:
+        break;
+    case ddspp::BC7_UNORM:
+        break;
+    case ddspp::BC7_UNORM_SRGB:
+        break;
+    case ddspp::AYUV:
+        break;
+    case ddspp::Y410:
+        break;
+    case ddspp::Y416:
+        break;
+    case ddspp::NV12:
+        break;
+    case ddspp::P010:
+        break;
+    case ddspp::P016:
+        break;
+    case ddspp::OPAQUE_420:
+        break;
+    case ddspp::YUY2:
+        break;
+    case ddspp::Y210:
+        break;
+    case ddspp::Y216:
+        break;
+    case ddspp::NV11:
+        break;
+    case ddspp::AI44:
+        break;
+    case ddspp::IA44:
+        break;
+    case ddspp::P8:
+        break;
+    case ddspp::A8P8:
+        break;
+    case ddspp::B4G4R4A4_UNORM:
+        break;
+    case ddspp::P208:
+        break;
+    case ddspp::V208:
+        break;
+    case ddspp::V408:
+        break;
+    case ddspp::ASTC_4X4_TYPELESS:
+        break;
+    case ddspp::ASTC_4X4_UNORM:
+        break;
+    case ddspp::ASTC_4X4_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_5X4_TYPELESS:
+        break;
+    case ddspp::ASTC_5X4_UNORM:
+        break;
+    case ddspp::ASTC_5X4_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_5X5_TYPELESS:
+        break;
+    case ddspp::ASTC_5X5_UNORM:
+        break;
+    case ddspp::ASTC_5X5_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_6X5_TYPELESS:
+        break;
+    case ddspp::ASTC_6X5_UNORM:
+        break;
+    case ddspp::ASTC_6X5_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_6X6_TYPELESS:
+        break;
+    case ddspp::ASTC_6X6_UNORM:
+        break;
+    case ddspp::ASTC_6X6_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_8X5_TYPELESS:
+        break;
+    case ddspp::ASTC_8X5_UNORM:
+        break;
+    case ddspp::ASTC_8X5_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_8X6_TYPELESS:
+        break;
+    case ddspp::ASTC_8X6_UNORM:
+        break;
+    case ddspp::ASTC_8X6_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_8X8_TYPELESS:
+        break;
+    case ddspp::ASTC_8X8_UNORM:
+        break;
+    case ddspp::ASTC_8X8_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_10X5_TYPELESS:
+        break;
+    case ddspp::ASTC_10X5_UNORM:
+        break;
+    case ddspp::ASTC_10X5_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_10X6_TYPELESS:
+        break;
+    case ddspp::ASTC_10X6_UNORM:
+        break;
+    case ddspp::ASTC_10X6_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_10X8_TYPELESS:
+        break;
+    case ddspp::ASTC_10X8_UNORM:
+        break;
+    case ddspp::ASTC_10X8_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_10X10_TYPELESS:
+        break;
+    case ddspp::ASTC_10X10_UNORM:
+        break;
+    case ddspp::ASTC_10X10_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_12X10_TYPELESS:
+        break;
+    case ddspp::ASTC_12X10_UNORM:
+        break;
+    case ddspp::ASTC_12X10_UNORM_SRGB:
+        break;
+    case ddspp::ASTC_12X12_TYPELESS:
+        break;
+    case ddspp::ASTC_12X12_UNORM:
+        break;
+    case ddspp::ASTC_12X12_UNORM_SRGB:
+        break;
+    case ddspp::FORCE_UINT:
+        break;
+    default:
+        break;
+    }
+    return -1;
+}
+
+std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>>& data) {
+    std::vector<TextureInfo> textureInfos;
+    textureInfos.reserve(data.size());
+    for (const auto& ddsVec : data) {
+        uint8_t* ddsData = (uint8_t*)ddsVec.data();
+        ddspp::Descriptor desc;
+        ddspp::decode_header(ddsData, desc);
+
+        TextureInfo info;
+        info.data = ddsData + desc.headerSize;
+        info.width = desc.width;
+        info.height = desc.height;
+        info.size = ddsVec.size() - desc.headerSize;
+        info.internalFormatOverride = fromDXGI(desc.format);
+        textureInfos.push_back(info);
+    }
+    return textureInfos;
+}
+
 uint32_t
-GameGraphicsModule::loadTextures(const std::vector<std::vector<char>> &data) {
+GameGraphicsModule::loadTextures(const std::vector<std::vector<char>> &data, const LoadType type) {
   std::vector<TextureInfo> textureInfos;
 
   util::OnExit onExit([tinfos = &textureInfos] {
@@ -523,27 +892,27 @@ GameGraphicsModule::loadTextures(const std::vector<std::vector<char>> &data) {
         free(tex.data);
   });
 
-  for (const auto &dataIn : data) {
-    TextureInfo info;
-    info.data = stbi_load_from_memory((stbi_uc *)dataIn.data(), dataIn.size(),
-                                      (int *)&info.width, (int *)&info.height,
-                                      (int *)&info.channel, 0);
-    info.size = info.width * info.height * info.channel;
-    textureInfos.push_back(info);
-    if (info.channel == 3)
-      throw std::runtime_error("Texture with 3 channels not supported!");
+  if (type == LoadType::STBI) {
+      textureInfos = loadSTBI(data);
   }
+  else if (type == LoadType::DDSPP) {
+      textureInfos = loadDDS(data);
+  }
+  else {
+      throw std::runtime_error("Wrong load type!");
+  }
+
   return apiLayer->pushTexture(textureInfos.size(), textureInfos.data());
 }
 
 uint32_t
-GameGraphicsModule::loadTextures(const std::vector<std::string> &names) {
+GameGraphicsModule::loadTextures(const std::vector<std::string> &names, const LoadType type) {
   std::vector<std::vector<char>> data;
   data.reserve(names.size());
   for (const auto &name : names) {
     data.push_back(util::wholeFile(name));
   }
-  return loadTextures(data);
+  return loadTextures(data, type);
 }
 
 size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,

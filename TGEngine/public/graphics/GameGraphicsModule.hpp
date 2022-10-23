@@ -31,6 +31,11 @@ struct FeatureSet {
   bool wideLines = false;
 };
 
+enum class LoadType {
+    STBI,
+    DDSPP
+};
+
 class GameGraphicsModule : public main::Module {
 
   APILayer *apiLayer;
@@ -61,9 +66,9 @@ public:
     return loadModel(data, binary, "");
   }
 
-  _NODISCARD uint32_t loadTextures(const std::vector<std::vector<char>> &data);
+  _NODISCARD uint32_t loadTextures(const std::vector<std::vector<char>> &data, const LoadType type = LoadType::STBI);
 
-  _NODISCARD uint32_t loadTextures(const std::vector<std::string> &names);
+  _NODISCARD uint32_t loadTextures(const std::vector<std::string> &names, const LoadType type= LoadType::STBI);
 
   _NODISCARD size_t addNode(const NodeInfo *nodeInfos, const size_t count);
 

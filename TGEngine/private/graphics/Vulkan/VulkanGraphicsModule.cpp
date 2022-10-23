@@ -521,12 +521,11 @@ namespace tge::graphics
 
 		constexpr ImageSubresourceRange range = {ImageAspectFlagBits::eColor, 0, 1, 0,
 												 1};
-		const Format format = Format::eR8G8B8A8Unorm;
-
 		std::vector<InternalImageInfo> imagesIn(textureCount);
 		for (size_t i = 0; i < textureCount; i++)
 		{
 			const TextureInfo &tex = textures[i];
+			const Format format = (Format)tex.internalFormatOverride;
 			const Extent2D ext = {tex.width, tex.height};
 			imagesIn[i] = {format, ext,
 						   ImageUsageFlagBits::eTransferDst |
