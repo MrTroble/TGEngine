@@ -674,11 +674,10 @@ inline size_t fromDXGI(ddspp::DXGIFormat format) {
     case ddspp::G8R8_G8B8_UNORM:
         break;
     case ddspp::BC1_TYPELESS:
-        break;
     case ddspp::BC1_UNORM:
-        break;
+        return (size_t)vk::Format::eBc1RgbaUnormBlock;
     case ddspp::BC1_UNORM_SRGB:
-        break;
+        return (size_t)vk::Format::eBc1RgbUnormBlock;
     case ddspp::BC2_TYPELESS:
         break;
     case ddspp::BC2_UNORM:
@@ -686,11 +685,10 @@ inline size_t fromDXGI(ddspp::DXGIFormat format) {
     case ddspp::BC2_UNORM_SRGB:
         break;
     case ddspp::BC3_TYPELESS:
-        break;
     case ddspp::BC3_UNORM:
-        break;
+        return (size_t)vk::Format::eBc3UnormBlock;
     case ddspp::BC3_UNORM_SRGB:
-        break;
+        return (size_t)vk::Format::eBc3SrgbBlock;
     case ddspp::BC4_TYPELESS:
         break;
     case ddspp::BC4_UNORM:
@@ -886,11 +884,13 @@ uint32_t
 GameGraphicsModule::loadTextures(const std::vector<std::vector<char>> &data, const LoadType type) {
   std::vector<TextureInfo> textureInfos;
 
-  util::OnExit onExit([tinfos = &textureInfos] {
-    for (const auto &tex : *tinfos)
-      if (tex.data != nullptr)
-        free(tex.data);
-  });
+  util::OnExit onExit([tinfos = &textureInfos,type=type] {
+      if (type != LoadType::STBI)
+          return;
+      for (const auto& tex : *tinfos)
+          if (tex.data != nullptr)
+              free(tex.data);
+      });
 
   if (type == LoadType::STBI) {
       textureInfos = loadSTBI(data);

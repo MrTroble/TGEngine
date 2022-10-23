@@ -91,25 +91,6 @@ namespace tge::shader
                                          format.getCompleteString()));
   }
 
-  inline uint32_t getSizeFromFormat(const Format format)
-  {
-    switch (format)
-    {
-    case Format::eR32Sfloat:
-    case Format::eR32Sint:
-      return 4;
-    case Format::eR32G32Sfloat:
-      return 8;
-    case Format::eR32G32B32Sfloat:
-      return 12;
-    case Format::eR32G32B32A32Sfloat:
-      return 16;
-    default:
-      throw std::runtime_error(std::string("Couldn't find size for Format ") +
-                               to_string(format));
-    }
-  }
-
 #define NO_BINDING_GIVEN 65535
 #define NO_LAYOUT_GIVEN 4095
 
