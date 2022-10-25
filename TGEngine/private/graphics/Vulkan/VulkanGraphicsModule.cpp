@@ -101,8 +101,13 @@ namespace tge::graphics
 			BlendOp::eAdd, BlendFactor::eOne, BlendFactor::eZero, BlendOp::eAdd,
 			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags);
 
-		const std::array blendAttachment = {pDefaultState, pDefaultState,
-											pDefaultState, pDefaultState};
+		const auto pOverrideState = PipelineColorBlendAttachmentState(
+			true, BlendFactor::eOne, BlendFactor::eZero,
+			BlendOp::eAdd, BlendFactor::eOne, BlendFactor::eZero, BlendOp::eAdd,
+			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags);
+
+		const std::array blendAttachment = {pDefaultState, pOverrideState,
+											pOverrideState, pOverrideState };
 
 		const PipelineColorBlendStateCreateInfo colorBlendState(
 			{}, false, LogicOp::eClear, blendAttachment);
@@ -950,8 +955,11 @@ namespace tge::graphics
 		const auto vkFeatures = this->physicalDevice.getFeatures();
 		if (features.wideLines)
 			features.wideLines = vkFeatures.wideLines;
+		if (!vkFeatures.independentBlend)
+			return main::Error::INDEPENDENT_BLEND_NOT_SUPPORTED;
 		vk::PhysicalDeviceFeatures enabledFeatures{};
 		enabledFeatures.wideLines = features.wideLines;
+		enabledFeatures.independentBlend = VK_TRUE;
 
 		const char *name = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 		const DeviceCreateInfo deviceCreateInfo({}, 1, &queueCreateInfo, 0, {}, 1,
