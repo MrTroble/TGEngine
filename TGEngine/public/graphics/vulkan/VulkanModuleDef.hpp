@@ -120,6 +120,8 @@ public:
                     const size_t offset = 0) override;
 
   void *loadShader(const MaterialType type) override;
+
+  void recreate() override;
 };
 
 } // namespace tge::graphics

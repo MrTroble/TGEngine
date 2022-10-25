@@ -83,6 +83,13 @@ namespace tge::graphics
 		return ptr;
 	}
 
+	void VulkanGraphicsModule::recreate() {
+		const auto capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
+		viewport = Viewport(0, 0, capabilities.currentExtent.width,
+			capabilities.currentExtent.height, 0, 1.0f);
+		printf("Viewport change!");
+	}
+
 	size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
 											   const Material *materials)
 	{

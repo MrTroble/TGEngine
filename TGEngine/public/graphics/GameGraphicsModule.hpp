@@ -71,6 +71,10 @@ public:
   _NODISCARD uint32_t loadTextures(const std::vector<std::string> &names, const LoadType type= LoadType::STBI);
 
   _NODISCARD size_t addNode(const NodeInfo *nodeInfos, const size_t count);
+  
+  _NODISCARD size_t nextNodeID() {
+      return node.size();
+  }
 
   void updateTransform(const size_t nodeID, const NodeTransform &transform);
 
