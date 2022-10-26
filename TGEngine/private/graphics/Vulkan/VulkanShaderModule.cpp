@@ -19,6 +19,21 @@ namespace tge::shader
 
   using namespace vk;
 
+  inline ShaderStageFlagBits getStageFromLang(const EShLanguage lang)
+  {
+      switch (lang)
+      {
+      case EShLanguage::EShLangVertex:
+          return ShaderStageFlagBits::eVertex;
+      case EShLanguage::EShLangFragment:
+          return ShaderStageFlagBits::eFragment;
+      default:
+          throw std::runtime_error(
+              std::string("Couldn't find ShaderStageFlagBits for EShLanguage ") +
+              std::to_string(lang));
+      }
+  }
+
   inline EShLanguage getLangFromShaderLang(const ShaderType type)
   {
       switch (type)
@@ -39,21 +54,6 @@ namespace tge::shader
     if (str.compare("frag") == 0)
       return ShaderType::FRAGMENT;
     throw std::runtime_error(std::string("Couldn't find EShLanguage for ") + str);
-  }
-
-  inline ShaderStageFlagBits getStageFromLang(const EShLanguage lang)
-  {
-    switch (lang)
-    {
-    case EShLanguage::EShLangVertex:
-      return ShaderStageFlagBits::eVertex;
-    case EShLanguage::EShLangFragment:
-      return ShaderStageFlagBits::eFragment;
-    default:
-      throw std::runtime_error(
-          std::string("Couldn't find ShaderStageFlagBits for EShLanguage ") +
-          std::to_string(lang));
-    }
   }
 
   inline Format getFormatFromElf(const glslang::TType &format)
@@ -83,6 +83,8 @@ namespace tge::shader
         return Format::eR32Sfloat;
       case glslang::TBasicType::EbtInt:
         return Format::eR32Sint;
+      case glslang::TBasicType::EbtUint:
+          return Format::eR32Uint;
       default:
         break;
       }
@@ -192,6 +194,7 @@ namespace tge::shader
     VulkanShaderPipe *shaderPipe;
     const ShaderStageFlags flags;
     std::unordered_set<uint32_t> uset;
+    bool pushConst = false;
 
     GeneralShaderAnalizer(VulkanShaderPipe *pipe, ShaderStageFlags flags)
         : glslang::TIntermTraverser(false, true, false), shaderPipe(pipe),
@@ -215,6 +218,16 @@ namespace tge::shader
         const DescriptorSetLayoutBinding descBinding(
             quali.layoutBinding, desc.first, desc.second, flags);
         shaderPipe->descriptorLayoutBindings.push_back(descBinding);
+      }
+      else if (quali.isPushConstant() && !pushConst) {
+          pushConst = true;
+          const auto &structure = *type.getStruct();
+          uint32_t size = 0;
+          for (const auto &type : structure) {
+              size += getSizeFromFormat(getFormatFromElf(*type.type));
+          }
+          const PushConstantRange range(flags, 0, size);
+          shaderPipe->constranges.push_back(range);
       }
     }
   };
@@ -370,7 +383,7 @@ namespace tge::shader
       const auto descPool = vgm->device.createDescriptorPool(descPoolCreateInfo);
       vsm->descPools.push_back(descPool);
 
-      const auto layoutCreateInfo = PipelineLayoutCreateInfo({}, descLayout);
+      const auto layoutCreateInfo = PipelineLayoutCreateInfo({}, descLayout, shaderPipe->constranges);
       const auto pipeLayout = vgm->device.createPipelineLayout(layoutCreateInfo);
       vsm->pipeLayouts.push_back(pipeLayout);
       shaderPipe->layoutID = vsm->pipeLayouts.size() - 1;

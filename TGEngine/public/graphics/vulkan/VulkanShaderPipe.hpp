@@ -26,6 +26,7 @@ struct VulkanShaderPipe {
   PipelineVertexInputStateCreateInfo inputStateCreateInfo;
   PipelineRasterizationStateCreateInfo rasterization;
   std::vector<DescriptorSetLayoutBinding> descriptorLayoutBindings;
+  std::vector<PushConstantRange> constranges;
   size_t layoutID = UINT64_MAX;
   bool needsDefaultBindings = true;
 };
@@ -34,6 +35,7 @@ inline uint32_t getSizeFromFormat(const Format format)
 {
     switch (format)
     {
+    case Format::eR32Uint:
     case Format::eR32Sfloat:
     case Format::eR32Sint:
         return 4;

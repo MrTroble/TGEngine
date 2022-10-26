@@ -8,6 +8,7 @@
 
 namespace tge::shader {
 class ShaderAPI;
+enum class ShaderType;
 }
 
 namespace tge::graphics {
@@ -15,6 +16,12 @@ namespace tge::graphics {
 class GameGraphicsModule;
 
 enum class IndexSize { UINT16, UINT32, NONE };
+
+struct PushConstRanges {
+    size_t pushConstSize = 0;
+    void* pushConstData = nullptr;
+    shader::ShaderType type;
+};
 
 struct RenderInfo {
   std::vector<size_t> vertexBuffer;
@@ -27,6 +34,7 @@ struct RenderInfo {
   std::vector<size_t> vertexOffsets;
   size_t bindingID = UINT64_MAX;
   size_t firstInstance = 0;
+  std::vector<PushConstRanges> constRanges;
 };
 
 struct TextureInfo {

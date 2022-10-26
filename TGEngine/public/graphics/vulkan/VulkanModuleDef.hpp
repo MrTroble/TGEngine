@@ -65,6 +65,7 @@ public:
   std::vector<ImageView> textureImageViews;
   std::vector<shader::ShaderPipe> shaderPipes;
   std::vector<CommandBuffer> primary = {CommandBuffer()};
+  std::vector<vk::PipelineLayout> materialToLayout;
 
   size_t firstImage;
   size_t depthImage;
@@ -120,8 +121,6 @@ public:
                     const size_t offset = 0) override;
 
   void *loadShader(const MaterialType type) override;
-
-  void recreate() override;
 };
 
 } // namespace tge::graphics

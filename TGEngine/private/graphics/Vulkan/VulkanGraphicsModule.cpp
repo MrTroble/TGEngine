@@ -7,6 +7,7 @@
 #include <mutex>
 #define VULKAN_HPP_HAS_SPACESHIP_OPERATOR
 #include "../../../public/graphics/vulkan/VulkanModuleDef.hpp"
+#include "../../../public/graphics/vulkan/VulkanShaderModule.hpp"
 #include <unordered_set>
 #include "../../../public/TGEngine.hpp"
 #include "../../../public/Error.hpp"
@@ -83,13 +84,6 @@ namespace tge::graphics
 		return ptr;
 	}
 
-	void VulkanGraphicsModule::recreate() {
-		const auto capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
-		viewport = Viewport(0, 0, capabilities.currentExtent.width,
-			capabilities.currentExtent.height, 0, 1.0f);
-		printf("Viewport change!");
-	}
-
 	size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
 											   const Material *materials)
 	{
@@ -127,6 +121,7 @@ namespace tge::graphics
 
 		std::vector<PipelineInputAssemblyStateCreateInfo> input;
 		input.resize(materialcount);
+		this->materialToLayout.reserve(this->materialToLayout.size() + materialcount);
 		for (size_t i = 0; i < materialcount; i++)
 		{
 			const auto &material = materials[i];
@@ -173,6 +168,7 @@ namespace tge::graphics
 			shaderAPI->addToMaterial(&material, &gpipeCreateInfo);
 			pipelineCreateInfos.push_back(gpipeCreateInfo);
 			shaderPipes.push_back(shaderPipe);
+			this->materialToLayout.push_back(gpipeCreateInfo.layout);
 		}
 
 		const auto piperesult =
@@ -185,6 +181,16 @@ namespace tge::graphics
 		return indexOffset;
 	}
 
+	inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
+		switch (type) {
+		case shader::ShaderType::VERTEX:
+			return vk::ShaderStageFlagBits::eVertex;
+		case shader::ShaderType::FRAGMENT:
+			return vk::ShaderStageFlagBits::eFragment;
+		}
+		throw std::runtime_error("Error shader translation not implemented!");
+	}
+
 	void VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
 										  const RenderInfo *renderInfos,
 										  const size_t offset)
@@ -193,11 +199,11 @@ namespace tge::graphics
 
 		const CommandBufferAllocateInfo commandBufferAllocate(
 			pool, CommandBufferLevel::eSecondary, 1);
+		const auto indexIn = this->secondaryCommandBuffer.size() -offset;
 		const CommandBuffer cmdBuf =
 			offset == 0
 				? device.allocateCommandBuffers(commandBufferAllocate).back()
-				: this->secondaryCommandBuffer[this->secondaryCommandBuffer.size() -
-											   offset];
+				: this->secondaryCommandBuffer[indexIn];
 
 		const CommandBufferInheritanceInfo inheritance(renderpass, 0);
 		const CommandBufferBeginInfo beginInfo(
@@ -243,6 +249,11 @@ namespace tge::graphics
 
 			cmdBuf.bindPipeline(PipelineBindPoint::eGraphics,
 								pipelines[info.materialId]);
+
+			for (const auto& range : info.constRanges) {
+				VulkanShaderModule* shaderMod = (VulkanShaderModule*)shaderAPI;
+				cmdBuf.pushConstants(this->materialToLayout[info.materialId], shaderToVulkan(range.type), 0, range.pushConstSize, range.pushConstData);
+			}
 
 			if (info.indexSize != IndexSize::NONE) [[likely]]
 			{
@@ -726,6 +737,7 @@ namespace tge::graphics
 		VERROR(gp.result)
 		vgm->lightPipe = vgm->pipelines.size();
 		vgm->pipelines.push_back(gp.value);
+		vgm->materialToLayout.push_back(graphicsPipeline.layout);
 	}
 
 	inline void oneTimeWait(VulkanGraphicsModule *vgm, size_t count)
@@ -793,10 +805,10 @@ namespace tge::graphics
 			{Format::eR8G8B8A8Snorm, ext,
 			 ImageUsageFlagBits::eColorAttachment |
 				 ImageUsageFlagBits::eInputAttachment},
-			{Format::eR8G8B8A8Snorm, ext,
+			{Format::eR32Sfloat, ext,
 			 ImageUsageFlagBits::eColorAttachment |
 				 ImageUsageFlagBits::eInputAttachment},
-			{Format::eR8G8B8A8Snorm, ext,
+			{Format::eR32Sfloat, ext,
 			 ImageUsageFlagBits::eColorAttachment |
 				 ImageUsageFlagBits::eInputAttachment}};
 
@@ -1083,12 +1095,12 @@ namespace tge::graphics
 				AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
 				ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
 			AttachmentDescription(
-				{}, Format::eR8G8B8A8Snorm, SampleCountFlagBits::e1,
+				{}, Format::eR32Sfloat, SampleCountFlagBits::e1,
 				AttachmentLoadOp::eClear, AttachmentStoreOp::eDontCare,
 				AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
 				ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
 			AttachmentDescription(
-				{}, Format::eR8G8B8A8Snorm, SampleCountFlagBits::e1,
+				{}, Format::eR32Sfloat, SampleCountFlagBits::e1,
 				AttachmentLoadOp::eClear, AttachmentStoreOp::eDontCare,
 				AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
 				ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
@@ -1203,6 +1215,7 @@ namespace tge::graphics
 				clearValue);
 			currentBuffer.beginRenderPass(renderPassBeginInfo,
 										  SubpassContents::eSecondaryCommandBuffers);
+
 			const std::lock_guard onExitUnlock(commandBufferRecording);
 			if (!secondaryCommandBuffer.empty())
 			{
@@ -1211,13 +1224,13 @@ namespace tge::graphics
 
 			currentBuffer.nextSubpass(SubpassContents::eInline);
 
-			currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
-									   pipelines[lightPipe]);
-
 			currentBuffer.setViewport(0, this->viewport);
 
-			const Rect2D scissor({}, {(uint32_t)viewport.width, (uint32_t)viewport.height});
+			const Rect2D scissor({}, { (uint32_t)viewport.width, (uint32_t)viewport.height });
 			currentBuffer.setScissor(0, scissor);
+
+			currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
+									   pipelines[lightPipe]);
 
 			const std::array lights = {lightBindings};
 			getShaderAPI()->addToRender(lights.data(), lights.size(),
