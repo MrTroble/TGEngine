@@ -121,9 +121,14 @@ public:
                                        const Light *lights,
                                        const size_t offset = 0) = 0;
 
+  _NODISCARD virtual size_t getAligned(const size_t buffer, const size_t toBeAligned) = 0;
+
+  _NODISCARD virtual size_t getAligned(const DataType type) = 0;
+
   _NODISCARD GameGraphicsModule *getGraphicsModule() { return graphicsModule; };
 
   _NODISCARD shader::ShaderAPI *getShaderAPI() { return this->shaderAPI; }
+
 };
 
 } // namespace tge::graphics

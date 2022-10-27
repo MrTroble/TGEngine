@@ -787,7 +787,8 @@ namespace tge::shader
       case BindingType::Storage:
       case BindingType::UniformBuffer:
       {
-        const auto &buffI = cinfo.data.buffer;
+        const auto& buffI = cinfo.data.buffer;
+
         bufferInfo[i] = (DescriptorBufferInfo(vgm->bufferList[buffI.dataID],
                                               buffI.offset, buffI.size));
         set.push_back(WriteDescriptorSet(

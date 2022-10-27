@@ -49,6 +49,7 @@ class GameGraphicsModule : public main::Module {
   std::vector<size_t> bindingID;
   std::vector<char> status; // jesus fuck not going to use a bool here
   size_t dataID = UINT64_MAX;
+  uint32_t alignment = 1;
 
 public:
   size_t defaultMaterial;

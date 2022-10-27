@@ -54,6 +54,7 @@ public:
   uint32_t memoryTypeDeviceLocal;
   std::vector<Buffer> bufferList;
   std::vector<size_t> bufferSizeList;
+  std::vector<size_t> alignment;
   std::vector<DeviceMemory> bufferMemoryList;
   Viewport viewport;
   std::vector<CommandBuffer> secondaryCommandBuffer;
@@ -121,6 +122,10 @@ public:
                     const size_t offset = 0) override;
 
   void *loadShader(const MaterialType type) override;
+
+  size_t getAligned(const size_t buffer, const size_t toBeAligned=0) override;
+
+  size_t getAligned(const DataType type) override;
 };
 
 } // namespace tge::graphics

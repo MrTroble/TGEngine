@@ -464,16 +464,18 @@ main::Error GameGraphicsModule::init() {
   const auto size = this->node.size();
   glm::mat4 projView = this->projectionMatrix * this->viewMatrix;
   modelMatrices.reserve(UINT16_MAX);
+  this->alignment = (uint32_t)ceil(this->apiLayer->getAligned(tge::graphics::DataType::Uniform) / sizeof(glm::mat4));
+  printf("Alignment: %d\n", this->alignment);
   for (size_t i = 0; i < size; i++) {
     const auto &transform = this->node[i];
-    const auto parantID = this->parents[i];
+    const auto parantID = this->parents[i] * alignment;
     const auto mMatrix = glm::translate(transform.translation) *
                          glm::scale(transform.scale) *
                          glm::toMat4(transform.rotation);
     if (parantID < size) {
-      modelMatrices[i] = modelMatrices[parantID] * mMatrix;
+      modelMatrices[i * alignment] = modelMatrices[parantID] * mMatrix;
     } else {
-      modelMatrices[i] = mMatrix;
+      modelMatrices[i * alignment] = mMatrix;
     }
   }
 
@@ -506,7 +508,7 @@ void GameGraphicsModule::tick(double time) {
         modelMatrices[i] = mMatrix;
       }
       apiLayer->changeData(dataID, (const uint8_t *)&modelMatrices[i],
-                           sizeof(glm::mat4), i * sizeof(glm::mat4));
+                           sizeof(glm::mat4), i * sizeof(glm::mat4) * alignment);
     }
   }
   std::fill(begin(this->status), end(this->status), 0);
@@ -939,7 +941,7 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
     status.push_back(0);
     if (nodeI.bindingID != UINT64_MAX) [[likely]] {
       const auto mvp = modelMatrices[nodeID];
-      const auto off = sizeof(mvp) * (nodeID + i);
+      const auto off = sizeof(mvp) * (nodeID + i) * alignment;
       apiLayer->changeData(dataID, (const uint8_t *)&mvp, sizeof(mvp), off);
       bindings.push_back({2,
                           nodeI.bindingID,

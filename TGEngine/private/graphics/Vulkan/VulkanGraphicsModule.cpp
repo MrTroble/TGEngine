@@ -75,6 +75,30 @@ namespace tge::graphics
 								 __FILE__ + " L" + std::to_string(__LINE__)); \
 	}
 
+	size_t VulkanGraphicsModule::getAligned(const DataType type) {
+		const auto properties = this->physicalDevice.getProperties();
+		switch (type)
+		{
+		case DataType::All:
+		case DataType::Uniform:
+			return properties.limits.minUniformBufferOffsetAlignment;
+		case DataType::VertexData:
+		case DataType::IndexData:
+		case DataType::VertexIndexData:
+			return 0;
+		default:
+			break;
+		}
+		throw std::runtime_error("Not implemented!");
+	}
+
+	size_t VulkanGraphicsModule::getAligned(const size_t buffer, const size_t toBeAligned) {
+		EXPECT(buffer < alignment.size());
+		const auto align = alignment[buffer];
+		const auto rest = toBeAligned % align;
+		return toBeAligned + (align - rest);
+	}
+
 	void *VulkanGraphicsModule::loadShader(const MaterialType type)
 	{
 		EXPECT(((size_t)type) <= (size_t)MAX_TYPE);
@@ -329,6 +353,7 @@ namespace tge::graphics
 		bufferList.reserve(firstIndex + dataCount);
 		const auto firstMemIndex = bufferMemoryList.size();
 		bufferMemoryList.reserve(firstMemIndex + dataCount);
+		alignment.reserve(alignment.size() + dataCount);
 
 		const auto cmdBuf = cmdbuffer.back();
 
@@ -373,6 +398,7 @@ namespace tge::graphics
 			device.bindBufferMemory(localBuffer, localMem, 0);
 			bufferMemoryList.push_back(localMem);
 			bufferSizeList.push_back(size);
+			alignment.push_back(memRequLocal.alignment);
 
 			const BufferCopy copyInfo(0, 0, size);
 			cmdBuf.copyBuffer(intermBuffer, localBuffer, copyInfo);
