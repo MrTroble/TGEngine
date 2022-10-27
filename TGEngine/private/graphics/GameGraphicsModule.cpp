@@ -858,7 +858,7 @@ inline size_t fromDXGI(ddspp::DXGIFormat format) {
     default:
         break;
     }
-    return -1;
+    throw std::runtime_error("Translation table not found for DXGI!");
 }
 
 std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>>& data) {

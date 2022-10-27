@@ -1,6 +1,6 @@
 #include "../public/Util.hpp"
-#include <fstream>
 #include <algorithm>
+#include <fstream>
 #include <string>
 
 namespace tge::util
@@ -15,14 +15,15 @@ wholeFile (const fs::path &path)
                              std::ios::ate | std::ios::in | std::ios::binary);
   if (!inputstream)
     {
-      std::string search = path.generic_string();
+      std::string search = path.generic_string ();
       std::transform (search.begin (), search.end (), search.begin (),
                       [] (unsigned char c) {
-                        if(c == '\\')
+                        if (c == '\\')
                           return '/';
-                        return (char)std::tolower (c); 
-                        });
-      inputstream = std::ifstream (search);
+                        return (char)std::tolower (c);
+                      });
+      inputstream = std::ifstream (search, std::ios::ate | std::ios::in
+                                               | std::ios::binary);
       if (!inputstream)
         {
 #ifdef DEBUG
