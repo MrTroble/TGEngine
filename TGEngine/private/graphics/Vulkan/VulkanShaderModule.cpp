@@ -377,7 +377,7 @@ namespace tge::shader
       for (const auto &binding : shaderPipe->descriptorLayoutBindings)
       {
         descPoolSizes.push_back(
-            {binding.descriptorType, binding.descriptorCount});
+            {binding.descriptorType, binding.descriptorCount * 1000});
       }
       const DescriptorPoolCreateInfo descPoolCreateInfo({}, 1000, descPoolSizes);
       const auto descPool = vgm->device.createDescriptorPool(descPoolCreateInfo);
