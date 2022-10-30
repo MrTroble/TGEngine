@@ -15,13 +15,6 @@ FETCHCONTENT_DECLARE(
   googletest
   URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
 )
-message("Downloading vulkansdk")
-FETCHCONTENT_DECLARE(
-	vulkansdk
-	URL https://seafile.media-dienste.de/f/85da9d3e98b347a490f6/?dl=1
-
-	BUILD_COMMAND ""
-)
 
 FETCHCONTENT_DECLARE(
 	glm
@@ -37,7 +30,6 @@ FETCHCONTENT_DECLARE(
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FETCHCONTENT_MAKEAVAILABLE(googletest)
-FETCHCONTENT_MAKEAVAILABLE(vulkansdk)
 FETCHCONTENT_MAKEAVAILABLE(imgui)
 FETCHCONTENT_MAKEAVAILABLE(glm)
 
@@ -94,15 +86,32 @@ list(APPEND ENGINE_DATA
 endif()
 
 add_library (TGEngine STATIC ${ENGINE_DATA})
-target_link_libraries(TGEngine PUBLIC glslang shaderc_combined SPIRV glm)
+include(FindVulkan)
+
 if(WIN32)
-target_include_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Include" "${imgui_SOURCE_DIR}")
+if(NOT Vulkan_FOUND)
+message(WARNING "Vulkan SDK instalation not found")
+message("Downloading vulkansdk")
+FETCHCONTENT_DECLARE(
+	vulkansdk
+	URL https://seafile.media-dienste.de/f/85da9d3e98b347a490f6/?dl=1
+
+	BUILD_COMMAND ""
+)
+FETCHCONTENT_MAKEAVAILABLE(vulkansdk)
+target_include_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Include")
 target_link_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Lib")
+else()
+target_include_directories(TGEngine PUBLIC ${Vulkan_INCLUDE_DIRS})
+target_link_directories(TGEngine PUBLIC "$ENV{VULKAN_SDK}/Lib") 
+endif()
 target_link_libraries(TGEngine PUBLIC vulkan-1)
 else()
 target_link_libraries(TGEngine PUBLIC glslang-default-resource-limits vulkan m ${X11_X11_LIB})
-target_include_directories(TGEngine PUBLIC "usr/include" "${imgui_SOURCE_DIR}")
+target_include_directories(TGEngine PUBLIC "usr/include")
 endif()
+target_include_directories(TGEngine PUBLIC "${imgui_SOURCE_DIR}")
+target_link_libraries(TGEngine PUBLIC glslang shaderc_combined SPIRV glm)
 
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>)
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>/..)
