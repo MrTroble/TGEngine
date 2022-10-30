@@ -1017,6 +1017,12 @@ namespace tge::graphics
 			  FormatFeatureFlagBits::eColorAttachment))
 			return main::Error::FORMAT_NOT_SUPPORTED;
 
+		const auto float32Props =
+			this->physicalDevice.getFormatProperties(Format::eR32Sfloat);
+		if (!(float32Props.optimalTilingFeatures &
+			FormatFeatureFlagBits::eColorAttachment))
+			return main::Error::FORMAT_NOT_SUPPORTED;
+
 #pragma endregion
 
 #pragma region Queue, Surface, Prepipe, MemTypes
@@ -1085,9 +1091,9 @@ namespace tge::graphics
 #pragma endregion
 
 #pragma region Depth and Output Attachments
-		constexpr std::array potentialDepthFormat = {
-			Format::eD32Sfloat, Format::eD32SfloatS8Uint, Format::eD24UnormS8Uint,
-			Format::eD16Unorm, Format::eD16UnormS8Uint};
+		constexpr std::array potentialDepthFormat = { Format::eD32Sfloat, Format::eD16Unorm,
+			Format::eD32SfloatS8Uint, Format::eD24UnormS8Uint,
+			Format::eD16UnormS8Uint};
 		for (const Format pDF : potentialDepthFormat)
 		{
 			const FormatProperties fProp = physicalDevice.getFormatProperties(pDF);
