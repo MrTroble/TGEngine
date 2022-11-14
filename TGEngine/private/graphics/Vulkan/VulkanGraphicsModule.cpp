@@ -17,11 +17,11 @@ namespace tge::graphics
 
 	using namespace tge::shader;
 
-	constexpr std::array layerToEnable = {"VK_LAYER_KHRONOS_validation",
-										  "VK_LAYER_VALVE_steam_overlay",
-										  "VK_LAYER_NV_optimus"};
+	constexpr std::array layerToEnable = {
+		"VK_LAYER_KHRONOS_validation"
+	};
 
-	constexpr std::array extensionToEnable = {VK_KHR_SURFACE_EXTENSION_NAME
+	constexpr std::array extensionToEnable = { VK_KHR_SURFACE_EXTENSION_NAME
 #ifdef WIN32
 											  ,
 											  VK_KHR_WIN32_SURFACE_EXTENSION_NAME
@@ -53,9 +53,9 @@ namespace tge::graphics
 	} // namespace tge::graphics
 
 	inline void waitForImageTransition(
-		const CommandBuffer &curBuffer, const ImageLayout oldLayout,
+		const CommandBuffer& curBuffer, const ImageLayout oldLayout,
 		const ImageLayout newLayout, const Image image,
-		const ImageSubresourceRange &subresource,
+		const ImageSubresourceRange& subresource,
 		const PipelineStageFlags srcFlags = PipelineStageFlagBits::eTopOfPipe,
 		const AccessFlags srcAccess = AccessFlagBits::eNoneKHR,
 		const PipelineStageFlags dstFlags = PipelineStageFlagBits::eAllGraphics,
@@ -65,7 +65,7 @@ namespace tge::graphics
 			srcAccess, dstAccess, oldLayout, newLayout, VK_QUEUE_FAMILY_IGNORED,
 			VK_QUEUE_FAMILY_IGNORED, image, subresource);
 		curBuffer.pipelineBarrier(srcFlags, dstFlags, DependencyFlagBits::eByRegion,
-								  {}, {}, imageMemoryBarrier);
+			{}, {}, imageMemoryBarrier);
 	}
 
 #define EXPECT(assertion)                                                     \
@@ -99,24 +99,24 @@ namespace tge::graphics
 		return toBeAligned + (align - rest);
 	}
 
-	void *VulkanGraphicsModule::loadShader(const MaterialType type)
+	void* VulkanGraphicsModule::loadShader(const MaterialType type)
 	{
 		EXPECT(((size_t)type) <= (size_t)MAX_TYPE);
 		const auto idx = (size_t)type;
-		auto &vert = shaderNames[idx];
+		auto& vert = shaderNames[idx];
 		const auto ptr = shaderAPI->loadShaderPipeAndCompile(vert);
 		return ptr;
 	}
 
 	size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
-											   const Material *materials)
+		const Material* materials, const size_t offset)
 	{
 		EXPECT(materialcount != 0 && materials != nullptr);
 
-		const Rect2D scissor({0, 0},
-							 {(uint32_t)viewport.width, (uint32_t)viewport.height});
+		const Rect2D scissor({ 0, 0 },
+			{ (uint32_t)viewport.width, (uint32_t)viewport.height });
 		const PipelineViewportStateCreateInfo pipelineViewportCreateInfo({}, viewport,
-																		 scissor);
+			scissor);
 
 		const PipelineMultisampleStateCreateInfo multisampleCreateInfo(
 			{}, SampleCountFlagBits::e1, false, 1);
@@ -131,7 +131,7 @@ namespace tge::graphics
 			BlendOp::eAdd, BlendFactor::eOne, BlendFactor::eZero, BlendOp::eAdd,
 			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags);
 
-		const std::array blendAttachment = {pDefaultState, pOverrideState,
+		const std::array blendAttachment = { pDefaultState, pOverrideState,
 											pOverrideState, pOverrideState };
 
 		const PipelineColorBlendStateCreateInfo colorBlendState(
@@ -145,19 +145,22 @@ namespace tge::graphics
 
 		std::vector<PipelineInputAssemblyStateCreateInfo> input;
 		input.resize(materialcount);
-		this->materialToLayout.reserve(this->materialToLayout.size() + materialcount);
+
+		const auto indexOffset = offset == SIZE_MAX ? pipelines.size() : offset;
+		this->materialToLayout.resize(indexOffset + materialcount);
+
 		for (size_t i = 0; i < materialcount; i++)
 		{
-			const auto &material = materials[i];
+			const auto& material = materials[i];
 
-			const auto shaderPipe = (VulkanShaderPipe *)material.costumShaderData;
+			const auto shaderPipe = (VulkanShaderPipe*)material.costumShaderData;
 
 			shaderPipe->pipelineShaderStage.clear();
 			shaderPipe->pipelineShaderStage.reserve(shaderPipe->shader.size());
 
-			for (const auto &shaderPair : shaderPipe->shader)
+			for (const auto& shaderPair : shaderPipe->shader)
 			{
-				const auto &shaderData = shaderPair.first;
+				const auto& shaderData = shaderPair.first;
 
 				const ShaderModuleCreateInfo shaderModuleCreateInfo(
 					{}, shaderData.size() * sizeof(uint32_t), shaderData.data());
@@ -174,14 +177,14 @@ namespace tge::graphics
 			shaderPipe->rasterization.depthClampEnable = false;
 			shaderPipe->rasterization.rasterizerDiscardEnable = false;
 			shaderPipe->rasterization.cullMode = material.doubleSided
-													 ? CullModeFlagBits::eNone
-													 : CullModeFlagBits::eFront;
+				? CullModeFlagBits::eNone
+				: CullModeFlagBits::eFront;
 
 			input[i] = PipelineInputAssemblyStateCreateInfo(
 				{},
 				material.primitiveType == UINT32_MAX
-					? PrimitiveTopology::eTriangleList
-					: (PrimitiveTopology)(material.primitiveType),
+				? PrimitiveTopology::eTriangleList
+				: (PrimitiveTopology)(material.primitiveType),
 				false);
 
 			GraphicsPipelineCreateInfo gpipeCreateInfo(
@@ -192,16 +195,29 @@ namespace tge::graphics
 			shaderAPI->addToMaterial(&material, &gpipeCreateInfo);
 			pipelineCreateInfos.push_back(gpipeCreateInfo);
 			shaderPipes.push_back(shaderPipe);
-			this->materialToLayout.push_back(gpipeCreateInfo.layout);
+			this->materialToLayout[i + indexOffset] = gpipeCreateInfo.layout;
 		}
 
 		const auto piperesult =
 			device.createGraphicsPipelines({}, pipelineCreateInfos);
 		VERROR(piperesult.result);
-		const auto indexOffset = pipelines.size();
-		pipelines.resize(indexOffset + piperesult.value.size());
+
+		const auto newSize = indexOffset + piperesult.value.size();
+		pipelines.resize(newSize);
+		materialsForRetry.resize(newSize);
+		for (size_t i = indexOffset; i < newSize; i++)
+		{
+			const auto currentPipe = pipelines[i];
+			if (currentPipe)
+				device.destroy(currentPipe);
+		}
 		std::copy(piperesult.value.cbegin(), piperesult.value.cend(),
-				  pipelines.begin() + indexOffset);
+			pipelines.begin() + indexOffset);
+
+		for (size_t i = 0; i < materialcount; i++)
+		{
+			materialsForRetry[i + indexOffset] = materials[i];
+		}
 		return indexOffset;
 	}
 
@@ -216,18 +232,18 @@ namespace tge::graphics
 	}
 
 	void VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
-										  const RenderInfo *renderInfos,
-										  const size_t offset)
+		const RenderInfo* renderInfos,
+		const size_t offset)
 	{
 		EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
 
 		const CommandBufferAllocateInfo commandBufferAllocate(
 			pool, CommandBufferLevel::eSecondary, 1);
-		const auto indexIn = this->secondaryCommandBuffer.size() -offset;
+		const auto indexIn = this->secondaryCommandBuffer.size() - offset;
 		const CommandBuffer cmdBuf =
 			offset == 0
-				? device.allocateCommandBuffers(commandBufferAllocate).back()
-				: this->secondaryCommandBuffer[indexIn];
+			? device.allocateCommandBuffers(commandBufferAllocate).back()
+			: this->secondaryCommandBuffer[indexIn];
 
 		const CommandBufferInheritanceInfo inheritance(renderpass, 0);
 		const CommandBufferBeginInfo beginInfo(
@@ -235,7 +251,7 @@ namespace tge::graphics
 		cmdBuf.begin(beginInfo);
 		for (size_t i = 0; i < renderInfoCount; i++)
 		{
-			auto &info = renderInfos[i];
+			auto& info = renderInfos[i];
 
 			std::vector<Buffer> vertexBuffer;
 			vertexBuffer.reserve(info.vertexBuffer.size());
@@ -256,23 +272,23 @@ namespace tge::graphics
 				else
 				{
 					TGE_EXPECT_N(vertexBuffer.size() == info.vertexOffsets.size(), "Size is not equal!");
-					cmdBuf.bindVertexBuffers(0, vertexBuffer.size(), vertexBuffer.data(), (DeviceSize *)info.vertexOffsets.data());
+					cmdBuf.bindVertexBuffers(0, vertexBuffer.size(), vertexBuffer.data(), (DeviceSize*)info.vertexOffsets.data());
 				}
 			}
 
 			if (info.bindingID != UINT64_MAX)
 			{
-				shaderAPI->addToRender(&info.bindingID, 1, (void *)&cmdBuf);
+				shaderAPI->addToRender(&info.bindingID, 1, (void*)&cmdBuf);
 			}
 			else
 			{
 				const auto binding =
 					shaderAPI->createBindings(shaderPipes[info.materialId]);
-				shaderAPI->addToRender(&binding, 1, (void *)&cmdBuf);
+				shaderAPI->addToRender(&binding, 1, (void*)&cmdBuf);
 			}
 
 			cmdBuf.bindPipeline(PipelineBindPoint::eGraphics,
-								pipelines[info.materialId]);
+				pipelines[info.materialId]);
 
 			for (const auto& range : info.constRanges) {
 				VulkanShaderModule* shaderMod = (VulkanShaderModule*)shaderAPI;
@@ -282,10 +298,10 @@ namespace tge::graphics
 			if (info.indexSize != IndexSize::NONE) [[likely]]
 			{
 				cmdBuf.bindIndexBuffer(bufferList[info.indexBuffer], info.indexOffset,
-									   (IndexType)info.indexSize);
+					(IndexType)info.indexSize);
 
 				cmdBuf.drawIndexed(info.indexCount, info.instanceCount, 0, 0,
-								   info.firstInstance);
+					info.firstInstance);
 			}
 			else
 			{
@@ -298,10 +314,14 @@ namespace tge::graphics
 			const std::lock_guard onExitUnlock(commandBufferRecording);
 			secondaryCommandBuffer.push_back(cmdBuf);
 		}
+		
+		if(renderInfosForRetry.size() <= indexIn)
+			renderInfosForRetry.resize(indexIn + 1);
+		renderInfosForRetry[indexIn] = std::vector(renderInfos, renderInfos + renderInfoCount);
 	}
 
-	inline void submitAndWait(const Device &device, const Queue &queue,
-							  const CommandBuffer &cmdBuf)
+	inline void submitAndWait(const Device& device, const Queue& queue,
+		const CommandBuffer& cmdBuf)
 	{
 		const FenceCreateInfo fenceCreateInfo;
 		const auto fence = device.createFence(fenceCreateInfo);
@@ -321,7 +341,7 @@ namespace tge::graphics
 		{
 		case DataType::VertexIndexData:
 			return BufferUsageFlagBits::eVertexBuffer |
-				   BufferUsageFlagBits::eIndexBuffer;
+				BufferUsageFlagBits::eIndexBuffer;
 		case DataType::Uniform:
 			return BufferUsageFlagBits::eUniformBuffer;
 		case DataType::VertexData:
@@ -330,17 +350,17 @@ namespace tge::graphics
 			return BufferUsageFlagBits::eIndexBuffer;
 		case DataType::All:
 			return BufferUsageFlagBits::eVertexBuffer |
-				   BufferUsageFlagBits::eIndexBuffer |
-				   BufferUsageFlagBits::eUniformBuffer |
-				   BufferUsageFlagBits::eStorageBuffer;
+				BufferUsageFlagBits::eIndexBuffer |
+				BufferUsageFlagBits::eUniformBuffer |
+				BufferUsageFlagBits::eStorageBuffer;
 		default:
 			throw std::runtime_error("Couldn't find usage flag");
 		}
 	}
 
-	size_t VulkanGraphicsModule::pushData(const size_t dataCount, void *data,
-										  const size_t *dataSizes,
-										  const DataType type)
+	size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
+		const size_t* dataSizes,
+		const DataType type)
 	{
 		EXPECT(dataCount != 0 && data != nullptr && dataSizes != nullptr);
 
@@ -366,7 +386,7 @@ namespace tge::graphics
 		for (size_t i = 0; i < dataCount; i++)
 		{
 			const auto size = dataSizes[i];
-			const auto dataptr = ((const uint8_t **)data)[i];
+			const auto dataptr = ((const uint8_t**)data)[i];
 
 			const BufferCreateInfo bufferCreateInfo(
 				{}, size, BufferUsageFlagBits::eTransferSrc, SharingMode::eExclusive);
@@ -375,7 +395,7 @@ namespace tge::graphics
 			const auto memRequ = device.getBufferMemoryRequirements(intermBuffer);
 
 			const MemoryAllocateInfo allocInfo(memRequ.size,
-											   memoryTypeHostVisibleCoherent);
+				memoryTypeHostVisibleCoherent);
 			const auto hostVisibleMemory = device.allocateMemory(allocInfo);
 			tempMemory.push_back(hostVisibleMemory);
 			device.bindBufferMemory(intermBuffer, hostVisibleMemory, 0);
@@ -387,13 +407,13 @@ namespace tge::graphics
 			const BufferCreateInfo bufferLocalCreateInfo(
 				{}, size,
 				BufferUsageFlagBits::eTransferDst | BufferUsageFlagBits::eTransferSrc |
-					bufferUsage,
+				bufferUsage,
 				SharingMode::eExclusive);
 			const auto localBuffer = device.createBuffer(bufferLocalCreateInfo);
 			bufferList.push_back(localBuffer);
 			const auto memRequLocal = device.getBufferMemoryRequirements(localBuffer);
 			const MemoryAllocateInfo allocLocalInfo(memRequLocal.size,
-													memoryTypeDeviceLocal);
+				memoryTypeDeviceLocal);
 			const auto localMem = device.allocateMemory(allocLocalInfo);
 			device.bindBufferMemory(localBuffer, localMem, 0);
 			bufferMemoryList.push_back(localMem);
@@ -417,25 +437,25 @@ namespace tge::graphics
 	}
 
 	void VulkanGraphicsModule::changeData(const size_t bufferIndex,
-										  const void *data, const size_t dataSizes,
-										  const size_t offset)
+		const void* data, const size_t dataSizes,
+		const size_t offset)
 	{
 		EXPECT(bufferIndex >= 0 && bufferIndex < this->bufferList.size() &&
-			   data != nullptr && dataSizes != 0);
+			data != nullptr && dataSizes != 0);
 
 		const BufferCreateInfo bufferCreateInfo({}, dataSizes,
-												BufferUsageFlagBits::eTransferSrc,
-												SharingMode::eExclusive);
+			BufferUsageFlagBits::eTransferSrc,
+			SharingMode::eExclusive);
 		const auto intermBuffer = device.createBuffer(bufferCreateInfo);
 		const auto memRequ = device.getBufferMemoryRequirements(intermBuffer);
 
 		const MemoryAllocateInfo allocInfo(memRequ.size,
-										   memoryTypeHostVisibleCoherent);
+			memoryTypeHostVisibleCoherent);
 		const auto hostVisibleMemory = device.allocateMemory(allocInfo);
 		device.bindBufferMemory(intermBuffer, hostVisibleMemory, 0);
 		const auto mappedHandle =
 			device.mapMemory(hostVisibleMemory, 0, VK_WHOLE_SIZE);
-		glm::mat4 mat = *(glm::mat4 *)data;
+		glm::mat4 mat = *(glm::mat4*)data;
 
 		memcpy(mappedHandle, data, dataSizes);
 
@@ -458,7 +478,7 @@ namespace tge::graphics
 		device.destroyBuffer(intermBuffer);
 	}
 
-	size_t VulkanGraphicsModule::pushSampler(const SamplerInfo &sampler)
+	size_t VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler)
 	{
 		const auto position = this->sampler.size();
 		const SamplerCreateInfo samplerCreateInfo(
@@ -480,18 +500,18 @@ namespace tge::graphics
 	};
 
 	inline size_t
-	createInternalImages(VulkanGraphicsModule *vgm,
-						 const std::vector<InternalImageInfo> &imagesIn)
+		createInternalImages(VulkanGraphicsModule* vgm,
+			const std::vector<InternalImageInfo>& imagesIn)
 	{
 		std::vector<std::tuple<ImageViewCreateInfo, size_t>> memorys;
 		size_t wholeSize = 0;
 
 		const auto firstIndex = vgm->textureImages.size();
 
-		for (const auto &img : imagesIn)
+		for (const auto& img : imagesIn)
 		{
 			const ImageCreateInfo depthImageCreateInfo(
-				{}, ImageType::e2D, img.format, {img.ex.width, img.ex.height, 1}, 1, 1,
+				{}, ImageType::e2D, img.format, { img.ex.width, img.ex.height, 1 }, 1, 1,
 				img.sampleCount, ImageTiling::eOptimal, img.usage);
 			const auto depthImage = vgm->device.createImage(depthImageCreateInfo);
 
@@ -500,12 +520,12 @@ namespace tge::graphics
 
 			const ImageAspectFlags aspect =
 				((img.usage & ImageUsageFlagBits::eColorAttachment ||
-				  img.usage & ImageUsageFlagBits::eSampled)
-					 ? ImageAspectFlagBits::eColor
-					 : (ImageAspectFlagBits)0) |
+					img.usage & ImageUsageFlagBits::eSampled)
+					? ImageAspectFlagBits::eColor
+					: (ImageAspectFlagBits)0) |
 				(img.usage & ImageUsageFlagBits::eDepthStencilAttachment
-					 ? ImageAspectFlagBits::eDepth
-					 : (ImageAspectFlagBits)0);
+					? ImageAspectFlagBits::eDepth
+					: (ImageAspectFlagBits)0);
 			const ImageSubresourceRange subresourceRange(aspect, 0, 1, 0, 1);
 
 			const ImageViewCreateInfo depthImageViewCreateInfo(
@@ -525,7 +545,7 @@ namespace tge::graphics
 		const MemoryAllocateInfo memAllocInfo(wholeSize, vgm->memoryTypeDeviceLocal);
 		const auto depthImageMemory = vgm->device.allocateMemory(memAllocInfo);
 
-		for (const auto &[image, offset] : memorys)
+		for (const auto& [image, offset] : memorys)
 		{
 			vgm->device.bindImageMemory(image.image, depthImageMemory, offset);
 			vgm->textureMemorys.push_back(std::make_tuple(depthImageMemory, offset));
@@ -538,7 +558,7 @@ namespace tge::graphics
 	}
 
 	size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
-											 const TextureInfo *textures)
+		const TextureInfo* textures)
 	{
 		EXPECT(textureCount != 0 && textures != nullptr);
 
@@ -552,11 +572,11 @@ namespace tge::graphics
 		intermCopys.reserve(textureCount);
 
 		util::OnExit exitHandle([&]
-								{
-			for (auto mem : intermMemorys)
+			{
+				for (auto mem : intermMemorys)
 				device.freeMemory(mem);
-			for (auto img : intermBuffers)
-				device.destroyBuffer(img); });
+		for (auto img : intermBuffers)
+			device.destroyBuffer(img); });
 
 		textureImages.reserve(firstIndex + textureCount);
 		textureMemorys.reserve(firstIndex + textureCount);
@@ -568,34 +588,34 @@ namespace tge::graphics
 			CommandBufferUsageFlagBits::eOneTimeSubmit, {});
 		cmd.begin(beginInfo);
 
-		constexpr ImageSubresourceRange range = {ImageAspectFlagBits::eColor, 0, 1, 0,
-												 1};
+		constexpr ImageSubresourceRange range = { ImageAspectFlagBits::eColor, 0, 1, 0,
+												 1 };
 		std::vector<InternalImageInfo> imagesIn(textureCount);
 		for (size_t i = 0; i < textureCount; i++)
 		{
-			const TextureInfo &tex = textures[i];
+			const TextureInfo& tex = textures[i];
 			const Format format = (Format)tex.internalFormatOverride;
-			const Extent2D ext = {tex.width, tex.height};
-			imagesIn[i] = {format, ext,
+			const Extent2D ext = { tex.width, tex.height };
+			imagesIn[i] = { format, ext,
 						   ImageUsageFlagBits::eTransferDst |
-							   ImageUsageFlagBits::eSampled};
+							   ImageUsageFlagBits::eSampled };
 		}
 
 		const auto internalImageIndex = createInternalImages(this, imagesIn);
 
 		for (size_t i = 0; i < textureCount; i++)
 		{
-			const TextureInfo &tex = textures[i];
-			const Extent3D ext = {tex.width, tex.height, 1};
+			const TextureInfo& tex = textures[i];
+			const Extent3D ext = { tex.width, tex.height, 1 };
 
 			const BufferCreateInfo intermBufferCreate({}, tex.size,
-													  BufferUsageFlagBits::eTransferSrc,
-													  SharingMode::eExclusive, {});
+				BufferUsageFlagBits::eTransferSrc,
+				SharingMode::eExclusive, {});
 			const auto intermBuffer = device.createBuffer(intermBufferCreate);
 			intermBuffers.push_back(intermBuffer);
 			const auto memRequIntern = device.getBufferMemoryRequirements(intermBuffer);
 			const MemoryAllocateInfo intermMemAllocInfo(memRequIntern.size,
-														memoryTypeHostVisibleCoherent);
+				memoryTypeHostVisibleCoherent);
 			const auto intermMemory = device.allocateMemory(intermMemAllocInfo);
 			intermMemorys.push_back(intermMemory);
 			device.bindBufferMemory(intermBuffer, intermMemory, 0);
@@ -603,12 +623,12 @@ namespace tge::graphics
 			std::memcpy(handle, tex.data, tex.size);
 			device.unmapMemory(intermMemory);
 
-			intermCopys.push_back({0,
+			intermCopys.push_back({ 0,
 								   tex.width,
 								   tex.height,
 								   {ImageAspectFlagBits::eColor, 0, 0, 1},
 								   {},
-								   ext});
+								   ext });
 
 			const auto curentImg = textureImages[i + internalImageIndex];
 
@@ -619,7 +639,7 @@ namespace tge::graphics
 				AccessFlagBits::eTransferWrite);
 
 			cmd.copyBufferToImage(intermBuffer, curentImg,
-								  ImageLayout::eTransferDstOptimal, intermCopys.back());
+				ImageLayout::eTransferDstOptimal, intermCopys.back());
 
 			waitForImageTransition(
 				cmd, ImageLayout::eTransferDstOptimal,
@@ -641,8 +661,8 @@ namespace tge::graphics
 	}
 
 	size_t VulkanGraphicsModule::pushLights(const size_t lightCount,
-											const Light *lights,
-											const size_t offset)
+		const Light* lights,
+		const size_t offset)
 	{
 		EXPECT(lightCount + offset < 50 && lights != nullptr);
 		this->lights.lightCount = offset + lightCount;
@@ -653,9 +673,9 @@ namespace tge::graphics
 
 #ifdef DEBUG
 	VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-						  DebugUtilsMessageTypeFlagsEXT messageTypes,
-						  const DebugUtilsMessengerCallbackDataEXT *pCallbackData,
-						  void *pUserData)
+		DebugUtilsMessageTypeFlagsEXT messageTypes,
+		const DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData)
 	{
 		if (messageSeverity == DebugUtilsMessageSeverityFlagBitsEXT::eVerbose)
 		{
@@ -665,12 +685,12 @@ namespace tge::graphics
 		std::string type = to_string(messageTypes);
 
 		printf("[%s][%s]: %s\n", severity.c_str(), type.c_str(),
-			   pCallbackData->pMessage);
+			pCallbackData->pMessage);
 		return VK_FALSE;
 	}
 #endif
 
-	inline void updateDescriptors(VulkanGraphicsModule *vgm, shader::ShaderAPI *sapi)
+	inline void updateDescriptors(VulkanGraphicsModule* vgm, shader::ShaderAPI* sapi)
 	{
 
 		const std::array bindingInfos = {
@@ -693,18 +713,18 @@ namespace tge::graphics
 			BindingInfo{4,
 						vgm->lightBindings,
 						BindingType::UniformBuffer,
-						{vgm->lightData, VK_WHOLE_SIZE, 0}}};
+						{vgm->lightData, VK_WHOLE_SIZE, 0}} };
 
 		sapi->bindData(bindingInfos.data(), bindingInfos.size());
 	}
 
-	inline void createLightPass(VulkanGraphicsModule *vgm)
+	inline void createLightPass(VulkanGraphicsModule* vgm)
 	{
 
 		const auto sapi = vgm->getShaderAPI();
 
-		const auto pipe = (VulkanShaderPipe *)sapi->loadShaderPipeAndCompile(
-			{"assets/lightPass.vert", "assets/lightPass.frag"});
+		const auto pipe = (VulkanShaderPipe*)sapi->loadShaderPipeAndCompile(
+			{ "assets/lightPass.vert", "assets/lightPass.frag" });
 		vgm->shaderPipes.push_back(pipe);
 		vgm->lightBindings = sapi->createBindings(pipe, 1);
 
@@ -714,9 +734,9 @@ namespace tge::graphics
 
 		updateDescriptors(vgm, sapi);
 
-		for (const auto &shaderPair : pipe->shader)
+		for (const auto& shaderPair : pipe->shader)
 		{
-			const auto &shaderData = shaderPair.first;
+			const auto& shaderData = shaderPair.first;
 
 			const ShaderModuleCreateInfo shaderModuleCreateInfo(
 				{}, shaderData.size() * sizeof(uint32_t), shaderData.data());
@@ -728,7 +748,7 @@ namespace tge::graphics
 		}
 
 		const Rect2D sic = {
-			{0, 0}, {(uint32_t)vgm->viewport.width, (uint32_t)vgm->viewport.height}};
+			{0, 0}, {(uint32_t)vgm->viewport.width, (uint32_t)vgm->viewport.height} };
 
 		const PipelineVertexInputStateCreateInfo visci;
 		const PipelineViewportStateCreateInfo vsci({}, vgm->viewport, sic);
@@ -737,10 +757,10 @@ namespace tge::graphics
 
 		const PipelineMultisampleStateCreateInfo msci;
 
-		constexpr std::array blendAttachment = {PipelineColorBlendAttachmentState(
+		constexpr std::array blendAttachment = { PipelineColorBlendAttachmentState(
 			true, BlendFactor::eSrcAlpha, BlendFactor::eOneMinusSrcAlpha,
 			BlendOp::eAdd, BlendFactor::eOne, BlendFactor::eZero, BlendOp::eAdd,
-			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags)};
+			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags) };
 
 		const PipelineColorBlendStateCreateInfo colorBlendState(
 			{}, false, LogicOp::eOr, blendAttachment);
@@ -748,7 +768,7 @@ namespace tge::graphics
 		const PipelineInputAssemblyStateCreateInfo inputAssemblyCreateInfo(
 			{}, PrimitiveTopology::eTriangleList, false);
 
-		const auto states = {DynamicState::eViewport, DynamicState::eScissor};
+		const auto states = { DynamicState::eViewport, DynamicState::eScissor };
 
 		const PipelineDynamicStateCreateInfo dynamicStateInfo({}, states);
 
@@ -761,12 +781,18 @@ namespace tge::graphics
 
 		const auto gp = vgm->device.createGraphicsPipeline({}, graphicsPipeline);
 		VERROR(gp.result)
-		vgm->lightPipe = vgm->pipelines.size();
-		vgm->pipelines.push_back(gp.value);
-		vgm->materialToLayout.push_back(graphicsPipeline.layout);
+	    vgm->lightPipe = 0;
+		if (vgm->pipelines.size() < 1)
+			vgm->pipelines.resize(1);
+		if (vgm->pipelines[0])
+			vgm->device.destroy(vgm->pipelines[0]);
+		vgm->pipelines[0] = gp.value;
+		if (vgm->materialToLayout.size() < 1)
+			vgm->materialToLayout.resize(1);
+		vgm->materialToLayout[0] = graphicsPipeline.layout;
 	}
 
-	inline void oneTimeWait(VulkanGraphicsModule *vgm, size_t count)
+	inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count)
 	{
 		const auto cmd = vgm->cmdbuffer.back();
 
@@ -775,30 +801,30 @@ namespace tge::graphics
 		cmd.begin(beginInfo);
 
 		waitForImageTransition(cmd, ImageLayout::eUndefined, ImageLayout::eGeneral,
-							   vgm->textureImages[vgm->depthImage],
-							   {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
+			vgm->textureImages[vgm->depthImage],
+			{ ImageAspectFlagBits::eDepth, 0, 1, 0, 1 });
 
-		constexpr ImageSubresourceRange range = {ImageAspectFlagBits::eColor, 0, 1, 0,
-												 1};
+		constexpr ImageSubresourceRange range = { ImageAspectFlagBits::eColor, 0, 1, 0,
+												 1 };
 		for (size_t i = vgm->firstImage + 1;
-			 i < vgm->firstImage + count; i++)
+			i < vgm->firstImage + count; i++)
 		{
 			waitForImageTransition(cmd, ImageLayout::eUndefined,
-								   ImageLayout::eSharedPresentKHR, vgm->textureImages[i],
-								   range);
+				ImageLayout::eSharedPresentKHR, vgm->textureImages[i],
+				range);
 		}
 
-		for (const auto &image : vgm->swapchainImages)
+		for (const auto& image : vgm->swapchainImages)
 		{
 			waitForImageTransition(cmd, ImageLayout::eUndefined, ImageLayout::eGeneral,
-								   image, range);
+				image, range);
 		}
 
 		cmd.end();
 		submitAndWait(vgm->device, vgm->queue, cmd);
 	}
 
-	inline void createSwapchain(VulkanGraphicsModule *vgm)
+	inline void createSwapchain(VulkanGraphicsModule* vgm)
 	{
 		vgm->device.waitIdle();
 
@@ -810,7 +836,7 @@ namespace tge::graphics
 
 		const auto capabilities = vgm->physicalDevice.getSurfaceCapabilitiesKHR(vgm->surface);
 		vgm->viewport = Viewport(0, 0, capabilities.currentExtent.width,
-								 capabilities.currentExtent.height, 0, 1.0f);
+			capabilities.currentExtent.height, 0, 1.0f);
 
 		const SwapchainCreateInfoKHR swapchainCreateInfo(
 			{}, vgm->surface, 3, vgm->format.format, vgm->format.colorSpace,
@@ -822,7 +848,7 @@ namespace tge::graphics
 		vgm->swapchain = vgm->device.createSwapchainKHR(swapchainCreateInfo);
 		vgm->swapchainImages = vgm->device.getSwapchainImagesKHR(vgm->swapchain);
 
-		const Extent2D ext = {(uint32_t)vgm->viewport.width, (uint32_t)vgm->viewport.height};
+		const Extent2D ext = { (uint32_t)vgm->viewport.width, (uint32_t)vgm->viewport.height };
 		const std::vector<InternalImageInfo> intImageInfo = {
 			{vgm->depthFormat, ext, ImageUsageFlagBits::eDepthStencilAttachment},
 			{vgm->format.format, ext,
@@ -836,7 +862,7 @@ namespace tge::graphics
 				 ImageUsageFlagBits::eInputAttachment},
 			{Format::eR32Sfloat, ext,
 			 ImageUsageFlagBits::eColorAttachment |
-				 ImageUsageFlagBits::eInputAttachment}};
+				 ImageUsageFlagBits::eInputAttachment} };
 
 		vgm->firstImage = createInternalImages(vgm, intImageInfo);
 		vgm->depthImage = vgm->firstImage;
@@ -866,8 +892,8 @@ namespace tge::graphics
 			std::vector<ImageView> images;
 			images.resize(vgm->attachmentCount);
 			std::copy(vgm->textureImageViews.begin() + vgm->firstImage,
-					  vgm->textureImageViews.begin() + vgm->firstImage + images.size(),
-					  images.begin());
+				vgm->textureImageViews.begin() + vgm->firstImage + images.size(),
+				images.begin());
 			images.back() = imview;
 
 			const FramebufferCreateInfo framebufferCreateInfo(
@@ -881,11 +907,20 @@ namespace tge::graphics
 		}
 	}
 
-	inline bool checkAndRecreate(VulkanGraphicsModule *vgm, const Result result)
+	inline bool checkAndRecreate(VulkanGraphicsModule* vgm, const Result result)
 	{
 		if (result == Result::eErrorOutOfDateKHR || result == Result::eSuboptimalKHR)
 		{
 			createSwapchain(vgm);
+			createLightPass(vgm);
+			const auto materialCopy = vgm->materialsForRetry;
+			const auto renderCopy = vgm->renderInfosForRetry;
+			vgm->pushMaterials(materialCopy.size() - 1, materialCopy.data() + 1, 1);
+			for (size_t i = 0; i < renderCopy.size(); i++)
+			{
+				const auto& currentVector = renderCopy[i];
+				vgm->pushRender(currentVector.size(), currentVector.data(), renderCopy.size() - i);
+			}
 			tge::main::fireRecreate();
 			return true;
 		}
@@ -898,34 +933,34 @@ namespace tge::graphics
 
 	main::Error VulkanGraphicsModule::init()
 	{
-		FeatureSet &features = getGraphicsModule()->features;
+		FeatureSet& features = getGraphicsModule()->features;
 		this->shaderAPI = new VulkanShaderModule(this);
 #pragma region Instance
 		const ApplicationInfo applicationInfo(APPLICATION_NAME, APPLICATION_VERSION,
-											  ENGINE_NAME, ENGINE_VERSION,
-											  VK_API_VERSION_1_0);
+			ENGINE_NAME, ENGINE_VERSION,
+			VK_API_VERSION_1_0);
 
 		const auto layerInfos = enumerateInstanceLayerProperties();
-		std::vector<const char *> layerEnabled;
-		for (const auto &layer : layerInfos)
+		std::vector<const char*> layerEnabled;
+		for (const auto& layer : layerInfos)
 		{
 			const auto lname = layer.layerName.data();
 			const auto enditr = layerToEnable.end();
 			if (std::find_if(layerToEnable.begin(), enditr,
-							 [&](auto in)
-							 { return strcmp(lname, in) == 0; }) != enditr)
+				[&](auto in)
+				{ return strcmp(lname, in) == 0; }) != enditr)
 				layerEnabled.push_back(lname);
 		}
 
 		const auto extensionInfos = enumerateInstanceExtensionProperties();
-		std::vector<const char *> extensionEnabled;
-		for (const auto &extension : extensionInfos)
+		std::vector<const char*> extensionEnabled;
+		for (const auto& extension : extensionInfos)
 		{
 			const auto lname = extension.extensionName.data();
 			const auto enditr = extensionToEnable.end();
 			if (std::find_if(extensionToEnable.begin(), enditr,
-							 [&](auto in)
-							 { return strcmp(lname, in) == 0; }) != enditr)
+				[&](auto in)
+				{ return strcmp(lname, in) == 0; }) != enditr)
 				extensionEnabled.push_back(lname);
 		}
 
@@ -936,8 +971,10 @@ namespace tge::graphics
 
 #ifdef DEBUG
 		if (std::find_if(begin(extensionEnabled), end(extensionEnabled), [](auto x)
-						 { return strcmp(x, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0; }) != end(extensionEnabled))
+			{ return strcmp(x, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0; }) != end(extensionEnabled))
 		{
+			std::cout << "Create debug utils!" << std::endl;
+
 			DispatchLoaderDynamic stat;
 			stat.vkCreateDebugUtilsMessengerEXT =
 				(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
@@ -945,9 +982,9 @@ namespace tge::graphics
 			const DebugUtilsMessengerCreateInfoEXT debugUtilsMsgCreateInfo(
 				{},
 				(DebugUtilsMessageSeverityFlagsEXT)
-					FlagTraits<DebugUtilsMessageSeverityFlagBitsEXT>::allFlags,
+				FlagTraits<DebugUtilsMessageSeverityFlagBitsEXT>::allFlags,
 				(DebugUtilsMessageTypeFlagsEXT)
-					FlagTraits<DebugUtilsMessageTypeFlagBitsEXT>::allFlags,
+				FlagTraits<DebugUtilsMessageTypeFlagBitsEXT>::allFlags,
 				(PFN_vkDebugUtilsMessengerCallbackEXT)debugMessage);
 			debugMessenger = instance.createDebugUtilsMessengerEXT(
 				debugUtilsMsgCreateInfo, nullptr, stat);
@@ -960,8 +997,8 @@ namespace tge::graphics
 		{
 			const auto properties = physDevice.getProperties();
 			return properties.limits.maxImageDimension2D +
-				   (properties.deviceType == PhysicalDeviceType::eDiscreteGpu ? 1000
-																			  : 0);
+				(properties.deviceType == PhysicalDeviceType::eDiscreteGpu ? 1000
+					: 0);
 		};
 
 		const auto physicalDevices = this->instance.enumeratePhysicalDevices();
@@ -975,12 +1012,12 @@ namespace tge::graphics
 		const auto bgnitr = queueFamilys.begin();
 		const auto enditr = queueFamilys.end();
 		const auto queueFamilyItr = std::find_if(bgnitr, enditr, [](auto queue)
-												 { return queue.queueFlags & QueueFlagBits::eGraphics; });
+			{ return queue.queueFlags & QueueFlagBits::eGraphics; });
 		if (queueFamilyItr == enditr)
 			return main::Error::NO_GRAPHIC_QUEUE_FOUND;
 
 		queueFamilyIndex = (uint32_t)std::distance(bgnitr, queueFamilyItr);
-		const auto &queueFamily = *queueFamilyItr;
+		const auto& queueFamily = *queueFamilyItr;
 		std::vector<float> priorities(queueFamily.queueCount);
 		std::fill(priorities.begin(), priorities.end(), 0.0f);
 
@@ -1006,15 +1043,15 @@ namespace tge::graphics
 		enabledFeatures.wideLines = features.wideLines;
 		enabledFeatures.independentBlend = VK_TRUE;
 
-		const char *name = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+		const char* name = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 		const DeviceCreateInfo deviceCreateInfo({}, 1, &queueCreateInfo, 0, {}, 1,
-												&name, &enabledFeatures);
+			&name, &enabledFeatures);
 		this->device = this->physicalDevice.createDevice(deviceCreateInfo);
 
 		const auto c4Props =
 			this->physicalDevice.getFormatProperties(Format::eR8G8B8A8Unorm);
 		if (!(c4Props.optimalTilingFeatures &
-			  FormatFeatureFlagBits::eColorAttachment))
+			FormatFeatureFlagBits::eColorAttachment))
 			return main::Error::FORMAT_NOT_SUPPORTED;
 
 		const auto float32Props =
@@ -1031,13 +1068,13 @@ namespace tge::graphics
 		const auto winM = graphicsModule->getWindowModule();
 #ifdef WIN32
 		Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, (HINSTANCE)winM->hInstance,
-													(HWND)winM->hWnd);
+			(HWND)winM->hWnd);
 		surface = instance.createWin32SurfaceKHR(surfaceCreateInfo);
 #endif // WIN32
 #ifdef __linux__
 		XlibSurfaceCreateInfoKHR surfaceCreateInfo(
 			{},
-			(Display *)winM->hInstance,
+			(Display*)winM->hInstance,
 			(Window)winM->hWnd);
 		surface = instance.createXlibSurfaceKHR(surfaceCreateInfo);
 #endif
@@ -1050,7 +1087,7 @@ namespace tge::graphics
 		const auto surfBeginItr = surfaceFormat.begin();
 		const auto fitr =
 			std::find_if(surfBeginItr, surfEndItr, [](SurfaceFormatKHR format)
-						 { return format.format == Format::eB8G8R8A8Unorm; });
+				{ return format.format == Format::eB8G8R8A8Unorm; });
 		if (fitr == surfEndItr)
 			return main::Error::FORMAT_NOT_FOUND;
 		format = *fitr;
@@ -1061,29 +1098,29 @@ namespace tge::graphics
 
 		const auto findMemoryIndex = [&](auto prop)
 		{
-			const auto findItr = std::find_if(memBeginItr, memEndItr, [&](auto &type)
-											  { return type.propertyFlags & (prop); });
+			const auto findItr = std::find_if(memBeginItr, memEndItr, [&](auto& type)
+				{ return type.propertyFlags & (prop); });
 			return std::distance(memBeginItr, findItr);
 		};
 
 		memoryTypeDeviceLocal = findMemoryIndex(MemoryPropertyFlagBits::eDeviceLocal);
 		memoryTypeHostVisibleCoherent =
 			findMemoryIndex(MemoryPropertyFlagBits::eHostVisible |
-							MemoryPropertyFlagBits::eHostCoherent);
+				MemoryPropertyFlagBits::eHostCoherent);
 
 		const auto capabilities = physicalDevice.getSurfaceCapabilitiesKHR(surface);
 		viewport = Viewport(0, 0, capabilities.currentExtent.width,
-							capabilities.currentExtent.height, 0, 1.0f);
+			capabilities.currentExtent.height, 0, 1.0f);
 
 		const auto presentModes = physicalDevice.getSurfacePresentModesKHR(surface);
 		const auto presentModesEndItr = presentModes.end();
 		const auto presentModesBeginItr = presentModes.begin();
 		auto fndPresentMode = std::find(presentModesBeginItr, presentModesEndItr,
-										PresentModeKHR::eMailbox);
+			PresentModeKHR::eMailbox);
 		if (fndPresentMode == presentModesEndItr)
 		{
 			fndPresentMode = std::find(presentModesBeginItr, presentModesEndItr,
-									   PresentModeKHR::eImmediate);
+				PresentModeKHR::eImmediate);
 			if (fndPresentMode == presentModesEndItr)
 				fndPresentMode = presentModesBeginItr;
 		}
@@ -1093,7 +1130,7 @@ namespace tge::graphics
 #pragma region Depth and Output Attachments
 		constexpr std::array potentialDepthFormat = { Format::eD32Sfloat, Format::eD16Unorm,
 			Format::eD32SfloatS8Uint, Format::eD24UnormS8Uint,
-			Format::eD16UnormS8Uint};
+			Format::eD16UnormS8Uint };
 		for (const Format pDF : potentialDepthFormat)
 		{
 			const FormatProperties fProp = physicalDevice.getFormatProperties(pDF);
@@ -1140,23 +1177,23 @@ namespace tge::graphics
 				{}, format.format, SampleCountFlagBits::e1, AttachmentLoadOp::eClear,
 				AttachmentStoreOp::eStore, AttachmentLoadOp::eDontCare,
 				AttachmentStoreOp::eDontCare, ImageLayout::eUndefined,
-				ImageLayout::ePresentSrcKHR)};
+				ImageLayout::ePresentSrcKHR) };
 		attachmentCount = attachments.size();
 
 		constexpr std::array colorAttachments = {
 			AttachmentReference(1, ImageLayout::eColorAttachmentOptimal),
 			AttachmentReference(2, ImageLayout::eColorAttachmentOptimal),
 			AttachmentReference(3, ImageLayout::eColorAttachmentOptimal),
-			AttachmentReference(4, ImageLayout::eColorAttachmentOptimal)};
+			AttachmentReference(4, ImageLayout::eColorAttachmentOptimal) };
 
 		constexpr std::array inputAttachments = {
 			AttachmentReference(1, ImageLayout::eShaderReadOnlyOptimal),
 			AttachmentReference(2, ImageLayout::eShaderReadOnlyOptimal),
 			AttachmentReference(3, ImageLayout::eShaderReadOnlyOptimal),
-			AttachmentReference(4, ImageLayout::eShaderReadOnlyOptimal)};
+			AttachmentReference(4, ImageLayout::eShaderReadOnlyOptimal) };
 
 		constexpr std::array colorAttachmentsSubpass1 = {
-			AttachmentReference(5, ImageLayout::eColorAttachmentOptimal)};
+			AttachmentReference(5, ImageLayout::eColorAttachmentOptimal) };
 
 		constexpr AttachmentReference depthAttachment(
 			0, ImageLayout::eDepthStencilAttachmentOptimal);
@@ -1165,23 +1202,23 @@ namespace tge::graphics
 			SubpassDescription({}, PipelineBindPoint::eGraphics, {}, colorAttachments,
 							   {}, &depthAttachment),
 			SubpassDescription({}, PipelineBindPoint::eGraphics, inputAttachments,
-							   colorAttachmentsSubpass1)};
+							   colorAttachmentsSubpass1) };
 
 		constexpr auto frag1 = PipelineStageFlagBits::eColorAttachmentOutput |
-							   PipelineStageFlagBits::eLateFragmentTests |
-							   PipelineStageFlagBits::eEarlyFragmentTests;
+			PipelineStageFlagBits::eLateFragmentTests |
+			PipelineStageFlagBits::eEarlyFragmentTests;
 
 		constexpr auto frag2 = AccessFlagBits::eColorAttachmentWrite |
-							   AccessFlagBits::eColorAttachmentRead |
-							   AccessFlagBits::eDepthStencilAttachmentRead |
-							   AccessFlagBits::eDepthStencilAttachmentWrite;
+			AccessFlagBits::eColorAttachmentRead |
+			AccessFlagBits::eDepthStencilAttachmentRead |
+			AccessFlagBits::eDepthStencilAttachmentWrite;
 
 		const std::array subpassDependencies = {
 			SubpassDependency(0, 1, frag1, frag1, frag2, frag2),
 			SubpassDependency(
 				1, VK_SUBPASS_EXTERNAL, PipelineStageFlagBits::eColorAttachmentOutput,
 				PipelineStageFlagBits::eColorAttachmentOutput,
-				AccessFlagBits::eColorAttachmentWrite, (AccessFlagBits)0)};
+				AccessFlagBits::eColorAttachmentWrite, (AccessFlagBits)0) };
 
 		const RenderPassCreateInfo renderPassCreateInfo(
 			{}, attachments, subpassDescriptions, subpassDependencies);
@@ -1230,23 +1267,23 @@ namespace tge::graphics
 		const auto currentBuffer = cmdbuffer[this->nextImage];
 		if (1)
 		{ // For now rerecord every tick
-			constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
-			const std::array clearValue = {ClearValue(ClearDepthStencilValue(1.0f, 0)),
+			constexpr std::array clearColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+			const std::array clearValue = { ClearValue(ClearDepthStencilValue(1.0f, 0)),
 										   ClearValue(clearColor),
 										   ClearValue(clearColor),
 										   ClearValue(clearColor),
 										   ClearValue(clearColor),
-										   ClearValue(clearColor)};
+										   ClearValue(clearColor) };
 
 			const CommandBufferBeginInfo cmdBufferBeginInfo({}, nullptr);
 			currentBuffer.begin(cmdBufferBeginInfo);
 
 			const RenderPassBeginInfo renderPassBeginInfo(
 				renderpass, framebuffer[this->nextImage],
-				{{0, 0}, {(uint32_t)viewport.width, (uint32_t)viewport.height}},
+				{ {0, 0}, {(uint32_t)viewport.width, (uint32_t)viewport.height} },
 				clearValue);
 			currentBuffer.beginRenderPass(renderPassBeginInfo,
-										  SubpassContents::eSecondaryCommandBuffers);
+				SubpassContents::eSecondaryCommandBuffers);
 
 			const std::lock_guard onExitUnlock(commandBufferRecording);
 			if (!secondaryCommandBuffer.empty())
@@ -1262,19 +1299,19 @@ namespace tge::graphics
 			currentBuffer.setScissor(0, scissor);
 
 			currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
-									   pipelines[lightPipe]);
+				pipelines[lightPipe]);
 
-			const std::array lights = {lightBindings};
+			const std::array lights = { lightBindings };
 			getShaderAPI()->addToRender(lights.data(), lights.size(),
-										(CommandBuffer *)&currentBuffer);
+				(CommandBuffer*)&currentBuffer);
 
 			currentBuffer.draw(3, 1, 0, 0);
 
 			currentBuffer.endRenderPass();
 
 			waitForImageTransition(currentBuffer, ImageLayout::eUndefined,
-								   ImageLayout::eGeneral, textureImages[depthImage],
-								   {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
+				ImageLayout::eGeneral, textureImages[depthImage],
+				{ ImageAspectFlagBits::eDepth, 0, 1, 0, 1 });
 
 			currentBuffer.end();
 		}
@@ -1285,12 +1322,12 @@ namespace tge::graphics
 			PipelineStageFlagBits::eColorAttachmentOutput |
 			PipelineStageFlagBits::eLateFragmentTests;
 		const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
-									signalSemaphore);
+			signalSemaphore);
 
 		queue.submit(submitInfo, commandBufferFence);
 
 		const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
-										 nullptr);
+			nullptr);
 		const Result result = queue.presentKHR(&presentInfo);
 		if (result == Result::eErrorInitializationFailed)
 		{
@@ -1376,6 +1413,6 @@ namespace tge::graphics
 		delete shaderAPI;
 	}
 
-	APILayer *getNewVulkanModule() { return new VulkanGraphicsModule(); }
+	APILayer* getNewVulkanModule() { return new VulkanGraphicsModule(); }
 
 } // namespace tge::graphics

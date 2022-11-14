@@ -29,6 +29,7 @@ struct VulkanShaderPipe {
   std::vector<PushConstantRange> constranges;
   size_t layoutID = UINT64_MAX;
   bool needsDefaultBindings = true;
+
 };
 
 inline uint32_t getSizeFromFormat(const Format format)

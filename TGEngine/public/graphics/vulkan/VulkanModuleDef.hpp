@@ -67,6 +67,8 @@ public:
   std::vector<shader::ShaderPipe> shaderPipes;
   std::vector<CommandBuffer> primary = {CommandBuffer()};
   std::vector<vk::PipelineLayout> materialToLayout;
+  std::vector<std::vector<RenderInfo>> renderInfosForRetry;
+  std::vector<Material> materialsForRetry;
 
   size_t firstImage;
   size_t depthImage;
@@ -102,7 +104,7 @@ public:
   void destroy() override;
 
   size_t pushMaterials(const size_t materialcount,
-                       const Material *materials) override;
+                       const Material *materials, const size_t offset = SIZE_MAX) override;
 
   size_t pushData(const size_t dataCount, void *data, const size_t *dataSizes,
                   const DataType type) override;

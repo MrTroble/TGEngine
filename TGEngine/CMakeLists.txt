@@ -86,6 +86,7 @@ list(APPEND ENGINE_DATA
 endif()
 
 add_library (TGEngine STATIC ${ENGINE_DATA})
+
 include(FindVulkan)
 
 if(WIN32)
@@ -99,10 +100,12 @@ FETCHCONTENT_DECLARE(
 	BUILD_COMMAND ""
 )
 FETCHCONTENT_MAKEAVAILABLE(vulkansdk)
+set(ENV{VULKAN_DIR} "${vulkansdk_SOURCE_DIR}/Include")
 target_include_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Include")
 target_link_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Lib")
 else()
-target_include_directories(TGEngine PUBLIC ${Vulkan_INCLUDE_DIRS})
+set(ENV{VULKAN_DIR} "${Vulkan_INCLUDE_DIRS}")
+target_include_directories(TGEngine PUBLIC "${Vulkan_INCLUDE_DIRS}")
 target_link_directories(TGEngine PUBLIC "$ENV{VULKAN_SDK}/Lib") 
 endif()
 target_link_libraries(TGEngine PUBLIC vulkan-1)
