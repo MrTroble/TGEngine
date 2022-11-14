@@ -75,7 +75,7 @@ namespace tge::graphics
 								 __FILE__ + " L" + std::to_string(__LINE__)); \
 	}
 
-	size_t VulkanGraphicsModule::getAligned(const DataType type) {
+	size_t VulkanGraphicsModule::getAligned(const DataType type) const {
 		const auto properties = this->physicalDevice.getProperties();
 		switch (type)
 		{
@@ -92,7 +92,7 @@ namespace tge::graphics
 		throw std::runtime_error("Not implemented!");
 	}
 
-	size_t VulkanGraphicsModule::getAligned(const size_t buffer, const size_t toBeAligned) {
+	size_t VulkanGraphicsModule::getAligned(const size_t buffer, const size_t toBeAligned) const {
 		EXPECT(buffer < alignment.size());
 		const auto align = alignment[buffer];
 		const auto rest = toBeAligned % align;
@@ -1411,6 +1411,10 @@ namespace tge::graphics
 #endif
 		instance.destroy();
 		delete shaderAPI;
+	}
+
+	glm::vec2 VulkanGraphicsModule::getRenderExtent() const {
+		return glm::vec2(this->viewport.width, this->viewport.height);
 	}
 
 	APILayer* getNewVulkanModule() { return new VulkanGraphicsModule(); }

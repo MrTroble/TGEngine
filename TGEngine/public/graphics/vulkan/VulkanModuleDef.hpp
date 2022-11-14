@@ -125,9 +125,11 @@ public:
 
   void *loadShader(const MaterialType type) override;
 
-  size_t getAligned(const size_t buffer, const size_t toBeAligned=0) override;
+  size_t getAligned(const size_t buffer, const size_t toBeAligned=0) const override;
 
-  size_t getAligned(const DataType type) override;
+  size_t getAligned(const DataType type) const  override;
+
+  glm::vec2 getRenderExtent() const override;
 };
 
 } // namespace tge::graphics
