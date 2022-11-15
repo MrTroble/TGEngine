@@ -238,7 +238,7 @@ namespace tge::graphics
 		EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
 
 		const CommandBufferAllocateInfo commandBufferAllocate(
-			pool, CommandBufferLevel::eSecondary, 1);
+			secondaryPool, CommandBufferLevel::eSecondary, 1);
 		const auto indexIn = this->secondaryCommandBuffer.size() - offset;
 		const CommandBuffer cmdBuf =
 			offset == 0
@@ -375,7 +375,8 @@ namespace tge::graphics
 		bufferMemoryList.reserve(firstMemIndex + dataCount);
 		alignment.reserve(alignment.size() + dataCount);
 
-		const auto cmdBuf = cmdbuffer.back();
+		const std::lock_guard lg(protectSecondaryData);
+		const auto cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
 		const CommandBufferBeginInfo beginInfo(
 			CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -461,7 +462,8 @@ namespace tge::graphics
 
 		device.unmapMemory(hostVisibleMemory);
 
-		const auto cmdBuf = cmdbuffer.back();
+		const std::lock_guard lg(protectSecondaryData);
+		const auto cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
 		const CommandBufferBeginInfo beginInfo(
 			CommandBufferUsageFlagBits::eOneTimeSubmit);
@@ -582,7 +584,8 @@ namespace tge::graphics
 		textureMemorys.reserve(firstIndex + textureCount);
 		textureImageViews.reserve(firstIndex + textureCount);
 
-		const auto cmd = this->cmdbuffer.back();
+		const std::lock_guard lg(protectSecondaryTexture);
+		const auto cmd = noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER];
 
 		const CommandBufferBeginInfo beginInfo(
 			CommandBufferUsageFlagBits::eOneTimeSubmit, {});
@@ -792,10 +795,8 @@ namespace tge::graphics
 		vgm->materialToLayout[0] = graphicsPipeline.layout;
 	}
 
-	inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count)
+	inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count, CommandBuffer cmd)
 	{
-		const auto cmd = vgm->cmdbuffer.back();
-
 		const CommandBufferBeginInfo beginInfo(
 			CommandBufferUsageFlagBits::eOneTimeSubmit, {});
 		cmd.begin(beginInfo);
@@ -871,7 +872,8 @@ namespace tge::graphics
 		vgm->roughnessMetallicImage = vgm->firstImage + 3;
 		vgm->position = vgm->firstImage + 4;
 
-		oneTimeWait(vgm, intImageInfo.size());
+		const std::lock_guard lg(vgm->protectSecondaryTexture);
+		oneTimeWait(vgm, intImageInfo.size(), vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER]);
 
 		for (const auto view : vgm->swapchainImageviews)
 		{
@@ -1229,10 +1231,15 @@ namespace tge::graphics
 		const CommandPoolCreateInfo commandPoolCreateInfo(
 			CommandPoolCreateFlagBits::eResetCommandBuffer, queueIndex);
 		pool = device.createCommandPool(commandPoolCreateInfo);
+		secondaryPool = device.createCommandPool(commandPoolCreateInfo);
 
 		const CommandBufferAllocateInfo cmdBufferAllocInfo(
-			pool, CommandBufferLevel::ePrimary, (uint32_t)4);
+			pool, CommandBufferLevel::ePrimary, (uint32_t)3);
 		cmdbuffer = device.allocateCommandBuffers(cmdBufferAllocInfo);
+
+		const CommandBufferAllocateInfo cmdBufferAllocInfoSecond(
+			secondaryPool, CommandBufferLevel::ePrimary, (uint32_t)2);
+		noneRenderCmdbuffer = device.allocateCommandBuffers(cmdBufferAllocInfoSecond);
 		createSwapchain(this);
 #pragma endregion
 

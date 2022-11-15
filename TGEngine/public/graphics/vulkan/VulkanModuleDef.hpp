@@ -25,6 +25,9 @@ namespace tge::graphics {
 
 using namespace vk;
 
+constexpr size_t DATA_ONLY_BUFFER = 0;
+constexpr size_t TEXTURE_ONLY_BUFFER = 1;
+
 class VulkanGraphicsModule : public APILayer {
 
 public:
@@ -41,7 +44,9 @@ public:
   std::vector<ImageView> swapchainImageviews;
   std::vector<Framebuffer> framebuffer;
   CommandPool pool;
+  CommandPool secondaryPool;
   std::vector<CommandBuffer> cmdbuffer;
+  std::vector<CommandBuffer> noneRenderCmdbuffer;
   std::vector<Pipeline> pipelines;
   Queue queue;
   uint32_t queueFamilyIndex;
@@ -60,6 +65,10 @@ public:
   std::vector<CommandBuffer> secondaryCommandBuffer;
   std::mutex commandBufferRecording; // protects secondaryCommandBuffer from
                                      // memory invalidation
+  std::mutex protectSecondaryTexture; // protects secondaryCommandBuffer from
+                                     // memory invalidation
+  std::mutex protectSecondaryData; // protects secondaryCommandBuffer from
+  // memory invalidation
   std::vector<Sampler> sampler;
   std::vector<Image> textureImages;
   std::vector<std::tuple<DeviceMemory, size_t>> textureMemorys;
