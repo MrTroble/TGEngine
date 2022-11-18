@@ -80,13 +80,15 @@ namespace tge::graphics {
 
 	class APILayer : public main::Module { // Interface
 	protected:
-		GameGraphicsModule* graphicsModule;
+		GameGraphicsModule* graphicsModule = nullptr;
 		shader::ShaderAPI* shaderAPI;
 
 	public:
 		void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
 			this->graphicsModule = graphicsModule;
 		}
+
+		APILayer(shader::ShaderAPI* shaderAPI) : shaderAPI(shaderAPI) {}
 
 		virtual ~APILayer() {}
 

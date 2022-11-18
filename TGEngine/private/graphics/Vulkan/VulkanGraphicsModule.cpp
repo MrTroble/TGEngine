@@ -245,6 +245,8 @@ namespace tge::graphics
 			? device.allocateCommandBuffers(commandBufferAllocate).back()
 			: this->secondaryCommandBuffer[indexIn];
 
+		const std::lock_guard onExitUnlock(commandBufferRecording);
+
 		const CommandBufferInheritanceInfo inheritance(renderpass, 0);
 		const CommandBufferBeginInfo beginInfo(
 			CommandBufferUsageFlagBits::eRenderPassContinue, &inheritance);
@@ -311,7 +313,6 @@ namespace tge::graphics
 		cmdBuf.end();
 		if (offset == 0)
 		{
-			const std::lock_guard onExitUnlock(commandBufferRecording);
 			secondaryCommandBuffer.push_back(cmdBuf);
 		}
 		
@@ -321,18 +322,15 @@ namespace tge::graphics
 	}
 
 	inline void submitAndWait(const Device& device, const Queue& queue,
-		const CommandBuffer& cmdBuf)
+		const CommandBuffer& cmdBuf, const Fence fence)
 	{
-		const FenceCreateInfo fenceCreateInfo;
-		const auto fence = device.createFence(fenceCreateInfo);
-
 		const SubmitInfo submitInfo({}, {}, cmdBuf, {});
 		queue.submit(submitInfo, fence);
 
 		const Result result = device.waitForFences(fence, true, UINT64_MAX);
 		VERROR(result);
 
-		device.destroyFence(fence);
+		device.resetFences(fence);
 	}
 
 	inline BufferUsageFlags getUsageFlagsFromDataType(const DataType type)
@@ -427,7 +425,7 @@ namespace tge::graphics
 
 		cmdBuf.end();
 
-		submitAndWait(device, queue, cmdBuf);
+		submitAndWait(device, secondaryQueue, cmdBuf, secondaryBufferFence);
 
 		for (const auto mem : tempMemory)
 			device.freeMemory(mem);
@@ -475,7 +473,7 @@ namespace tge::graphics
 
 		cmdBuf.end();
 
-		submitAndWait(device, queue, cmdBuf);
+		submitAndWait(device, secondaryQueue, cmdBuf, secondaryBufferFence);
 		device.freeMemory(hostVisibleMemory);
 		device.destroyBuffer(intermBuffer);
 	}
@@ -584,7 +582,7 @@ namespace tge::graphics
 		textureMemorys.reserve(firstIndex + textureCount);
 		textureImageViews.reserve(firstIndex + textureCount);
 
-		const std::lock_guard lg(protectSecondaryTexture);
+		const std::lock_guard lg(protectSecondaryData);
 		const auto cmd = noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER];
 
 		const CommandBufferBeginInfo beginInfo(
@@ -654,11 +652,11 @@ namespace tge::graphics
 		cmd.end();
 
 		const SubmitInfo submitInfo({}, {}, cmd, {});
-		queue.submit(submitInfo, commandBufferFence);
+		secondaryQueue.submit(submitInfo, secondaryBufferFence);
 		const Result result =
-			device.waitForFences(commandBufferFence, true, UINT64_MAX);
+			device.waitForFences(secondaryBufferFence, true, UINT64_MAX);
 		VERROR(result);
-		device.resetFences(commandBufferFence);
+		device.resetFences(secondaryBufferFence);
 
 		return firstIndex;
 	}
@@ -795,7 +793,7 @@ namespace tge::graphics
 		vgm->materialToLayout[0] = graphicsPipeline.layout;
 	}
 
-	inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count, CommandBuffer cmd)
+	inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count, CommandBuffer cmd, Queue queue)
 	{
 		const CommandBufferBeginInfo beginInfo(
 			CommandBufferUsageFlagBits::eOneTimeSubmit, {});
@@ -822,7 +820,7 @@ namespace tge::graphics
 		}
 
 		cmd.end();
-		submitAndWait(vgm->device, vgm->queue, cmd);
+		submitAndWait(vgm->device, queue, cmd, vgm->secondaryBufferFence);
 	}
 
 	inline void createSwapchain(VulkanGraphicsModule* vgm)
@@ -872,8 +870,8 @@ namespace tge::graphics
 		vgm->roughnessMetallicImage = vgm->firstImage + 3;
 		vgm->position = vgm->firstImage + 4;
 
-		const std::lock_guard lg(vgm->protectSecondaryTexture);
-		oneTimeWait(vgm, intImageInfo.size(), vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER]);
+		const std::lock_guard lg(vgm->protectSecondaryData);
+		oneTimeWait(vgm, intImageInfo.size(), vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER], vgm->queue);
 
 		for (const auto view : vgm->swapchainImageviews)
 		{
@@ -936,7 +934,6 @@ namespace tge::graphics
 	main::Error VulkanGraphicsModule::init()
 	{
 		FeatureSet& features = getGraphicsModule()->features;
-		this->shaderAPI = new VulkanShaderModule(this);
 #pragma region Instance
 		const ApplicationInfo applicationInfo(APPLICATION_NAME, APPLICATION_VERSION,
 			ENGINE_NAME, ENGINE_VERSION,
@@ -1022,8 +1019,10 @@ namespace tge::graphics
 		const auto& queueFamily = *queueFamilyItr;
 		std::vector<float> priorities(queueFamily.queueCount);
 		std::fill(priorities.begin(), priorities.end(), 0.0f);
-
-		queueIndex = (uint32_t)std::distance(bgnitr, queueFamilyItr);
+		if (queueFamily.queueCount < 2)
+			return main::Error::NO_GRAPHIC_QUEUE_FOUND;
+		queueIndex = 0;
+		secondaryqueueIndex = 1;
 		const DeviceQueueCreateInfo queueCreateInfo(
 			{}, queueIndex, queueFamily.queueCount, priorities.data());
 
@@ -1064,8 +1063,19 @@ namespace tge::graphics
 
 #pragma endregion
 
+#pragma region Vulkan Mutex
+		const FenceCreateInfo fenceCreateInfo;
+		commandBufferFence = device.createFence(fenceCreateInfo);
+		secondaryBufferFence = device.createFence(fenceCreateInfo);
+
+		const SemaphoreCreateInfo semaphoreCreateInfo;
+		waitSemaphore = device.createSemaphore(semaphoreCreateInfo);
+		signalSemaphore = device.createSemaphore(semaphoreCreateInfo);
+#pragma endregion
+
 #pragma region Queue, Surface, Prepipe, MemTypes
 		queue = device.getQueue(queueFamilyIndex, queueIndex);
+		secondaryQueue = device.getQueue(queueFamilyIndex, secondaryqueueIndex);
 
 		const auto winM = graphicsModule->getWindowModule();
 #ifdef WIN32
@@ -1229,7 +1239,7 @@ namespace tge::graphics
 
 #pragma region CommandBuffer
 		const CommandPoolCreateInfo commandPoolCreateInfo(
-			CommandPoolCreateFlagBits::eResetCommandBuffer, queueIndex);
+			CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamilyIndex);
 		pool = device.createCommandPool(commandPoolCreateInfo);
 		secondaryPool = device.createCommandPool(commandPoolCreateInfo);
 
@@ -1241,15 +1251,6 @@ namespace tge::graphics
 			secondaryPool, CommandBufferLevel::ePrimary, (uint32_t)2);
 		noneRenderCmdbuffer = device.allocateCommandBuffers(cmdBufferAllocInfoSecond);
 		createSwapchain(this);
-#pragma endregion
-
-#pragma region Vulkan Mutex
-		const FenceCreateInfo fenceCreateInfo;
-		commandBufferFence = device.createFence(fenceCreateInfo);
-
-		const SemaphoreCreateInfo semaphoreCreateInfo;
-		waitSemaphore = device.createSemaphore(semaphoreCreateInfo);
-		signalSemaphore = device.createSemaphore(semaphoreCreateInfo);
 #pragma endregion
 
 		this->isInitialiazed = true;
@@ -1292,7 +1293,6 @@ namespace tge::graphics
 			currentBuffer.beginRenderPass(renderPassBeginInfo,
 				SubpassContents::eSecondaryCommandBuffers);
 
-			const std::lock_guard onExitUnlock(commandBufferRecording);
 			if (!secondaryCommandBuffer.empty())
 			{
 				currentBuffer.executeCommands(secondaryCommandBuffer);
@@ -1331,6 +1331,7 @@ namespace tge::graphics
 		const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
 			signalSemaphore);
 
+		commandBufferRecording.lock();
 		queue.submit(submitInfo, commandBufferFence);
 
 		const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
@@ -1347,12 +1348,14 @@ namespace tge::graphics
 			auto nextimage =
 				device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
 			this->nextImage = nextimage.value;
+			commandBufferRecording.unlock();
 			return;
 		}
 
 		const Result waitresult =
 			device.waitForFences(commandBufferFence, true, UINT64_MAX);
 		VERROR(waitresult);
+		commandBufferRecording.unlock();
 
 		currentBuffer.reset();
 		device.resetFences(commandBufferFence);
@@ -1373,6 +1376,7 @@ namespace tge::graphics
 		device.waitIdle();
 		this->shaderAPI->destroy();
 		device.destroyFence(commandBufferFence);
+		device.destroyFence(secondaryBufferFence);
 		device.destroySemaphore(waitSemaphore);
 		device.destroySemaphore(signalSemaphore);
 		device.freeCommandBuffers(pool, secondaryCommandBuffer);

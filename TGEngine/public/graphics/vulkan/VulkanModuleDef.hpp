@@ -49,11 +49,14 @@ public:
   std::vector<CommandBuffer> noneRenderCmdbuffer;
   std::vector<Pipeline> pipelines;
   Queue queue;
+  Queue secondaryQueue;
   uint32_t queueFamilyIndex;
   uint32_t queueIndex;
+  uint32_t secondaryqueueIndex;
   Semaphore waitSemaphore;
   Semaphore signalSemaphore;
   Fence commandBufferFence;
+  Fence secondaryBufferFence;
   std::vector<ShaderModule> shaderModules;
   uint32_t memoryTypeHostVisibleCoherent;
   uint32_t memoryTypeDeviceLocal;
@@ -64,8 +67,6 @@ public:
   Viewport viewport;
   std::vector<CommandBuffer> secondaryCommandBuffer;
   std::mutex commandBufferRecording; // protects secondaryCommandBuffer from
-                                     // memory invalidation
-  std::mutex protectSecondaryTexture; // protects secondaryCommandBuffer from
                                      // memory invalidation
   std::mutex protectSecondaryData; // protects secondaryCommandBuffer from
   // memory invalidation
@@ -105,6 +106,8 @@ public:
 #ifdef DEBUG
   DebugUtilsMessengerEXT debugMessenger;
 #endif
+
+  VulkanGraphicsModule() : APILayer(new shader::VulkanShaderModule(this)) {}
 
   main::Error init() override;
 
