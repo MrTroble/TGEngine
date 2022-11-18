@@ -18,8 +18,7 @@ namespace tge::graphics {
 	enum class IndexSize { UINT16, UINT32, NONE };
 
 	struct PushConstRanges {
-		size_t pushConstSize = 0;
-		void* pushConstData = nullptr;
+		std::vector<char> pushConstData;
 		shader::ShaderType type;
 	};
 

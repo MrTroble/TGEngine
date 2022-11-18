@@ -244,7 +244,6 @@ namespace tge::graphics
 			offset == 0
 			? device.allocateCommandBuffers(commandBufferAllocate).back()
 			: this->secondaryCommandBuffer[indexIn];
-
 		const std::lock_guard onExitUnlock(commandBufferRecording);
 
 		const CommandBufferInheritanceInfo inheritance(renderpass, 0);
@@ -294,7 +293,7 @@ namespace tge::graphics
 
 			for (const auto& range : info.constRanges) {
 				VulkanShaderModule* shaderMod = (VulkanShaderModule*)shaderAPI;
-				cmdBuf.pushConstants(this->materialToLayout[info.materialId], shaderToVulkan(range.type), 0, range.pushConstSize, range.pushConstData);
+				cmdBuf.pushConstants(this->materialToLayout[info.materialId], shaderToVulkan(range.type), 0, range.pushConstData.size(), range.pushConstData.data());
 			}
 
 			if (info.indexSize != IndexSize::NONE) [[likely]]
@@ -1295,6 +1294,7 @@ namespace tge::graphics
 
 			if (!secondaryCommandBuffer.empty())
 			{
+				std::lock_guard lg(commandBufferRecording);
 				currentBuffer.executeCommands(secondaryCommandBuffer);
 			}
 
@@ -1331,7 +1331,6 @@ namespace tge::graphics
 		const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
 			signalSemaphore);
 
-		commandBufferRecording.lock();
 		queue.submit(submitInfo, commandBufferFence);
 
 		const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
@@ -1348,14 +1347,12 @@ namespace tge::graphics
 			auto nextimage =
 				device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
 			this->nextImage = nextimage.value;
-			commandBufferRecording.unlock();
 			return;
 		}
 
 		const Result waitresult =
 			device.waitForFences(commandBufferFence, true, UINT64_MAX);
 		VERROR(waitresult);
-		commandBufferRecording.unlock();
 
 		currentBuffer.reset();
 		device.resetFences(commandBufferFence);
@@ -1379,7 +1376,6 @@ namespace tge::graphics
 		device.destroyFence(secondaryBufferFence);
 		device.destroySemaphore(waitSemaphore);
 		device.destroySemaphore(signalSemaphore);
-		device.freeCommandBuffers(pool, secondaryCommandBuffer);
 		for (const auto imag : textureImages)
 			device.destroyImage(imag);
 		const auto eItr = std::unique(
@@ -1400,8 +1396,8 @@ namespace tge::graphics
 			device.destroyPipeline(pipe);
 		for (const auto shader : shaderModules)
 			device.destroyShaderModule(shader);
-		device.freeCommandBuffers(pool, cmdbuffer);
 		device.destroyCommandPool(pool);
+		device.destroyCommandPool(secondaryPool);
 		for (const auto framebuff : framebuffer)
 			device.destroyFramebuffer(framebuff);
 		for (const auto imv : swapchainImageviews)
