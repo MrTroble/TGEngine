@@ -45,6 +45,7 @@ public:
   std::vector<Framebuffer> framebuffer;
   CommandPool pool;
   CommandPool secondaryPool;
+  CommandPool secondaryBufferPool;
   std::vector<CommandBuffer> cmdbuffer;
   std::vector<CommandBuffer> noneRenderCmdbuffer;
   std::vector<Pipeline> pipelines;

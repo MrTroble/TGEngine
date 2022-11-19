@@ -236,15 +236,15 @@ namespace tge::graphics
 		const size_t offset)
 	{
 		EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
+		const std::lock_guard onExitUnlock(commandBufferRecording);
 
 		const CommandBufferAllocateInfo commandBufferAllocate(
-			secondaryPool, CommandBufferLevel::eSecondary, 1);
+			secondaryBufferPool, CommandBufferLevel::eSecondary, 1);
 		const auto indexIn = this->secondaryCommandBuffer.size() - offset;
 		const CommandBuffer cmdBuf =
 			offset == 0
 			? device.allocateCommandBuffers(commandBufferAllocate).back()
 			: this->secondaryCommandBuffer[indexIn];
-		const std::lock_guard onExitUnlock(commandBufferRecording);
 
 		const CommandBufferInheritanceInfo inheritance(renderpass, 0);
 		const CommandBufferBeginInfo beginInfo(
@@ -1241,6 +1241,7 @@ namespace tge::graphics
 			CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamilyIndex);
 		pool = device.createCommandPool(commandPoolCreateInfo);
 		secondaryPool = device.createCommandPool(commandPoolCreateInfo);
+		secondaryBufferPool = device.createCommandPool(commandPoolCreateInfo);
 
 		const CommandBufferAllocateInfo cmdBufferAllocInfo(
 			pool, CommandBufferLevel::ePrimary, (uint32_t)3);
@@ -1398,6 +1399,7 @@ namespace tge::graphics
 			device.destroyShaderModule(shader);
 		device.destroyCommandPool(pool);
 		device.destroyCommandPool(secondaryPool);
+		device.destroyCommandPool(secondaryBufferPool);
 		for (const auto framebuff : framebuffer)
 			device.destroyFramebuffer(framebuff);
 		for (const auto imv : swapchainImageviews)
