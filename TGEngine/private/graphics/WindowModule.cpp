@@ -1,6 +1,7 @@
 #include "../../public/graphics/WindowModule.hpp"
 #include <iostream>
 #include <string>
+#include <array>
 #include "../../public/Util.hpp"
 
 #ifndef APPLICATION_NAME
