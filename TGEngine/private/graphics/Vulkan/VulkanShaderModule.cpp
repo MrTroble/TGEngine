@@ -266,12 +266,15 @@ namespace tge::shader
 			const auto descLayout = vgm->device.createDescriptorSetLayout(layoutCreate);
 			vsm->setLayouts.push_back(descLayout);
 			std::vector<DescriptorPoolSize> descPoolSizes;
+			constexpr auto limit = 100000;
 			for (const auto& binding : shaderPipe->descriptorLayoutBindings)
 			{
 				descPoolSizes.push_back(
-					{ binding.descriptorType, binding.descriptorCount * 1000 });
+                                    {binding.descriptorType,
+                                     binding.descriptorCount * limit});
 			}
-			const DescriptorPoolCreateInfo descPoolCreateInfo({}, 1000, descPoolSizes);
+                        const DescriptorPoolCreateInfo descPoolCreateInfo(
+                            {}, limit, descPoolSizes);
 			const auto descPool = vgm->device.createDescriptorPool(descPoolCreateInfo);
 			vsm->descPools.push_back(descPool);
 

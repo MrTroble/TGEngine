@@ -3,16 +3,16 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <array>
+#include <glm/gtx/transform.hpp>
+#include <iostream>
+
 #include "../../public/Util.hpp"
 #include "../../public/graphics/GameShaderModule.hpp"
 #include "../../public/graphics/vulkan/VulkanShaderPipe.hpp"
 #include "../../public/headerlibs/ddspp.h"
 #include "../../public/headerlibs/tiny_gltf.h"
 #include "BGAL.h"
-#include <array>
-#include <glm/gtx/transform.hpp>
-#include <iostream>
-
 
 namespace tge::graphics {
 
@@ -20,39 +20,39 @@ using namespace tinygltf;
 
 inline AddressMode gltfToAPI(int in, AddressMode def) {
   switch (in) {
-  case TINYGLTF_TEXTURE_WRAP_REPEAT:
-    return AddressMode::REPEAT;
-  case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
-    return AddressMode::CLAMP_TO_EDGE;
-  case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
-    return AddressMode::MIRROR_REPEAT;
+    case TINYGLTF_TEXTURE_WRAP_REPEAT:
+      return AddressMode::REPEAT;
+    case TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE:
+      return AddressMode::CLAMP_TO_EDGE;
+    case TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT:
+      return AddressMode::MIRROR_REPEAT;
   }
   return def;
 }
 
 inline FilterSetting gltfToAPI(int in, FilterSetting def) {
   switch (in) {
-  case TINYGLTF_TEXTURE_FILTER_LINEAR:
-    return FilterSetting::LINEAR;
-  case TINYGLTF_TEXTURE_FILTER_NEAREST:
-    return FilterSetting::NEAREST;
-  default:
-    return def;
+    case TINYGLTF_TEXTURE_FILTER_LINEAR:
+      return FilterSetting::LINEAR;
+    case TINYGLTF_TEXTURE_FILTER_NEAREST:
+      return FilterSetting::NEAREST;
+    default:
+      return def;
   }
 }
 
 inline vk::Format getFormatFromStride(uint32_t stride) {
   switch (stride) {
-  case 4:
-    return vk::Format::eR32Sfloat;
-  case 8:
-    return vk::Format::eR32G32Sfloat;
-  case 12:
-    return vk::Format::eR32G32B32Sfloat;
-  case 16:
-    return vk::Format::eR32G32B32A32Sfloat;
-  default:
-    throw std::runtime_error("Couldn't find format");
+    case 4:
+      return vk::Format::eR32Sfloat;
+    case 8:
+      return vk::Format::eR32G32Sfloat;
+    case 12:
+      return vk::Format::eR32G32B32Sfloat;
+    case 16:
+      return vk::Format::eR32G32B32A32Sfloat;
+    default:
+      throw std::runtime_error("Couldn't find format");
   }
 }
 
@@ -69,7 +69,7 @@ inline size_t loadSampler(const Model &model, APILayer *apiLayer) {
   samplerIndex -= model.samplers.size() - 1;
 
   if (!model.images.empty()) {
-    if (model.samplers.empty()) { // default sampler
+    if (model.samplers.empty()) {  // default sampler
       const SamplerInfo samplerInfo = {
           FilterSetting::LINEAR, FilterSetting::LINEAR, AddressMode::REPEAT,
           AddressMode::REPEAT};
@@ -100,20 +100,20 @@ inline size_t loadTexturesFM(const Model &model, APILayer *apiLayer) {
 inline shader::IOType inputTypeFromGLTF(int type) {
   namespace s = shader;
   switch (type) {
-  case TINYGLTF_TYPE_VEC2:
-    return s::IOType::VEC2;
-  case TINYGLTF_TYPE_VEC3:
-    return s::IOType::VEC3;
-  case TINYGLTF_TYPE_VEC4:
-    return s::IOType::VEC4;
-  case TINYGLTF_TYPE_MAT4:
-    return s::IOType::MAT4;
-  case TINYGLTF_TYPE_MAT3:
-    return s::IOType::MAT3;
-  case TINYGLTF_TYPE_SCALAR:
-    return s::IOType::FLOAT;
-  default:
-    throw std::runtime_error("Type not found in GLTF translation!");
+    case TINYGLTF_TYPE_VEC2:
+      return s::IOType::VEC2;
+    case TINYGLTF_TYPE_VEC3:
+      return s::IOType::VEC3;
+    case TINYGLTF_TYPE_VEC4:
+      return s::IOType::VEC4;
+    case TINYGLTF_TYPE_MAT4:
+      return s::IOType::MAT4;
+    case TINYGLTF_TYPE_MAT3:
+      return s::IOType::MAT3;
+    case TINYGLTF_TYPE_SCALAR:
+      return s::IOType::FLOAT;
+    default:
+      throw std::runtime_error("Type not found in GLTF translation!");
   }
 }
 
@@ -575,330 +575,330 @@ std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>> &data) {
 
 inline size_t fromDXGI(ddspp::DXGIFormat format) {
   switch (format) {
-  case ddspp::UNKNOWN:
-    return (size_t)vk::Format::eUndefined;
-  case ddspp::R32G32B32A32_TYPELESS:
-    break;
-  case ddspp::R32G32B32A32_FLOAT:
-    break;
-  case ddspp::R32G32B32A32_UINT:
-    break;
-  case ddspp::R32G32B32A32_SINT:
-    break;
-  case ddspp::R32G32B32_TYPELESS:
-    break;
-  case ddspp::R32G32B32_FLOAT:
-    break;
-  case ddspp::R32G32B32_UINT:
-    break;
-  case ddspp::R32G32B32_SINT:
-    break;
-  case ddspp::R16G16B16A16_TYPELESS:
-    break;
-  case ddspp::R16G16B16A16_FLOAT:
-    break;
-  case ddspp::R16G16B16A16_UNORM:
-    break;
-  case ddspp::R16G16B16A16_UINT:
-    break;
-  case ddspp::R16G16B16A16_SNORM:
-    break;
-  case ddspp::R16G16B16A16_SINT:
-    break;
-  case ddspp::R32G32_TYPELESS:
-    break;
-  case ddspp::R32G32_FLOAT:
-    break;
-  case ddspp::R32G32_UINT:
-    break;
-  case ddspp::R32G32_SINT:
-    break;
-  case ddspp::R32G8X24_TYPELESS:
-    break;
-  case ddspp::D32_FLOAT_S8X24_UINT:
-    break;
-  case ddspp::R32_FLOAT_X8X24_TYPELESS:
-    break;
-  case ddspp::X32_TYPELESS_G8X24_UINT:
-    break;
-  case ddspp::R10G10B10A2_TYPELESS:
-    break;
-  case ddspp::R10G10B10A2_UNORM:
-    break;
-  case ddspp::R10G10B10A2_UINT:
-    break;
-  case ddspp::R11G11B10_FLOAT:
-    break;
-  case ddspp::R8G8B8A8_TYPELESS:
-    break;
-  case ddspp::R8G8B8A8_UNORM:
-    break;
-  case ddspp::R8G8B8A8_UNORM_SRGB:
-    break;
-  case ddspp::R8G8B8A8_UINT:
-    break;
-  case ddspp::R8G8B8A8_SNORM:
-    break;
-  case ddspp::R8G8B8A8_SINT:
-    break;
-  case ddspp::R16G16_TYPELESS:
-    break;
-  case ddspp::R16G16_FLOAT:
-    break;
-  case ddspp::R16G16_UNORM:
-    break;
-  case ddspp::R16G16_UINT:
-    break;
-  case ddspp::R16G16_SNORM:
-    break;
-  case ddspp::R16G16_SINT:
-    break;
-  case ddspp::R32_TYPELESS:
-    break;
-  case ddspp::D32_FLOAT:
-    break;
-  case ddspp::R32_FLOAT:
-    break;
-  case ddspp::R32_UINT:
-    break;
-  case ddspp::R32_SINT:
-    break;
-  case ddspp::R24G8_TYPELESS:
-    break;
-  case ddspp::D24_UNORM_S8_UINT:
-    break;
-  case ddspp::R24_UNORM_X8_TYPELESS:
-    break;
-  case ddspp::X24_TYPELESS_G8_UINT:
-    break;
-  case ddspp::R8G8_TYPELESS:
-    break;
-  case ddspp::R8G8_UNORM:
-    break;
-  case ddspp::R8G8_UINT:
-    break;
-  case ddspp::R8G8_SNORM:
-    break;
-  case ddspp::R8G8_SINT:
-    break;
-  case ddspp::R16_TYPELESS:
-    break;
-  case ddspp::R16_FLOAT:
-    break;
-  case ddspp::D16_UNORM:
-    break;
-  case ddspp::R16_UNORM:
-    break;
-  case ddspp::R16_UINT:
-    break;
-  case ddspp::R16_SNORM:
-    break;
-  case ddspp::R16_SINT:
-    break;
-  case ddspp::R8_TYPELESS:
-    break;
-  case ddspp::R8_UNORM:
-    break;
-  case ddspp::R8_UINT:
-    break;
-  case ddspp::R8_SNORM:
-    break;
-  case ddspp::R8_SINT:
-    break;
-  case ddspp::A8_UNORM:
-    break;
-  case ddspp::R1_UNORM:
-    break;
-  case ddspp::R9G9B9E5_SHAREDEXP:
-    break;
-  case ddspp::R8G8_B8G8_UNORM:
-    break;
-  case ddspp::G8R8_G8B8_UNORM:
-    break;
-  case ddspp::BC1_TYPELESS:
-  case ddspp::BC1_UNORM:
-    return (size_t)vk::Format::eBc1RgbaUnormBlock;
-  case ddspp::BC1_UNORM_SRGB:
-    return (size_t)vk::Format::eBc1RgbUnormBlock;
-  case ddspp::BC2_TYPELESS:
-    break;
-  case ddspp::BC2_UNORM:
-    break;
-  case ddspp::BC2_UNORM_SRGB:
-    break;
-  case ddspp::BC3_TYPELESS:
-  case ddspp::BC3_UNORM:
-    return (size_t)vk::Format::eBc3UnormBlock;
-  case ddspp::BC3_UNORM_SRGB:
-    return (size_t)vk::Format::eBc3SrgbBlock;
-  case ddspp::BC4_TYPELESS:
-    break;
-  case ddspp::BC4_UNORM:
-    break;
-  case ddspp::BC4_SNORM:
-    break;
-  case ddspp::BC5_TYPELESS:
-    break;
-  case ddspp::BC5_UNORM:
-    break;
-  case ddspp::BC5_SNORM:
-    break;
-  case ddspp::B5G6R5_UNORM:
-    break;
-  case ddspp::B5G5R5A1_UNORM:
-    break;
-  case ddspp::B8G8R8A8_UNORM:
-    break;
-  case ddspp::B8G8R8X8_UNORM:
-    break;
-  case ddspp::R10G10B10_XR_BIAS_A2_UNORM:
-    break;
-  case ddspp::B8G8R8A8_TYPELESS:
-    break;
-  case ddspp::B8G8R8A8_UNORM_SRGB:
-    break;
-  case ddspp::B8G8R8X8_TYPELESS:
-    break;
-  case ddspp::B8G8R8X8_UNORM_SRGB:
-    break;
-  case ddspp::BC6H_TYPELESS:
-    break;
-  case ddspp::BC6H_UF16:
-    break;
-  case ddspp::BC6H_SF16:
-    break;
-  case ddspp::BC7_TYPELESS:
-    break;
-  case ddspp::BC7_UNORM:
-    break;
-  case ddspp::BC7_UNORM_SRGB:
-    break;
-  case ddspp::AYUV:
-    break;
-  case ddspp::Y410:
-    break;
-  case ddspp::Y416:
-    break;
-  case ddspp::NV12:
-    break;
-  case ddspp::P010:
-    break;
-  case ddspp::P016:
-    break;
-  case ddspp::OPAQUE_420:
-    break;
-  case ddspp::YUY2:
-    break;
-  case ddspp::Y210:
-    break;
-  case ddspp::Y216:
-    break;
-  case ddspp::NV11:
-    break;
-  case ddspp::AI44:
-    break;
-  case ddspp::IA44:
-    break;
-  case ddspp::P8:
-    break;
-  case ddspp::A8P8:
-    break;
-  case ddspp::B4G4R4A4_UNORM:
-    break;
-  case ddspp::P208:
-    break;
-  case ddspp::V208:
-    break;
-  case ddspp::V408:
-    break;
-  case ddspp::ASTC_4X4_TYPELESS:
-    break;
-  case ddspp::ASTC_4X4_UNORM:
-    break;
-  case ddspp::ASTC_4X4_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_5X4_TYPELESS:
-    break;
-  case ddspp::ASTC_5X4_UNORM:
-    break;
-  case ddspp::ASTC_5X4_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_5X5_TYPELESS:
-    break;
-  case ddspp::ASTC_5X5_UNORM:
-    break;
-  case ddspp::ASTC_5X5_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_6X5_TYPELESS:
-    break;
-  case ddspp::ASTC_6X5_UNORM:
-    break;
-  case ddspp::ASTC_6X5_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_6X6_TYPELESS:
-    break;
-  case ddspp::ASTC_6X6_UNORM:
-    break;
-  case ddspp::ASTC_6X6_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_8X5_TYPELESS:
-    break;
-  case ddspp::ASTC_8X5_UNORM:
-    break;
-  case ddspp::ASTC_8X5_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_8X6_TYPELESS:
-    break;
-  case ddspp::ASTC_8X6_UNORM:
-    break;
-  case ddspp::ASTC_8X6_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_8X8_TYPELESS:
-    break;
-  case ddspp::ASTC_8X8_UNORM:
-    break;
-  case ddspp::ASTC_8X8_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_10X5_TYPELESS:
-    break;
-  case ddspp::ASTC_10X5_UNORM:
-    break;
-  case ddspp::ASTC_10X5_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_10X6_TYPELESS:
-    break;
-  case ddspp::ASTC_10X6_UNORM:
-    break;
-  case ddspp::ASTC_10X6_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_10X8_TYPELESS:
-    break;
-  case ddspp::ASTC_10X8_UNORM:
-    break;
-  case ddspp::ASTC_10X8_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_10X10_TYPELESS:
-    break;
-  case ddspp::ASTC_10X10_UNORM:
-    break;
-  case ddspp::ASTC_10X10_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_12X10_TYPELESS:
-    break;
-  case ddspp::ASTC_12X10_UNORM:
-    break;
-  case ddspp::ASTC_12X10_UNORM_SRGB:
-    break;
-  case ddspp::ASTC_12X12_TYPELESS:
-    break;
-  case ddspp::ASTC_12X12_UNORM:
-    break;
-  case ddspp::ASTC_12X12_UNORM_SRGB:
-    break;
-  case ddspp::FORCE_UINT:
-    break;
-  default:
-    break;
+    case ddspp::UNKNOWN:
+      return (size_t)vk::Format::eUndefined;
+    case ddspp::R32G32B32A32_TYPELESS:
+      break;
+    case ddspp::R32G32B32A32_FLOAT:
+      break;
+    case ddspp::R32G32B32A32_UINT:
+      break;
+    case ddspp::R32G32B32A32_SINT:
+      break;
+    case ddspp::R32G32B32_TYPELESS:
+      break;
+    case ddspp::R32G32B32_FLOAT:
+      break;
+    case ddspp::R32G32B32_UINT:
+      break;
+    case ddspp::R32G32B32_SINT:
+      break;
+    case ddspp::R16G16B16A16_TYPELESS:
+      break;
+    case ddspp::R16G16B16A16_FLOAT:
+      break;
+    case ddspp::R16G16B16A16_UNORM:
+      break;
+    case ddspp::R16G16B16A16_UINT:
+      break;
+    case ddspp::R16G16B16A16_SNORM:
+      break;
+    case ddspp::R16G16B16A16_SINT:
+      break;
+    case ddspp::R32G32_TYPELESS:
+      break;
+    case ddspp::R32G32_FLOAT:
+      break;
+    case ddspp::R32G32_UINT:
+      break;
+    case ddspp::R32G32_SINT:
+      break;
+    case ddspp::R32G8X24_TYPELESS:
+      break;
+    case ddspp::D32_FLOAT_S8X24_UINT:
+      break;
+    case ddspp::R32_FLOAT_X8X24_TYPELESS:
+      break;
+    case ddspp::X32_TYPELESS_G8X24_UINT:
+      break;
+    case ddspp::R10G10B10A2_TYPELESS:
+      break;
+    case ddspp::R10G10B10A2_UNORM:
+      break;
+    case ddspp::R10G10B10A2_UINT:
+      break;
+    case ddspp::R11G11B10_FLOAT:
+      break;
+    case ddspp::R8G8B8A8_TYPELESS:
+      break;
+    case ddspp::R8G8B8A8_UNORM:
+      break;
+    case ddspp::R8G8B8A8_UNORM_SRGB:
+      break;
+    case ddspp::R8G8B8A8_UINT:
+      break;
+    case ddspp::R8G8B8A8_SNORM:
+      break;
+    case ddspp::R8G8B8A8_SINT:
+      break;
+    case ddspp::R16G16_TYPELESS:
+      break;
+    case ddspp::R16G16_FLOAT:
+      break;
+    case ddspp::R16G16_UNORM:
+      break;
+    case ddspp::R16G16_UINT:
+      break;
+    case ddspp::R16G16_SNORM:
+      break;
+    case ddspp::R16G16_SINT:
+      break;
+    case ddspp::R32_TYPELESS:
+      break;
+    case ddspp::D32_FLOAT:
+      break;
+    case ddspp::R32_FLOAT:
+      break;
+    case ddspp::R32_UINT:
+      break;
+    case ddspp::R32_SINT:
+      break;
+    case ddspp::R24G8_TYPELESS:
+      break;
+    case ddspp::D24_UNORM_S8_UINT:
+      break;
+    case ddspp::R24_UNORM_X8_TYPELESS:
+      break;
+    case ddspp::X24_TYPELESS_G8_UINT:
+      break;
+    case ddspp::R8G8_TYPELESS:
+      break;
+    case ddspp::R8G8_UNORM:
+      break;
+    case ddspp::R8G8_UINT:
+      break;
+    case ddspp::R8G8_SNORM:
+      break;
+    case ddspp::R8G8_SINT:
+      break;
+    case ddspp::R16_TYPELESS:
+      break;
+    case ddspp::R16_FLOAT:
+      break;
+    case ddspp::D16_UNORM:
+      break;
+    case ddspp::R16_UNORM:
+      break;
+    case ddspp::R16_UINT:
+      break;
+    case ddspp::R16_SNORM:
+      break;
+    case ddspp::R16_SINT:
+      break;
+    case ddspp::R8_TYPELESS:
+      break;
+    case ddspp::R8_UNORM:
+      break;
+    case ddspp::R8_UINT:
+      break;
+    case ddspp::R8_SNORM:
+      break;
+    case ddspp::R8_SINT:
+      break;
+    case ddspp::A8_UNORM:
+      break;
+    case ddspp::R1_UNORM:
+      break;
+    case ddspp::R9G9B9E5_SHAREDEXP:
+      break;
+    case ddspp::R8G8_B8G8_UNORM:
+      break;
+    case ddspp::G8R8_G8B8_UNORM:
+      break;
+    case ddspp::BC1_TYPELESS:
+    case ddspp::BC1_UNORM:
+      return (size_t)vk::Format::eBc1RgbaUnormBlock;
+    case ddspp::BC1_UNORM_SRGB:
+      return (size_t)vk::Format::eBc1RgbUnormBlock;
+    case ddspp::BC2_TYPELESS:
+      break;
+    case ddspp::BC2_UNORM:
+      break;
+    case ddspp::BC2_UNORM_SRGB:
+      break;
+    case ddspp::BC3_TYPELESS:
+    case ddspp::BC3_UNORM:
+      return (size_t)vk::Format::eBc3UnormBlock;
+    case ddspp::BC3_UNORM_SRGB:
+      return (size_t)vk::Format::eBc3SrgbBlock;
+    case ddspp::BC4_TYPELESS:
+      break;
+    case ddspp::BC4_UNORM:
+      break;
+    case ddspp::BC4_SNORM:
+      break;
+    case ddspp::BC5_TYPELESS:
+      break;
+    case ddspp::BC5_UNORM:
+      break;
+    case ddspp::BC5_SNORM:
+      break;
+    case ddspp::B5G6R5_UNORM:
+      break;
+    case ddspp::B5G5R5A1_UNORM:
+      break;
+    case ddspp::B8G8R8A8_UNORM:
+      break;
+    case ddspp::B8G8R8X8_UNORM:
+      break;
+    case ddspp::R10G10B10_XR_BIAS_A2_UNORM:
+      break;
+    case ddspp::B8G8R8A8_TYPELESS:
+      break;
+    case ddspp::B8G8R8A8_UNORM_SRGB:
+      break;
+    case ddspp::B8G8R8X8_TYPELESS:
+      break;
+    case ddspp::B8G8R8X8_UNORM_SRGB:
+      break;
+    case ddspp::BC6H_TYPELESS:
+      break;
+    case ddspp::BC6H_UF16:
+      break;
+    case ddspp::BC6H_SF16:
+      break;
+    case ddspp::BC7_TYPELESS:
+      break;
+    case ddspp::BC7_UNORM:
+      break;
+    case ddspp::BC7_UNORM_SRGB:
+      break;
+    case ddspp::AYUV:
+      break;
+    case ddspp::Y410:
+      break;
+    case ddspp::Y416:
+      break;
+    case ddspp::NV12:
+      break;
+    case ddspp::P010:
+      break;
+    case ddspp::P016:
+      break;
+    case ddspp::OPAQUE_420:
+      break;
+    case ddspp::YUY2:
+      break;
+    case ddspp::Y210:
+      break;
+    case ddspp::Y216:
+      break;
+    case ddspp::NV11:
+      break;
+    case ddspp::AI44:
+      break;
+    case ddspp::IA44:
+      break;
+    case ddspp::P8:
+      break;
+    case ddspp::A8P8:
+      break;
+    case ddspp::B4G4R4A4_UNORM:
+      break;
+    case ddspp::P208:
+      break;
+    case ddspp::V208:
+      break;
+    case ddspp::V408:
+      break;
+    case ddspp::ASTC_4X4_TYPELESS:
+      break;
+    case ddspp::ASTC_4X4_UNORM:
+      break;
+    case ddspp::ASTC_4X4_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_5X4_TYPELESS:
+      break;
+    case ddspp::ASTC_5X4_UNORM:
+      break;
+    case ddspp::ASTC_5X4_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_5X5_TYPELESS:
+      break;
+    case ddspp::ASTC_5X5_UNORM:
+      break;
+    case ddspp::ASTC_5X5_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_6X5_TYPELESS:
+      break;
+    case ddspp::ASTC_6X5_UNORM:
+      break;
+    case ddspp::ASTC_6X5_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_6X6_TYPELESS:
+      break;
+    case ddspp::ASTC_6X6_UNORM:
+      break;
+    case ddspp::ASTC_6X6_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_8X5_TYPELESS:
+      break;
+    case ddspp::ASTC_8X5_UNORM:
+      break;
+    case ddspp::ASTC_8X5_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_8X6_TYPELESS:
+      break;
+    case ddspp::ASTC_8X6_UNORM:
+      break;
+    case ddspp::ASTC_8X6_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_8X8_TYPELESS:
+      break;
+    case ddspp::ASTC_8X8_UNORM:
+      break;
+    case ddspp::ASTC_8X8_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_10X5_TYPELESS:
+      break;
+    case ddspp::ASTC_10X5_UNORM:
+      break;
+    case ddspp::ASTC_10X5_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_10X6_TYPELESS:
+      break;
+    case ddspp::ASTC_10X6_UNORM:
+      break;
+    case ddspp::ASTC_10X6_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_10X8_TYPELESS:
+      break;
+    case ddspp::ASTC_10X8_UNORM:
+      break;
+    case ddspp::ASTC_10X8_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_10X10_TYPELESS:
+      break;
+    case ddspp::ASTC_10X10_UNORM:
+      break;
+    case ddspp::ASTC_10X10_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_12X10_TYPELESS:
+      break;
+    case ddspp::ASTC_12X10_UNORM:
+      break;
+    case ddspp::ASTC_12X10_UNORM_SRGB:
+      break;
+    case ddspp::ASTC_12X12_TYPELESS:
+      break;
+    case ddspp::ASTC_12X12_UNORM:
+      break;
+    case ddspp::ASTC_12X12_UNORM_SRGB:
+      break;
+    case ddspp::FORCE_UINT:
+      break;
+    default:
+      break;
   }
   throw std::runtime_error("Translation table not found for DXGI!");
 }
@@ -926,17 +926,15 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
   return textureInfos;
 }
 
-uint32_t
-GameGraphicsModule::loadTextures(const std::vector<std::vector<char>> &data,
-                                 const LoadType type) {
+uint32_t GameGraphicsModule::loadTextures(
+    const std::vector<std::vector<char>> &data, const LoadType type) {
+  if (data.empty()) return UINT32_MAX;
   std::vector<TextureInfo> textureInfos;
 
   util::OnExit onExit([tinfos = &textureInfos, type = type] {
-    if (type != LoadType::STBI)
-      return;
+    if (type != LoadType::STBI) return;
     for (const auto &tex : *tinfos)
-      if (tex.data != nullptr)
-        free(tex.data);
+      if (tex.data != nullptr) free(tex.data);
   });
 
   if (type == LoadType::STBI) {
@@ -1007,4 +1005,4 @@ void GameGraphicsModule::updateTransform(const size_t nodeID,
   this->status[nodeID] = 1;
 }
 
-} // namespace tge::graphics
+}  // namespace tge::graphics
