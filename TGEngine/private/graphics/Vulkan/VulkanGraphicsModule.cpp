@@ -1135,7 +1135,7 @@ namespace tge::graphics
 			if (fndPresentMode == presentModesEndItr)
 				fndPresentMode = presentModesBeginItr;
 		}
-		const auto presentMode = *fndPresentMode;
+		this->presentMode = *fndPresentMode;
 #pragma endregion
 
 #pragma region Depth and Output Attachments
