@@ -25,7 +25,7 @@ namespace tge::graphics {
 	struct RenderInfo {
 		std::vector<size_t> vertexBuffer;
 		size_t indexBuffer;
-		size_t materialId;
+		size_t materialId = SIZE_MAX;
 		size_t indexCount;
 		size_t instanceCount = 1;
 		size_t indexOffset = 0;

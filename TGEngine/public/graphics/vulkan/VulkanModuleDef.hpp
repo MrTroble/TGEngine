@@ -63,6 +63,7 @@ public:
   uint32_t memoryTypeDeviceLocal;
   std::vector<Buffer> bufferList;
   std::vector<size_t> bufferSizeList;
+  std::vector<size_t> bufferOffset;
   std::vector<size_t> alignment;
   std::vector<DeviceMemory> bufferMemoryList;
   Viewport viewport;
