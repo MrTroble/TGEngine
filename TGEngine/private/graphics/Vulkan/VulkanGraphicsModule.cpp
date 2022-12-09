@@ -301,15 +301,24 @@ void VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
       std::vector(renderInfos, renderInfos + renderInfoCount);
 }
 
+inline void waitAndReset(const Device& device, const Fence fence) {
+  const Result result = device.waitForFences(fence, true, UINT64_MAX);
+  VERROR(result);
+  device.resetFences(fence);
+}
+
+static std::mutex submitAndWaitMutex;
+
 inline void submitAndWait(const Device& device, const Queue& queue,
                           const CommandBuffer& cmdBuf, const Fence fence) {
+  std::lock_guard onExit(submitAndWaitMutex);
+  waitAndReset(device, fence);
+
   const SubmitInfo submitInfo({}, {}, cmdBuf, {});
   queue.submit(submitInfo, fence);
 
   const Result result = device.waitForFences(fence, true, UINT64_MAX);
   VERROR(result);
-
-  device.resetFences(fence);
 }
 
 inline BufferUsageFlags getUsageFlagsFromDataType(const DataType type) {
@@ -644,13 +653,7 @@ size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
 
   cmd.end();
 
-  const SubmitInfo submitInfo({}, {}, cmd, {});
-  secondaryQueue.submit(submitInfo, secondaryBufferFence);
-  const Result result =
-      device.waitForFences(secondaryBufferFence, true, UINT64_MAX);
-  VERROR(result);
-  device.resetFences(secondaryBufferFence);
-
+  submitAndWait(device, queue, cmd, secondaryBufferFence);
   return firstIndex;
 }
 
@@ -990,11 +993,10 @@ main::Error VulkanGraphicsModule::init() {
   const auto& queueFamily = *queueFamilyItr;
   std::vector<float> priorities(queueFamily.queueCount);
   std::fill(priorities.begin(), priorities.end(), 0.0f);
-  if (queueFamily.queueCount < 2) return main::Error::NO_GRAPHIC_QUEUE_FOUND;
   queueIndex = 0;
-  secondaryqueueIndex = 1;
+  secondaryqueueIndex = queueFamily.queueCount > 1 ? 1 : 0;
   const DeviceQueueCreateInfo queueCreateInfo(
-      {}, queueIndex, queueFamily.queueCount, priorities.data());
+      {}, queueIndex, secondaryqueueIndex + 1, priorities.data());
 
   const auto devextensions =
       physicalDevice.enumerateDeviceExtensionProperties();
@@ -1033,9 +1035,13 @@ main::Error VulkanGraphicsModule::init() {
 #pragma endregion
 
 #pragma region Vulkan Mutex
-  const FenceCreateInfo fenceCreateInfo;
+  const FenceCreateInfo fenceCreateInfo{vk::FenceCreateFlagBits::eSignaled};
   commandBufferFence = device.createFence(fenceCreateInfo);
-  secondaryBufferFence = device.createFence(fenceCreateInfo);
+  if (queueFamily.queueCount > 1) {
+    secondaryBufferFence = device.createFence(fenceCreateInfo);
+  } else {
+    secondaryBufferFence = commandBufferFence;
+  }
 
   const SemaphoreCreateInfo semaphoreCreateInfo;
   waitSemaphore = device.createSemaphore(semaphoreCreateInfo);
@@ -1293,7 +1299,11 @@ void VulkanGraphicsModule::tick(double time) {
   const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
                               signalSemaphore);
 
-  queue.submit(submitInfo, commandBufferFence);
+  {
+    std::lock_guard onExit(submitAndWaitMutex);
+    waitAndReset(device, commandBufferFence);
+    queue.submit(submitInfo, commandBufferFence);
+  }
 
   const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
                                    nullptr);
@@ -1303,19 +1313,11 @@ void VulkanGraphicsModule::tick(double time) {
   }
   if (checkAndRecreate(this, result)) {
     currentBuffer.reset();
-    device.resetFences(commandBufferFence);
     auto nextimage =
         device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
     this->nextImage = nextimage.value;
     return;
   }
-
-  const Result waitresult =
-      device.waitForFences(commandBufferFence, true, UINT64_MAX);
-  VERROR(waitresult);
-
-  currentBuffer.reset();
-  device.resetFences(commandBufferFence);
 
   while (true) {
     auto nextimage =
