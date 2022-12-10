@@ -1316,6 +1316,8 @@ void VulkanGraphicsModule::tick(double time) {
     auto nextimage =
         device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
     this->nextImage = nextimage.value;
+    if(this->nextImage > 2)
+      printf("WTF!");
     return;
   }
 
