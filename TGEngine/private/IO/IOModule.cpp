@@ -94,9 +94,14 @@ namespace tge::io
     case KeyPress:
     {
       const auto sym = XLookupKeysym(&event.xkey, 0);
-      const auto name = std::toupper(*XKeysymToString(sym));
+      uint32_t name = (int)sym;
+      if(sym <= 'z' && sym >= 'a') {
+        name -= 32;
+      } else if(sym >= 'A' && sym <= 'Z') {
+        name += 32;
+      }
       for (const auto io : ios)
-        io->keyboardEvent({(uint32_t)name});
+        io->keyboardEvent({name});
       break;
     }
     }

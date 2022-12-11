@@ -1240,6 +1240,9 @@ main::Error VulkanGraphicsModule::init() {
 void VulkanGraphicsModule::tick(double time) {
   if (exitFailed) return;
 
+  if(this->nextImage > cmdbuffer.size()) {
+    printf("Size greater command buffer size!");
+  }
   const auto currentBuffer = cmdbuffer[this->nextImage];
   if (1) {  // For now rerecord every tick
     constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
