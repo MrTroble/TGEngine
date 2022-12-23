@@ -623,13 +623,7 @@ size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
 
   cmd.end();
 
-  const SubmitInfo submitInfo({}, {}, cmd, {});
-  secondaryQueue.submit(submitInfo, secondaryBufferFence);
-  const Result result =
-      device.waitForFences(secondaryBufferFence, true, UINT64_MAX);
-  VERROR(result);
-  device.resetFences(secondaryBufferFence);
-
+  submitAndWait(device, queue, cmd, secondaryBufferFence);
   return firstIndex;
 }
 
@@ -971,11 +965,10 @@ main::Error VulkanGraphicsModule::init() {
   const auto& queueFamily = *queueFamilyItr;
   std::vector<float> priorities(queueFamily.queueCount);
   std::fill(priorities.begin(), priorities.end(), 0.0f);
-  if (queueFamily.queueCount < 2) return main::Error::NO_GRAPHIC_QUEUE_FOUND;
   queueIndex = 0;
-  secondaryqueueIndex = 1;
+  secondaryqueueIndex = queueFamily.queueCount > 1 ? 1 : 0;
   const DeviceQueueCreateInfo queueCreateInfo(
-      {}, queueIndex, queueFamily.queueCount, priorities.data());
+      {}, queueIndex, secondaryqueueIndex + 1, priorities.data());
 
   const auto devextensions =
       physicalDevice.enumerateDeviceExtensionProperties();
@@ -1014,19 +1007,25 @@ main::Error VulkanGraphicsModule::init() {
 #pragma endregion
 
 #pragma region Vulkan Mutex
-  const FenceCreateInfo fenceCreateInfo;
+  const FenceCreateInfo fenceCreateInfo{vk::FenceCreateFlagBits::eSignaled};
   commandBufferFence = device.createFence(fenceCreateInfo);
+<<<<<<< HEAD
 <<<<<<< Updated upstream
   secondaryBufferFence = device.createFence(fenceCreateInfo);
 =======
+=======
+>>>>>>> 9b710c46c7d58d407d4c37e54932a6f0917165a9
   if (queueFamily.queueCount > 1) {
     secondaryBufferFence = device.createFence(fenceCreateInfo);
   } else {
     secondaryBufferFence = commandBufferFence;
   }
+<<<<<<< HEAD
   const FenceCreateInfo normalFenceInfo{};
   initialFence = device.createFence(normalFenceInfo);
 >>>>>>> Stashed changes
+=======
+>>>>>>> 9b710c46c7d58d407d4c37e54932a6f0917165a9
 
   const SemaphoreCreateInfo semaphoreCreateInfo;
   waitSemaphore = device.createSemaphore(semaphoreCreateInfo);
@@ -1225,6 +1224,9 @@ main::Error VulkanGraphicsModule::init() {
 void VulkanGraphicsModule::tick(double time) {
   if (exitFailed) return;
 
+  if(this->nextImage > cmdbuffer.size()) {
+    printf("Size greater command buffer size!");
+  }
   const auto currentBuffer = cmdbuffer[this->nextImage];
   if (1) {  // For now rerecord every tick
     constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -1284,7 +1286,11 @@ void VulkanGraphicsModule::tick(double time) {
   const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
                               signalSemaphore);
 
-  queue.submit(submitInfo, commandBufferFence);
+  {
+    std::lock_guard onExit(submitAndWaitMutex);
+    waitAndReset(device, commandBufferFence);
+    queue.submit(submitInfo, commandBufferFence);
+  }
 
   const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
                                    nullptr);
@@ -1294,20 +1300,17 @@ void VulkanGraphicsModule::tick(double time) {
   }
   if (checkAndRecreate(this, result)) {
     currentBuffer.reset();
-    device.resetFences(commandBufferFence);
     auto nextimage =
         device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
     this->nextImage = nextimage.value;
+<<<<<<< HEAD
     if (this->nextImage > 2) printf("WTF!");
+=======
+    if(this->nextImage > 2)
+      printf("WTF!");
+>>>>>>> 9b710c46c7d58d407d4c37e54932a6f0917165a9
     return;
   }
-
-  const Result waitresult =
-      device.waitForFences(commandBufferFence, true, UINT64_MAX);
-  VERROR(waitresult);
-
-  currentBuffer.reset();
-  device.resetFences(commandBufferFence);
 
   while (true) {
     auto nextimage =
