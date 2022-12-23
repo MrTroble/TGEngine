@@ -41,16 +41,6 @@ using namespace vk;
 
 Result verror = Result::eSuccess;
 
-#define VERROR(rslt)                                               \
-  if (rslt != Result::eSuccess) {                                  \
-    verror = rslt;                                                 \
-    main::error = main::Error::VULKAN_ERROR;                       \
-    std::string s = to_string(verror);                             \
-    const auto file = __FILE__;                                    \
-    const auto line = __LINE__;                                    \
-    printf("Vulkan error %s in %s L%d!\n", s.c_str(), file, line); \
-  }  // namespace tge::graphics
-
 inline void waitForImageTransition(
     const CommandBuffer& curBuffer, const ImageLayout oldLayout,
     const ImageLayout newLayout, const Image image,
@@ -301,17 +291,6 @@ void VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
       std::vector(renderInfos, renderInfos + renderInfoCount);
 }
 
-inline void submitAndWait(const Device& device, const Queue& queue,
-                          const CommandBuffer& cmdBuf, const Fence fence) {
-  const SubmitInfo submitInfo({}, {}, cmdBuf, {});
-  queue.submit(submitInfo, fence);
-
-  const Result result = device.waitForFences(fence, true, UINT64_MAX);
-  VERROR(result);
-
-  device.resetFences(fence);
-}
-
 inline BufferUsageFlags getUsageFlagsFromDataType(const DataType type) {
   switch (type) {
     case DataType::VertexIndexData:
@@ -357,7 +336,7 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
   alignment.reserve(alignment.size() + dataCount);
   bufferOffset.reserve(firstMemIndex + dataCount);
 
-  const std::lock_guard lg(protectSecondaryData);
+  std::lock_guard lg(protectSecondaryData);
   const auto cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
@@ -465,7 +444,7 @@ void VulkanGraphicsModule::changeData(const size_t bufferIndex,
 
   device.unmapMemory(hostVisibleMemory);
 
-  const std::lock_guard lg(protectSecondaryData);
+  std::lock_guard lg(protectSecondaryData);
   const auto cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
@@ -577,7 +556,7 @@ size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
   textureMemorys.reserve(firstIndex + textureCount);
   textureImageViews.reserve(firstIndex + textureCount);
 
-  const std::lock_guard lg(protectSecondaryData);
+  std::lock_guard lg(protectSecondaryData);
   const auto cmd = noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
@@ -677,6 +656,8 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 
   printf("[%s][%s]: %s\n", severity.c_str(), type.c_str(),
          pCallbackData->pMessage);
+  if (messageSeverity == DebugUtilsMessageSeverityFlagBitsEXT::eError)
+    return VK_TRUE;
   return VK_FALSE;
 }
 #endif
@@ -800,7 +781,7 @@ inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count,
   }
 
   cmd.end();
-  submitAndWait(vgm->device, queue, cmd, vgm->secondaryBufferFence);
+  vgm->submitAndWait(vgm->device, queue, cmd, vgm->secondaryBufferFence);
 }
 
 inline void createSwapchain(VulkanGraphicsModule* vgm) {
@@ -851,7 +832,7 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
   vgm->roughnessMetallicImage = vgm->firstImage + 3;
   vgm->position = vgm->firstImage + 4;
 
-  const std::lock_guard lg(vgm->protectSecondaryData);
+  std::lock_guard lg(vgm->protectSecondaryData);
   oneTimeWait(vgm, intImageInfo.size(),
               vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER], vgm->queue);
 
@@ -1035,7 +1016,17 @@ main::Error VulkanGraphicsModule::init() {
 #pragma region Vulkan Mutex
   const FenceCreateInfo fenceCreateInfo;
   commandBufferFence = device.createFence(fenceCreateInfo);
+<<<<<<< Updated upstream
   secondaryBufferFence = device.createFence(fenceCreateInfo);
+=======
+  if (queueFamily.queueCount > 1) {
+    secondaryBufferFence = device.createFence(fenceCreateInfo);
+  } else {
+    secondaryBufferFence = commandBufferFence;
+  }
+  const FenceCreateInfo normalFenceInfo{};
+  initialFence = device.createFence(normalFenceInfo);
+>>>>>>> Stashed changes
 
   const SemaphoreCreateInfo semaphoreCreateInfo;
   waitSemaphore = device.createSemaphore(semaphoreCreateInfo);
@@ -1307,6 +1298,7 @@ void VulkanGraphicsModule::tick(double time) {
     auto nextimage =
         device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
     this->nextImage = nextimage.value;
+    if (this->nextImage > 2) printf("WTF!");
     return;
   }
 

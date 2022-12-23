@@ -9,7 +9,8 @@ class GUIModule : public tge::main::Module {
 public:
 
   void *pool;
-  void *buffer;
+  size_t buffer;
+  size_t primary;
   void *renderpass;
   void *framebuffer = nullptr;
 

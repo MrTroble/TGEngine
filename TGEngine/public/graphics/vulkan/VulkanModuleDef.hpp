@@ -7,30 +7,41 @@
 #undef min
 #undef max
 #undef ERROR
-#endif // WIN32
+#endif  // WIN32
 #ifdef __linux__
 #define VULKAN_HPP_ENABLE_DYNAMIC_LOADER_TOOL 1
 #define VK_USE_PLATFORM_XLIB_KHR 1
 #endif
+#include <vector>
+#include <vulkan/vulkan.hpp>
+
 #include "../../../public/Module.hpp"
 #include "../GameGraphicsModule.hpp"
 #include "VulkanShaderModule.hpp"
 #include "VulkanShaderPipe.hpp"
-#include <vector>
-#include <vulkan/vulkan.hpp>
 #undef None
 #undef Bool
+
+#define VERROR(rslt)                                               \
+  if (rslt != Result::eSuccess) {                                  \
+    verror = rslt;                                                 \
+    main::error = main::Error::VULKAN_ERROR;                       \
+    std::string s = to_string(verror);                             \
+    const auto file = __FILE__;                                    \
+    const auto line = __LINE__;                                    \
+    printf("Vulkan error %s in %s L%d!\n", s.c_str(), file, line); \
+  }  // namespace tge::graphics
 
 namespace tge::graphics {
 
 using namespace vk;
+extern Result verror;
 
 constexpr size_t DATA_ONLY_BUFFER = 0;
 constexpr size_t TEXTURE_ONLY_BUFFER = 1;
 
 class VulkanGraphicsModule : public APILayer {
-
-public:
+ public:
   Instance instance;
   PhysicalDevice physicalDevice;
   Device device;
@@ -56,6 +67,7 @@ public:
   uint32_t secondaryqueueIndex;
   Semaphore waitSemaphore;
   Semaphore signalSemaphore;
+  Fence initialFence;
   Fence commandBufferFence;
   Fence secondaryBufferFence;
   std::vector<ShaderModule> shaderModules;
@@ -68,9 +80,9 @@ public:
   std::vector<DeviceMemory> bufferMemoryList;
   Viewport viewport;
   std::vector<CommandBuffer> secondaryCommandBuffer;
-  std::mutex commandBufferRecording; // protects secondaryCommandBuffer from
-                                     // memory invalidation
-  std::mutex protectSecondaryData; // protects secondaryCommandBuffer from
+  std::mutex commandBufferRecording;  // protects secondaryCommandBuffer from
+                                      // memory invalidation
+  std::mutex protectSecondaryData;    // protects secondaryCommandBuffer from
   // memory invalidation
   std::vector<Sampler> sampler;
   std::vector<Image> textureImages;
@@ -117,8 +129,8 @@ public:
 
   void destroy() override;
 
-  size_t pushMaterials(const size_t materialcount,
-                       const Material *materials, const size_t offset = SIZE_MAX) override;
+  size_t pushMaterials(const size_t materialcount, const Material *materials,
+                       const size_t offset = SIZE_MAX) override;
 
   size_t pushData(const size_t dataCount, void *data, const size_t *dataSizes,
                   const DataType type) override;
@@ -139,11 +151,33 @@ public:
 
   void *loadShader(const MaterialType type) override;
 
-  size_t getAligned(const size_t buffer, const size_t toBeAligned=0) const override;
+  size_t getAligned(const size_t buffer,
+                    const size_t toBeAligned = 0) const override;
 
-  size_t getAligned(const DataType type) const  override;
+  size_t getAligned(const DataType type) const override;
 
   glm::vec2 getRenderExtent() const override;
+
+  std::mutex submitAndWaitMutex;
+
+  inline void waitAndReset(const Device &device, const Fence fence) {
+    const Result result = device.waitForFences(fence, true, UINT64_MAX);
+    VERROR(result);
+
+    device.resetFences(fence);
+  }
+
+  inline void submitAndWait(const Device &device, const Queue &queue,
+                            const CommandBuffer &cmdBuf, const Fence fence) {
+    std::lock_guard onExit(submitAndWaitMutex);
+    waitAndReset(device, fence);
+
+    const SubmitInfo submitInfo({}, {}, cmdBuf, {});
+    queue.submit(submitInfo, fence);
+
+    const Result result = device.waitForFences(fence, true, UINT64_MAX);
+    VERROR(result);
+  }
 };
 
-} // namespace tge::graphics
+}  // namespace tge::graphics
