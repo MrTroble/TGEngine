@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Module.hpp"
+#include <cstddef>
 
 namespace tge::gui {
 
