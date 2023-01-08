@@ -1009,23 +1009,11 @@ main::Error VulkanGraphicsModule::init() {
 #pragma region Vulkan Mutex
   const FenceCreateInfo fenceCreateInfo{vk::FenceCreateFlagBits::eSignaled};
   commandBufferFence = device.createFence(fenceCreateInfo);
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-  secondaryBufferFence = device.createFence(fenceCreateInfo);
-=======
-=======
->>>>>>> 9b710c46c7d58d407d4c37e54932a6f0917165a9
   if (queueFamily.queueCount > 1) {
     secondaryBufferFence = device.createFence(fenceCreateInfo);
   } else {
     secondaryBufferFence = commandBufferFence;
   }
-<<<<<<< HEAD
-  const FenceCreateInfo normalFenceInfo{};
-  initialFence = device.createFence(normalFenceInfo);
->>>>>>> Stashed changes
-=======
->>>>>>> 9b710c46c7d58d407d4c37e54932a6f0917165a9
 
   const SemaphoreCreateInfo semaphoreCreateInfo;
   waitSemaphore = device.createSemaphore(semaphoreCreateInfo);
@@ -1224,71 +1212,74 @@ main::Error VulkanGraphicsModule::init() {
 void VulkanGraphicsModule::tick(double time) {
   if (exitFailed) return;
 
-  if(this->nextImage > cmdbuffer.size()) {
+  if (this->nextImage > cmdbuffer.size()) {
     printf("Size greater command buffer size!");
   }
+
   const auto currentBuffer = cmdbuffer[this->nextImage];
-  if (1) {  // For now rerecord every tick
-    constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
-    const std::array clearValue = {ClearValue(ClearDepthStencilValue(1.0f, 0)),
-                                   ClearValue(clearColor),
-                                   ClearValue(clearColor),
-                                   ClearValue(clearColor),
-                                   ClearValue(clearColor),
-                                   ClearValue(clearColor)};
-
-    const CommandBufferBeginInfo cmdBufferBeginInfo({}, nullptr);
-    currentBuffer.begin(cmdBufferBeginInfo);
-
-    const RenderPassBeginInfo renderPassBeginInfo(
-        renderpass, framebuffer[this->nextImage],
-        {{0, 0}, {(uint32_t)viewport.width, (uint32_t)viewport.height}},
-        clearValue);
-    currentBuffer.beginRenderPass(renderPassBeginInfo,
-                                  SubpassContents::eSecondaryCommandBuffers);
-
-    if (!secondaryCommandBuffer.empty()) {
-      std::lock_guard lg(commandBufferRecording);
-      currentBuffer.executeCommands(secondaryCommandBuffer);
-    }
-
-    currentBuffer.nextSubpass(SubpassContents::eInline);
-
-    currentBuffer.setViewport(0, this->viewport);
-
-    const Rect2D scissor({},
-                         {(uint32_t)viewport.width, (uint32_t)viewport.height});
-    currentBuffer.setScissor(0, scissor);
-
-    currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
-                               pipelines[lightPipe]);
-
-    const std::array lights = {lightBindings};
-    getShaderAPI()->addToRender(lights.data(), lights.size(),
-                                (CommandBuffer*)&currentBuffer);
-
-    currentBuffer.draw(3, 1, 0, 0);
-
-    currentBuffer.endRenderPass();
-
-    waitForImageTransition(currentBuffer, ImageLayout::eUndefined,
-                           ImageLayout::eGeneral, textureImages[depthImage],
-                           {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
-
-    currentBuffer.end();
-  }
-
-  primary[0] = currentBuffer;
-
-  const PipelineStageFlags stageFlag =
-      PipelineStageFlagBits::eColorAttachmentOutput |
-      PipelineStageFlagBits::eLateFragmentTests;
-  const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
-                              signalSemaphore);
-
   {
     std::lock_guard onExit(submitAndWaitMutex);
     waitAndReset(device, commandBufferFence);
+
+    if (1) {  // For now rerecord every tick
+      constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
+      const std::array clearValue = {
+          ClearValue(ClearDepthStencilValue(1.0f, 0)),
+          ClearValue(clearColor),
+          ClearValue(clearColor),
+          ClearValue(clearColor),
+          ClearValue(clearColor),
+          ClearValue(clearColor)};
+
+      const CommandBufferBeginInfo cmdBufferBeginInfo({}, nullptr);
+      currentBuffer.begin(cmdBufferBeginInfo);
+
+      const RenderPassBeginInfo renderPassBeginInfo(
+          renderpass, framebuffer[this->nextImage],
+          {{0, 0}, {(uint32_t)viewport.width, (uint32_t)viewport.height}},
+          clearValue);
+      currentBuffer.beginRenderPass(renderPassBeginInfo,
+                                    SubpassContents::eSecondaryCommandBuffers);
+
+      if (!secondaryCommandBuffer.empty()) {
+        std::lock_guard lg(commandBufferRecording);
+        currentBuffer.executeCommands(secondaryCommandBuffer);
+      }
+
+      currentBuffer.nextSubpass(SubpassContents::eInline);
+
+      currentBuffer.setViewport(0, this->viewport);
+
+      const Rect2D scissor(
+          {}, {(uint32_t)viewport.width, (uint32_t)viewport.height});
+      currentBuffer.setScissor(0, scissor);
+
+      currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
+                                 pipelines[lightPipe]);
+
+      const std::array lights = {lightBindings};
+      getShaderAPI()->addToRender(lights.data(), lights.size(),
+                                  (CommandBuffer*)&currentBuffer);
+
+      currentBuffer.draw(3, 1, 0, 0);
+
+      currentBuffer.endRenderPass();
+
+      waitForImageTransition(currentBuffer, ImageLayout::eUndefined,
+                             ImageLayout::eGeneral, textureImages[depthImage],
+                             {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
+
+      currentBuffer.end();
+    }
+
+    primary[0] = currentBuffer;
+
+    const PipelineStageFlags stageFlag =
+        PipelineStageFlagBits::eColorAttachmentOutput |
+        PipelineStageFlagBits::eLateFragmentTests;
+    const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
+                                signalSemaphore);
+
     queue.submit(submitInfo, commandBufferFence);
   }
 
@@ -1303,12 +1294,7 @@ void VulkanGraphicsModule::tick(double time) {
     auto nextimage =
         device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
     this->nextImage = nextimage.value;
-<<<<<<< HEAD
     if (this->nextImage > 2) printf("WTF!");
-=======
-    if(this->nextImage > 2)
-      printf("WTF!");
->>>>>>> 9b710c46c7d58d407d4c37e54932a6f0917165a9
     return;
   }
 
@@ -1336,7 +1322,9 @@ void VulkanGraphicsModule::destroy() {
     device.freeMemory(std::get<0>(*itr));
   for (const auto imView : textureImageViews) device.destroyImageView(imView);
   for (const auto samp : sampler) device.destroySampler(samp);
-  for (const auto mem : bufferMemoryList) device.freeMemory(mem);
+  const auto endMem = end(bufferMemoryList);
+  auto memItr = std::unique(begin(bufferMemoryList), endMem);
+  for (; memItr != endMem; memItr++) device.freeMemory(*memItr);
   for (const auto buf : bufferList) device.destroyBuffer(buf);
   for (const auto pipe : pipelines) device.destroyPipeline(pipe);
   for (const auto shader : shaderModules) device.destroyShaderModule(shader);

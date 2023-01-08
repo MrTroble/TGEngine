@@ -57,6 +57,7 @@ class VulkanGraphicsModule : public APILayer {
   CommandPool pool;
   CommandPool secondaryPool;
   CommandPool secondaryBufferPool;
+  CommandPool guiPool;
   std::vector<CommandBuffer> cmdbuffer;
   std::vector<CommandBuffer> noneRenderCmdbuffer;
   std::vector<Pipeline> pipelines;
@@ -67,7 +68,6 @@ class VulkanGraphicsModule : public APILayer {
   uint32_t secondaryqueueIndex;
   Semaphore waitSemaphore;
   Semaphore signalSemaphore;
-  Fence initialFence;
   Fence commandBufferFence;
   Fence secondaryBufferFence;
   std::vector<ShaderModule> shaderModules;
@@ -160,14 +160,14 @@ class VulkanGraphicsModule : public APILayer {
 
   std::mutex submitAndWaitMutex;
 
-  inline void waitAndReset(const Device &device, const Fence fence) {
+  inline void waitAndReset(const Device device, const Fence fence) {
     const Result result = device.waitForFences(fence, true, UINT64_MAX);
     VERROR(result);
 
     device.resetFences(fence);
   }
 
-  inline void submitAndWait(const Device &device, const Queue &queue,
+  inline void submitAndWait(const Device device, const Queue queue,
                             const CommandBuffer &cmdBuf, const Fence fence) {
     std::lock_guard onExit(submitAndWaitMutex);
     waitAndReset(device, fence);

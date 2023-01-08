@@ -158,13 +158,17 @@ main::Error GUIModule::init() {
   vmod->device.waitIdle();
   ImGui_ImplVulkan_DestroyFontUploadObjects();
 
+  CommandPoolCreateInfo poolCreateInfo(CommandPoolCreateFlagBits::eResetCommandBuffer, vmod->queueFamilyIndex);
+  vmod->guiPool = vmod->device.createCommandPool(poolCreateInfo);
+
   const auto allocInfo = CommandBufferAllocateInfo(
-      vmod->secondaryBufferPool, CommandBufferLevel::ePrimary,
+     vmod->guiPool, CommandBufferLevel::ePrimary,
       vmod->swapchainImages.size());
   this->buffer = vmod->cmdbuffer.size();
   for (const auto buffer : vmod->device.allocateCommandBuffers(allocInfo)) {
     vmod->cmdbuffer.push_back(buffer);
   }
+
 
   this->primary = vmod->primary.size();
   vmod->primary.push_back(vmod->cmdbuffer[this->buffer]);
