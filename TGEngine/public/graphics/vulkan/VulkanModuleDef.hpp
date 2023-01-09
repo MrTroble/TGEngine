@@ -12,6 +12,8 @@
 #define VULKAN_HPP_ENABLE_DYNAMIC_LOADER_TOOL 1
 #define VK_USE_PLATFORM_XLIB_KHR 1
 #endif
+#include <chrono>
+#include <mutex>
 #include <vector>
 #include <vulkan/vulkan.hpp>
 
@@ -33,12 +35,98 @@
   }  // namespace tge::graphics
 
 namespace tge::graphics {
-
 using namespace vk;
 extern Result verror;
 
+struct QueueSync {
+  Device device;
+  Queue queue;
+  Fence fence;
+  bool armed = false;
+  std::mutex handle;
+
+  QueueSync() : device(nullptr), fence(nullptr), queue(nullptr) {}
+
+  QueueSync(const Device device, const Queue queue)
+      : device(device), queue(queue) {
+    FenceCreateInfo info{};
+    fence = device.createFence(info);
+  }
+
+  void internalWaitStopWithoutUnlock() {
+    if (armed) {
+      const auto result = device.waitForFences(fence, true, UINT64_MAX);
+      VERROR(result);
+    }
+    handle.lock();
+    if (armed) {
+      const auto result2 = device.waitForFences(fence, true, UINT64_MAX);
+      VERROR(result2);
+      device.resetFences(fence);
+      armed = false;
+    }
+  }
+
+  void waitAndDisarm() { 
+    internalWaitStopWithoutUnlock();
+    handle.unlock();
+  }
+
+  void begin(const CommandBuffer buffer, const CommandBufferBeginInfo &info) {
+    internalWaitStopWithoutUnlock();
+    buffer.begin(info);
+  }
+
+  void end(const CommandBuffer buffer) {
+    buffer.end();
+    handle.unlock();
+  }
+
+  void submit(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
+    internalWaitStopWithoutUnlock();
+    queue.submit(submitInfos, fence);
+    armed = true;
+    handle.unlock();
+  }
+
+  void submitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
+    internalWaitStopWithoutUnlock();
+    queue.submit(submitInfos, fence);
+    const auto result = device.waitForFences(fence, true, UINT64_MAX);
+    VERROR(result);
+    device.resetFences(fence);
+    handle.unlock();
+  }
+
+  void endSubmitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
+    for (const auto &submit : submitInfos) {
+      for (size_t i = 0; i < submit.commandBufferCount; i++) {
+        submit.pCommandBuffers[i].end();
+      }
+    }
+    if (armed) {
+      const auto result = device.waitForFences(fence, true, UINT64_MAX);
+      VERROR(result);
+      device.resetFences(fence);
+    }
+    queue.submit(submitInfos, fence);
+    const auto result = device.waitForFences(fence, true, UINT64_MAX);
+    VERROR(result);
+    device.resetFences(fence);
+    handle.unlock();
+  }
+
+  Fence getFence() { return fence; }
+
+  void destroy() {
+    std::lock_guard guard(handle);
+    device.destroyFence(fence);
+  }
+};
+
 constexpr size_t DATA_ONLY_BUFFER = 0;
 constexpr size_t TEXTURE_ONLY_BUFFER = 1;
+constexpr size_t DATA_CHANGE_ONLY_BUFFER = 2;
 
 class VulkanGraphicsModule : public APILayer {
  public:
@@ -61,15 +149,13 @@ class VulkanGraphicsModule : public APILayer {
   std::vector<CommandBuffer> cmdbuffer;
   std::vector<CommandBuffer> noneRenderCmdbuffer;
   std::vector<Pipeline> pipelines;
-  Queue queue;
-  Queue secondaryQueue;
   uint32_t queueFamilyIndex;
   uint32_t queueIndex;
   uint32_t secondaryqueueIndex;
   Semaphore waitSemaphore;
   Semaphore signalSemaphore;
-  Fence commandBufferFence;
-  Fence secondaryBufferFence;
+  QueueSync *primarySync = nullptr;
+  QueueSync *secondarySync = nullptr;
   std::vector<ShaderModule> shaderModules;
   uint32_t memoryTypeHostVisibleCoherent;
   uint32_t memoryTypeDeviceLocal;
@@ -82,9 +168,7 @@ class VulkanGraphicsModule : public APILayer {
   std::vector<CommandBuffer> secondaryCommandBuffer;
   std::mutex commandBufferRecording;  // protects secondaryCommandBuffer from
                                       // memory invalidation
-  std::mutex protectSecondaryData;    // protects secondaryCommandBuffer from
-  // memory invalidation
-  std::vector<Sampler> sampler;
+  std::vector<vk::Sampler> sampler;
   std::vector<Image> textureImages;
   std::vector<std::tuple<DeviceMemory, size_t>> textureMemorys;
   std::vector<ImageView> textureImageViews;
@@ -157,27 +241,6 @@ class VulkanGraphicsModule : public APILayer {
   size_t getAligned(const DataType type) const override;
 
   glm::vec2 getRenderExtent() const override;
-
-  std::mutex submitAndWaitMutex;
-
-  inline void waitAndReset(const Device device, const Fence fence) {
-    const Result result = device.waitForFences(fence, true, UINT64_MAX);
-    VERROR(result);
-
-    device.resetFences(fence);
-  }
-
-  inline void submitAndWait(const Device device, const Queue queue,
-                            const CommandBuffer &cmdBuf, const Fence fence) {
-    std::lock_guard onExit(submitAndWaitMutex);
-    waitAndReset(device, fence);
-
-    const SubmitInfo submitInfo({}, {}, cmdBuf, {});
-    queue.submit(submitInfo, fence);
-
-    const Result result = device.waitForFences(fence, true, UINT64_MAX);
-    VERROR(result);
-  }
 };
 
 }  // namespace tge::graphics

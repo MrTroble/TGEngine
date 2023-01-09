@@ -3,10 +3,14 @@
 #include "../../public/TGEngine.hpp"
 #include "../../public/graphics/WindowModule.hpp"
 #include "../../public/graphics/vulkan/VulkanModuleDef.hpp"
+#if 1
 #include <backends/imgui_impl_vulkan.h>
+#endif  // DEBUG
+
 #ifdef WIN32
 #include <Windows.h>
 #include <backends/imgui_impl_win32.h>
+
 #include <backends/imgui_impl_win32.cpp>
 #endif
 #ifdef __linux__
@@ -41,7 +45,7 @@ inline void render(gui::GUIModule *gmod) {
   ImDrawData *draw_data = ImGui::GetDrawData();
 
   const CommandBufferBeginInfo beginInfo;
-  buffer.begin(beginInfo);
+  vgm->primarySync->begin(buffer, beginInfo);
 
   constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
@@ -55,7 +59,7 @@ inline void render(gui::GUIModule *gmod) {
   buffer.beginRenderPass(renderPassBeginInfo, {});
   ImGui_ImplVulkan_RenderDrawData(draw_data, (VkCommandBuffer)buffer);
   buffer.endRenderPass();
-  buffer.end();
+  vgm->primarySync->end(buffer);
 
   vgm->primary[gmod->primary] = buffer;
 }
@@ -131,7 +135,7 @@ main::Error GUIModule::init() {
                                         (VkPhysicalDevice)vmod->physicalDevice,
                                         (VkDevice)vmod->device,
                                         vmod->queueFamilyIndex,
-                                        (VkQueue)vmod->queue,
+                                        (VkQueue)vmod->primarySync->queue,
                                         VK_NULL_HANDLE,
                                         (VkDescriptorPool)pool,
                                         0,
@@ -145,7 +149,13 @@ main::Error GUIModule::init() {
                                         }};
   ImGui_ImplVulkan_Init(&instinfo, (VkRenderPass)this->renderpass);
 
-  const auto sCmd = vmod->cmdbuffer.back();
+  const CommandPoolCreateInfo poolCreateInfo(
+      CommandPoolCreateFlagBits::eResetCommandBuffer, vmod->queueFamilyIndex);
+  vmod->guiPool = vmod->device.createCommandPool(poolCreateInfo);
+
+  const CommandBufferAllocateInfo info(vmod->guiPool,
+                                       CommandBufferLevel::ePrimary, 1);
+  const auto sCmd = vmod->device.allocateCommandBuffers(info).back();
   const auto beginInfo =
       CommandBufferBeginInfo(CommandBufferUsageFlagBits::eOneTimeSubmit);
   sCmd.begin(beginInfo);
@@ -153,22 +163,18 @@ main::Error GUIModule::init() {
   sCmd.end();
 
   const auto submitInfo = SubmitInfo({}, {}, sCmd, {});
-  vmod->queue.submit(submitInfo);
+  vmod->primarySync->submitAndWait(submitInfo);
 
   vmod->device.waitIdle();
   ImGui_ImplVulkan_DestroyFontUploadObjects();
 
-  CommandPoolCreateInfo poolCreateInfo(CommandPoolCreateFlagBits::eResetCommandBuffer, vmod->queueFamilyIndex);
-  vmod->guiPool = vmod->device.createCommandPool(poolCreateInfo);
-
-  const auto allocInfo = CommandBufferAllocateInfo(
-     vmod->guiPool, CommandBufferLevel::ePrimary,
-      vmod->swapchainImages.size());
+  const auto allocInfo =
+      CommandBufferAllocateInfo(vmod->guiPool, CommandBufferLevel::ePrimary,
+                                vmod->swapchainImages.size());
   this->buffer = vmod->cmdbuffer.size();
   for (const auto buffer : vmod->device.allocateCommandBuffers(allocInfo)) {
     vmod->cmdbuffer.push_back(buffer);
   }
-
 
   this->primary = vmod->primary.size();
   vmod->primary.push_back(vmod->cmdbuffer[this->buffer]);

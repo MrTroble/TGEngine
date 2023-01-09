@@ -317,6 +317,8 @@ inline size_t aligned(const size_t size, const size_t align) {
   return size + (align - alignmentOffset) % align;
 }
 
+constexpr PipelineStageFlags ALL_COMMANDS = PipelineStageFlagBits::eAllCommands;
+
 size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
                                       const size_t* dataSizes,
                                       const DataType type) {
@@ -336,12 +338,11 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
   alignment.reserve(alignment.size() + dataCount);
   bufferOffset.reserve(firstMemIndex + dataCount);
 
-  std::lock_guard lg(protectSecondaryData);
-  const auto cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
+  const auto& cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit);
-  cmdBuf.begin(beginInfo);
+  secondarySync->begin(cmdBuf, beginInfo);
 
   const BufferUsageFlags bufferUsage = getUsageFlagsFromDataType(type);
 
@@ -410,9 +411,8 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
     cmdBuf.copyBuffer(tempBuf, cBuffer, copyInfo);
   }
 
-  cmdBuf.end();
-
-  submitAndWait(device, secondaryQueue, cmdBuf, secondaryBufferFence);
+  const SubmitInfo info({}, {}, cmdBuf);
+  secondarySync->endSubmitAndWait(info);
 
   device.freeMemory(hostVisibleMemory);
   for (const auto buf : tempBuffer) device.destroyBuffer(buf);
@@ -444,20 +444,19 @@ void VulkanGraphicsModule::changeData(const size_t bufferIndex,
 
   device.unmapMemory(hostVisibleMemory);
 
-  std::lock_guard lg(protectSecondaryData);
-  const auto cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
+  const auto& cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit);
-  cmdBuf.begin(beginInfo);
+  secondarySync->begin(cmdBuf, beginInfo);
 
   const BufferCopy copyRegion(0, offset, dataSizes);
 
   cmdBuf.copyBuffer(intermBuffer, this->bufferList[bufferIndex], copyRegion);
 
-  cmdBuf.end();
+  const SubmitInfo info({}, {}, cmdBuf);
+  secondarySync->endSubmitAndWait(info);
 
-  submitAndWait(device, secondaryQueue, cmdBuf, secondaryBufferFence);
   device.freeMemory(hostVisibleMemory);
   device.destroyBuffer(intermBuffer);
 }
@@ -556,12 +555,11 @@ size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
   textureMemorys.reserve(firstIndex + textureCount);
   textureImageViews.reserve(firstIndex + textureCount);
 
-  std::lock_guard lg(protectSecondaryData);
-  const auto cmd = noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER];
+  const auto& cmd = noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit, {});
-  cmd.begin(beginInfo);
+  secondarySync->begin(cmd, beginInfo);
 
   constexpr ImageSubresourceRange range = {ImageAspectFlagBits::eColor, 0, 1, 0,
                                            1};
@@ -621,9 +619,8 @@ size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
         PipelineStageFlagBits::eFragmentShader, AccessFlagBits::eShaderRead);
   }
 
-  cmd.end();
-
-  submitAndWait(device, queue, cmd, secondaryBufferFence);
+  const SubmitInfo info({}, {}, cmd);
+  secondarySync->endSubmitAndWait(info);
   return firstIndex;
 }
 
@@ -751,11 +748,11 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   vgm->materialToLayout[0] = graphicsPipeline.layout;
 }
 
-inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count,
-                        CommandBuffer cmd, Queue queue) {
+inline void oneTimeWait(VulkanGraphicsModule* vgm, const size_t count,
+                        const CommandBuffer cmd, QueueSync* sync) {
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit, {});
-  cmd.begin(beginInfo);
+  sync->begin(cmd, beginInfo);
 
   waitForImageTransition(cmd, ImageLayout::eUndefined, ImageLayout::eGeneral,
                          vgm->textureImages[vgm->depthImage],
@@ -774,8 +771,8 @@ inline void oneTimeWait(VulkanGraphicsModule* vgm, size_t count,
                            image, range);
   }
 
-  cmd.end();
-  vgm->submitAndWait(vgm->device, queue, cmd, vgm->secondaryBufferFence);
+  const SubmitInfo info({}, {}, cmd);
+  sync->endSubmitAndWait(info);
 }
 
 inline void createSwapchain(VulkanGraphicsModule* vgm) {
@@ -826,9 +823,9 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
   vgm->roughnessMetallicImage = vgm->firstImage + 3;
   vgm->position = vgm->firstImage + 4;
 
-  std::lock_guard lg(vgm->protectSecondaryData);
   oneTimeWait(vgm, intImageInfo.size(),
-              vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER], vgm->queue);
+              vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER],
+              vgm->secondarySync);
 
   for (const auto view : vgm->swapchainImageviews) {
     vgm->device.destroy(view);
@@ -1007,12 +1004,13 @@ main::Error VulkanGraphicsModule::init() {
 #pragma endregion
 
 #pragma region Vulkan Mutex
-  const FenceCreateInfo fenceCreateInfo{vk::FenceCreateFlagBits::eSignaled};
-  commandBufferFence = device.createFence(fenceCreateInfo);
+  this->primarySync = new QueueSync(
+      this->device, device.getQueue(queueFamilyIndex, queueIndex));
   if (queueFamily.queueCount > 1) {
-    secondaryBufferFence = device.createFence(fenceCreateInfo);
+    this->secondarySync = new QueueSync(
+        this->device, device.getQueue(queueFamilyIndex, secondaryqueueIndex));
   } else {
-    secondaryBufferFence = commandBufferFence;
+    this->secondarySync = this->primarySync;
   }
 
   const SemaphoreCreateInfo semaphoreCreateInfo;
@@ -1021,9 +1019,6 @@ main::Error VulkanGraphicsModule::init() {
 #pragma endregion
 
 #pragma region Queue, Surface, Prepipe, MemTypes
-  queue = device.getQueue(queueFamilyIndex, queueIndex);
-  secondaryQueue = device.getQueue(queueFamilyIndex, secondaryqueueIndex);
-
   const auto winM = graphicsModule->getWindowModule();
 #ifdef WIN32
   Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, (HINSTANCE)winM->hInstance,
@@ -1190,7 +1185,7 @@ main::Error VulkanGraphicsModule::init() {
   cmdbuffer = device.allocateCommandBuffers(cmdBufferAllocInfo);
 
   const CommandBufferAllocateInfo cmdBufferAllocInfoSecond(
-      secondaryPool, CommandBufferLevel::ePrimary, (uint32_t)2);
+      secondaryPool, CommandBufferLevel::ePrimary, (uint32_t)3);
   noneRenderCmdbuffer = device.allocateCommandBuffers(cmdBufferAllocInfoSecond);
   createSwapchain(this);
 #pragma endregion
@@ -1217,75 +1212,69 @@ void VulkanGraphicsModule::tick(double time) {
   }
 
   const auto currentBuffer = cmdbuffer[this->nextImage];
-  {
-    std::lock_guard onExit(submitAndWaitMutex);
-    waitAndReset(device, commandBufferFence);
 
-    if (1) {  // For now rerecord every tick
-      constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
-      const std::array clearValue = {
-          ClearValue(ClearDepthStencilValue(1.0f, 0)),
-          ClearValue(clearColor),
-          ClearValue(clearColor),
-          ClearValue(clearColor),
-          ClearValue(clearColor),
-          ClearValue(clearColor)};
+  if (1) {  // For now rerecord every tick
+    constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    const std::array clearValue = {ClearValue(ClearDepthStencilValue(1.0f, 0)),
+                                   ClearValue(clearColor),
+                                   ClearValue(clearColor),
+                                   ClearValue(clearColor),
+                                   ClearValue(clearColor),
+                                   ClearValue(clearColor)};
 
-      const CommandBufferBeginInfo cmdBufferBeginInfo({}, nullptr);
-      currentBuffer.begin(cmdBufferBeginInfo);
+    const CommandBufferBeginInfo cmdBufferBeginInfo({}, nullptr);
+    currentBuffer.begin(cmdBufferBeginInfo);
 
-      const RenderPassBeginInfo renderPassBeginInfo(
-          renderpass, framebuffer[this->nextImage],
-          {{0, 0}, {(uint32_t)viewport.width, (uint32_t)viewport.height}},
-          clearValue);
-      currentBuffer.beginRenderPass(renderPassBeginInfo,
-                                    SubpassContents::eSecondaryCommandBuffers);
+    const RenderPassBeginInfo renderPassBeginInfo(
+        renderpass, framebuffer[this->nextImage],
+        {{0, 0}, {(uint32_t)viewport.width, (uint32_t)viewport.height}},
+        clearValue);
+    currentBuffer.beginRenderPass(renderPassBeginInfo,
+                                  SubpassContents::eSecondaryCommandBuffers);
 
-      if (!secondaryCommandBuffer.empty()) {
-        std::lock_guard lg(commandBufferRecording);
-        currentBuffer.executeCommands(secondaryCommandBuffer);
-      }
-
-      currentBuffer.nextSubpass(SubpassContents::eInline);
-
-      currentBuffer.setViewport(0, this->viewport);
-
-      const Rect2D scissor(
-          {}, {(uint32_t)viewport.width, (uint32_t)viewport.height});
-      currentBuffer.setScissor(0, scissor);
-
-      currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
-                                 pipelines[lightPipe]);
-
-      const std::array lights = {lightBindings};
-      getShaderAPI()->addToRender(lights.data(), lights.size(),
-                                  (CommandBuffer*)&currentBuffer);
-
-      currentBuffer.draw(3, 1, 0, 0);
-
-      currentBuffer.endRenderPass();
-
-      waitForImageTransition(currentBuffer, ImageLayout::eUndefined,
-                             ImageLayout::eGeneral, textureImages[depthImage],
-                             {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
-
-      currentBuffer.end();
+    if (!secondaryCommandBuffer.empty()) {
+      std::lock_guard lg(commandBufferRecording);
+      currentBuffer.executeCommands(secondaryCommandBuffer);
     }
 
-    primary[0] = currentBuffer;
+    currentBuffer.nextSubpass(SubpassContents::eInline);
 
-    const PipelineStageFlags stageFlag =
-        PipelineStageFlagBits::eColorAttachmentOutput |
-        PipelineStageFlagBits::eLateFragmentTests;
-    const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
-                                signalSemaphore);
+    currentBuffer.setViewport(0, this->viewport);
 
-    queue.submit(submitInfo, commandBufferFence);
+    const Rect2D scissor({},
+                         {(uint32_t)viewport.width, (uint32_t)viewport.height});
+    currentBuffer.setScissor(0, scissor);
+
+    currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
+                               pipelines[lightPipe]);
+
+    const std::array lights = {lightBindings};
+    getShaderAPI()->addToRender(lights.data(), lights.size(),
+                                (CommandBuffer*)&currentBuffer);
+
+    currentBuffer.draw(3, 1, 0, 0);
+
+    currentBuffer.endRenderPass();
+
+    waitForImageTransition(currentBuffer, ImageLayout::eUndefined,
+                           ImageLayout::eGeneral, textureImages[depthImage],
+                           {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
+
+    currentBuffer.end();
   }
+
+  primary[0] = currentBuffer;
+
+  constexpr PipelineStageFlags stageFlag =
+      PipelineStageFlagBits::eColorAttachmentOutput |
+      PipelineStageFlagBits::eLateFragmentTests;
+  const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
+                              signalSemaphore);
+  primarySync->submit(submitInfo);
 
   const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
                                    nullptr);
-  const Result result = queue.presentKHR(&presentInfo);
+  const Result result = primarySync->queue.presentKHR(&presentInfo);
   if (result == Result::eErrorInitializationFailed) {
     printf("For some reasone NV drivers seem to be hitting this error!");
   }
@@ -1310,8 +1299,8 @@ void VulkanGraphicsModule::destroy() {
   this->isInitialiazed = false;
   device.waitIdle();
   this->shaderAPI->destroy();
-  device.destroyFence(commandBufferFence);
-  device.destroyFence(secondaryBufferFence);
+  delete primarySync;
+  if (primarySync != secondarySync) delete secondarySync;
   device.destroySemaphore(waitSemaphore);
   device.destroySemaphore(signalSemaphore);
   for (const auto imag : textureImages) device.destroyImage(imag);
