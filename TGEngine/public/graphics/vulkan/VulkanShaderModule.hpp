@@ -25,6 +25,7 @@ namespace tge::shader {
 		std::vector<tge::shader::VulkanShaderPipe*> shaderPipes;
 		DescriptorSetLayout defaultDescLayout;
 		PipelineLayout defaultLayout;
+        std::mutex mutex;
 		// Legacy support
 		std::vector<std::vector<BindingInfo>> defaultbindings;
 

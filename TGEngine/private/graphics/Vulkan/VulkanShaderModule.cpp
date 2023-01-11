@@ -343,6 +343,7 @@ namespace tge::shader
 	ShaderPipe VulkanShaderModule::compile(
 		const std::vector<ShaderInfo>& vector)
 	{
+        std::lock_guard guard(this->mutex);
 		const auto loadedPipes = __implLoadShaderPipeAndCompile(vector);
 		if (loadedPipes)
 			__implCreateDescSets(loadedPipes, this);

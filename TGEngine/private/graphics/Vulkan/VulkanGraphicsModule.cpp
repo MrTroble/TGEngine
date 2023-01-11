@@ -4,6 +4,8 @@
 #include <iostream>
 #include <mutex>
 
+#define DEBUG 1
+
 #include "../../../public/Error.hpp"
 #include "../../../public/Util.hpp"
 #include "../../../public/graphics/WindowModule.hpp"
