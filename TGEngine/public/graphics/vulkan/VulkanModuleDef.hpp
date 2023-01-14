@@ -54,10 +54,6 @@ struct QueueSync {
   }
 
   void internalWaitStopWithoutUnlock() {
-    if (armed) {
-      const auto result = device.waitForFences(fence, true, UINT64_MAX);
-      VERROR(result);
-    }
     handle.lock();
     if (armed) {
       const auto result2 = device.waitForFences(fence, true, UINT64_MAX);
