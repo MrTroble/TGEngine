@@ -3,6 +3,8 @@
 #include "../GameShaderModule.hpp"
 #include "VulkanShaderPipe.hpp"
 #include <vulkan/vulkan.hpp>
+#include <mutex>
+#include <thread>
 
 namespace tge::shader {
 
