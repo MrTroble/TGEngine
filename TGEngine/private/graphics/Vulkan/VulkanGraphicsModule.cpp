@@ -96,6 +96,31 @@ void* VulkanGraphicsModule::loadShader(const MaterialType type) {
   return ptr;
 }
 
+inline void getOrCreate(
+    VulkanGraphicsModule* module, VulkanShaderPipe* shaderPipe,
+    std::vector<PipelineShaderStageCreateInfo>& currentStages) {
+  if (shaderPipe->modules.empty()) {
+    std::lock_guard guard(shaderPipe->pipeMutex);
+    for (size_t index = 0; index < shaderPipe->shader.size(); index++) {
+      const auto& shaderPair = shaderPipe->shader[index];
+      const auto& shaderData = shaderPair.first;
+
+      const ShaderModuleCreateInfo shaderModuleCreateInfo(
+          {}, shaderData.size() * sizeof(uint32_t), shaderData.data());
+      const auto shaderModule =
+          module->device.createShaderModule(shaderModuleCreateInfo);
+      module->shaderModules.push_back(shaderModule);
+      shaderPipe->modules.push_back(
+          std::make_pair(shaderPair.second, shaderModule));
+    }
+  }
+
+  for (const auto [level, module] : shaderPipe->modules) {
+    currentStages.push_back(
+        PipelineShaderStageCreateInfo({}, level, module, "main"));
+  }
+}
+
 size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
                                            const Material* materials,
                                            const size_t offset) {
@@ -137,34 +162,26 @@ size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
   const auto indexOffset = offset == SIZE_MAX ? pipelines.size() : offset;
   this->materialToLayout.resize(indexOffset + materialcount);
 
+  std::vector<PipelineRasterizationStateCreateInfo> rasterizationInfos(
+      materialcount);
+
+  std::vector<std::vector<PipelineShaderStageCreateInfo>> shaderStages(
+      materialcount);
+
   for (size_t i = 0; i < materialcount; i++) {
     const auto& material = materials[i];
 
     const auto shaderPipe = (VulkanShaderPipe*)material.costumShaderData;
 
-    shaderPipe->pipelineShaderStage.clear();
-    shaderPipe->pipelineShaderStage.reserve(shaderPipe->shader.size());
+    auto& currentStages = shaderStages[i];
+    currentStages.reserve(shaderPipe->shader.size());
+    getOrCreate(this, shaderPipe, currentStages);
 
-    for (const auto& shaderPair : shaderPipe->shader) {
-      const auto& shaderData = shaderPair.first;
-
-      const ShaderModuleCreateInfo shaderModuleCreateInfo(
-          {}, shaderData.size() * sizeof(uint32_t), shaderData.data());
-      const auto shaderModule =
-          device.createShaderModule(shaderModuleCreateInfo);
-      shaderModules.push_back(shaderModule);
-      shaderPipe->pipelineShaderStage.push_back(PipelineShaderStageCreateInfo(
-          {}, shaderPair.second, shaderModule, "main"));
-    }
-
-    shaderPipe->rasterization.frontFace = FrontFace::eCounterClockwise;
-    shaderPipe->rasterization.lineWidth = 1;
-    shaderPipe->rasterization.depthBiasEnable = false;
-    shaderPipe->rasterization.depthClampEnable = false;
-    shaderPipe->rasterization.rasterizerDiscardEnable = false;
-    shaderPipe->rasterization.cullMode = material.doubleSided
-                                             ? CullModeFlagBits::eNone
-                                             : CullModeFlagBits::eFront;
+    rasterizationInfos[i] = PipelineRasterizationStateCreateInfo(
+        {}, false, false, {},
+        material.doubleSided ? CullModeFlagBits::eNone
+                             : CullModeFlagBits::eFront,
+        FrontFace::eCounterClockwise, false, 0, 0, 0, 1.0f);
 
     input[i] = PipelineInputAssemblyStateCreateInfo(
         {},
@@ -174,8 +191,8 @@ size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
         false);
 
     GraphicsPipelineCreateInfo gpipeCreateInfo(
-        {}, shaderPipe->pipelineShaderStage, &shaderPipe->inputStateCreateInfo,
-        &input[i], {}, &pipelineViewportCreateInfo, &shaderPipe->rasterization,
+        {}, shaderStages[i], &shaderPipe->inputStateCreateInfo, &input[i], {},
+        &pipelineViewportCreateInfo, &rasterizationInfos[i],
         &multisampleCreateInfo, &pipeDepthState, &colorBlendState, {}, {},
         renderpass, 0);
     shaderAPI->addToMaterial(&material, &gpipeCreateInfo);
@@ -696,17 +713,8 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
 
   updateDescriptors(vgm, sapi);
 
-  for (const auto& shaderPair : pipe->shader) {
-    const auto& shaderData = shaderPair.first;
-
-    const ShaderModuleCreateInfo shaderModuleCreateInfo(
-        {}, shaderData.size() * sizeof(uint32_t), shaderData.data());
-    const auto shaderModule =
-        vgm->device.createShaderModule(shaderModuleCreateInfo);
-    vgm->shaderModules.push_back(shaderModule);
-    pipe->pipelineShaderStage.push_back(PipelineShaderStageCreateInfo(
-        {}, shaderPair.second, shaderModule, "main"));
-  }
+  std::vector<PipelineShaderStageCreateInfo> createInfos;
+  getOrCreate(vgm, pipe, createInfos);
 
   const Rect2D sic = {
       {0, 0}, {(uint32_t)vgm->viewport.width, (uint32_t)vgm->viewport.height}};
@@ -734,7 +742,7 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   const PipelineDynamicStateCreateInfo dynamicStateInfo({}, states);
 
   GraphicsPipelineCreateInfo graphicsPipeline(
-      {}, pipe->pipelineShaderStage, &visci, &inputAssemblyCreateInfo, {},
+      {}, createInfos, &visci, &inputAssemblyCreateInfo, {},
       &vsci, &rsci, &msci, {}, &colorBlendState, &dynamicStateInfo, nullptr,
       vgm->renderpass, 1);
   vgm->lightMat = Material(pipe);

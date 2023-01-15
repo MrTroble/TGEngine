@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <mutex>
 
 namespace tge::shader {
 
@@ -20,15 +21,16 @@ const std::array shaderNames = {
 
 struct VulkanShaderPipe {
   std::vector<std::pair<std::vector<uint32_t>, ShaderStageFlagBits>> shader;
-  std::vector<PipelineShaderStageCreateInfo> pipelineShaderStage;
   std::vector<VertexInputBindingDescription> vertexInputBindings;
   std::vector<VertexInputAttributeDescription> vertexInputAttributes;
   PipelineVertexInputStateCreateInfo inputStateCreateInfo;
-  PipelineRasterizationStateCreateInfo rasterization;
   std::vector<DescriptorSetLayoutBinding> descriptorLayoutBindings;
   std::vector<PushConstantRange> constranges;
   size_t layoutID = UINT64_MAX;
   bool needsDefaultBindings = true;
+
+  std::mutex pipeMutex;
+  std::vector<std::pair<ShaderStageFlagBits, ShaderModule>> modules;
 
 };
 
