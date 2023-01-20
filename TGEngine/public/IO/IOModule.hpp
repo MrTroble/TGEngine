@@ -19,9 +19,9 @@ struct MouseEvent {
 
 class IOModule : public tge::main::Module {
 
+public:
   main::Error init() override;
 
-public:
   virtual void mouseEvent(const MouseEvent event) = 0;
 
   virtual void keyboardEvent(const KeyboardEvent event) = 0;

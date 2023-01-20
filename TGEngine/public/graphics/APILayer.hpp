@@ -1,138 +1,150 @@
 #pragma once
 
-#include "../Module.hpp"
-#include "Material.hpp"
-#include <glm/glm.hpp>
 #include <stdint.h>
+
+#include <glm/glm.hpp>
 #include <vector>
 
+#include "../Module.hpp"
+#include "Material.hpp"
+
 namespace tge::shader {
-	class ShaderAPI;
-	enum class ShaderType;
-}
+class ShaderAPI;
+enum class ShaderType;
+}  // namespace tge::shader
 
 namespace tge::graphics {
 
-	class GameGraphicsModule;
+class GameGraphicsModule;
 
-	enum class IndexSize { UINT16, UINT32, NONE };
+enum class IndexSize { UINT16, UINT32, NONE };
 
-	struct PushConstRanges {
-		std::vector<char> pushConstData;
-		shader::ShaderType type;
-	};
+struct CacheIndex {
+  size_t buffer = SIZE_MAX;
+  size_t memory = SIZE_MAX;
+};
 
-	struct RenderInfo {
-		std::vector<size_t> vertexBuffer;
-		size_t indexBuffer;
-		size_t materialId = SIZE_MAX;
-		size_t indexCount;
-		size_t instanceCount = 1;
-		size_t indexOffset = 0;
-		IndexSize indexSize = IndexSize::UINT32;
-		std::vector<size_t> vertexOffsets;
-		size_t bindingID = UINT64_MAX;
-		size_t firstInstance = 0;
-		std::vector<PushConstRanges> constRanges;
-	};
+struct PushConstRanges {
+  std::vector<char> pushConstData;
+  shader::ShaderType type;
+};
 
-	struct TextureInfo {
-		uint8_t* data = nullptr;
-		uint32_t size;
-		uint32_t width;
-		uint32_t height;
-		uint32_t channel;
-		size_t internalFormatOverride = 37;
-	};
+struct RenderInfo {
+  std::vector<size_t> vertexBuffer;
+  size_t indexBuffer;
+  size_t materialId = SIZE_MAX;
+  size_t indexCount;
+  size_t instanceCount = 1;
+  size_t indexOffset = 0;
+  IndexSize indexSize = IndexSize::UINT32;
+  std::vector<size_t> vertexOffsets;
+  size_t bindingID = UINT64_MAX;
+  size_t firstInstance = 0;
+  std::vector<PushConstRanges> constRanges;
+};
 
-	enum class FilterSetting { NEAREST, LINEAR };
+struct TextureInfo {
+  uint8_t* data = nullptr;
+  uint32_t size;
+  uint32_t width;
+  uint32_t height;
+  uint32_t channel;
+  size_t internalFormatOverride = 37;
+};
 
-	enum class AddressMode {
-		REPEAT,
-		MIRROR_REPEAT,
-		CLAMP_TO_EDGE,
-		CLAMP_TO_BORDER,
-		MIRROR_CLAMP_TO_EDGE
-	};
+enum class FilterSetting { NEAREST, LINEAR };
 
-	struct SamplerInfo {
-		FilterSetting minFilter;
-		FilterSetting magFilter;
-		AddressMode uMode;
-		AddressMode vMode;
-		int anisotropy = 0;
-	};
+enum class AddressMode {
+  REPEAT,
+  MIRROR_REPEAT,
+  CLAMP_TO_EDGE,
+  CLAMP_TO_BORDER,
+  MIRROR_CLAMP_TO_EDGE
+};
 
-	struct Light {
-		glm::vec3 pos;
-		float __alignment = 0;
-		glm::vec3 color;
-		float intensity;
+struct SamplerInfo {
+  FilterSetting minFilter;
+  FilterSetting magFilter;
+  AddressMode uMode;
+  AddressMode vMode;
+  int anisotropy = 0;
+};
 
-		Light() = default;
+struct Light {
+  glm::vec3 pos;
+  float __alignment = 0;
+  glm::vec3 color;
+  float intensity;
 
-		Light(glm::vec3 pos, glm::vec3 color, float intensity)
-			: pos(pos), color(color), intensity(intensity) {}
-	};
+  Light() = default;
 
-	enum class DataType { IndexData, VertexData, VertexIndexData, Uniform, All };
+  Light(glm::vec3 pos, glm::vec3 color, float intensity)
+      : pos(pos), color(color), intensity(intensity) {}
+};
 
-	class APILayer : public main::Module { // Interface
-	protected:
-		GameGraphicsModule* graphicsModule = nullptr;
-		shader::ShaderAPI* shaderAPI;
+enum class DataType { IndexData, VertexData, VertexIndexData, Uniform, All };
 
-	public:
-		void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
-			this->graphicsModule = graphicsModule;
-		}
+class APILayer : public main::Module {  // Interface
+ protected:
+  GameGraphicsModule* graphicsModule = nullptr;
+  shader::ShaderAPI* shaderAPI;
 
-		APILayer(shader::ShaderAPI* shaderAPI) : shaderAPI(shaderAPI) {}
+ public:
+  void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
+    this->graphicsModule = graphicsModule;
+  }
 
-		virtual ~APILayer() {}
+  APILayer(shader::ShaderAPI* shaderAPI) : shaderAPI(shaderAPI) {}
 
-		_NODISCARD virtual void*
-			loadShader(const MaterialType type) = 0; // Legacy support
+  virtual ~APILayer() {}
 
-		_NODISCARD virtual size_t pushMaterials(const size_t materialcount,
-			const Material* materials,
-			const size_t offset = SIZE_MAX) = 0;
+  _NODISCARD virtual void* loadShader(
+      const MaterialType type) = 0;  // Legacy support
 
-		_NODISCARD virtual size_t pushData(const size_t dataCount, void* data,
-			const size_t* dataSizes,
-			const DataType type) = 0;
+  _NODISCARD virtual size_t pushMaterials(const size_t materialcount,
+                                          const Material* materials,
+                                          const size_t offset = SIZE_MAX) = 0;
 
-		virtual void changeData(const size_t bufferIndex, const void* data,
-			const size_t dataSizes, const size_t offset = 0) = 0;
+  _NODISCARD virtual size_t pushData(const size_t dataCount, void* data,
+                                     const size_t* dataSizes,
+                                     const DataType type) = 0;
 
-		void changeData(const size_t bufferIndex, void* data, const size_t dataSizes,
-			const size_t offset = 0) {
-			changeData(bufferIndex, (const void*)data, dataSizes, offset);
-		}
+  virtual void changeData(const size_t bufferIndex, const void* data,
+                          const size_t dataSizes, const size_t offset = 0) = 0;
 
-		virtual void pushRender(const size_t renderInfoCount,
-			const RenderInfo* renderInfos,
-			const size_t offset = 0) = 0;
+  void changeData(const size_t bufferIndex, void* data, const size_t dataSizes,
+                  const size_t offset = 0) {
+    changeData(bufferIndex, (const void*)data, dataSizes, offset);
+  }
 
-		_NODISCARD virtual size_t pushSampler(const SamplerInfo& sampler) = 0;
+  virtual void pushRender(const size_t renderInfoCount,
+                          const RenderInfo* renderInfos,
+                          const size_t offset = 0) = 0;
 
-		_NODISCARD virtual size_t pushTexture(const size_t textureCount,
-			const TextureInfo* textures) = 0;
+  _NODISCARD virtual size_t pushSampler(const SamplerInfo& sampler) = 0;
 
-		_NODISCARD virtual size_t pushLights(const size_t lightCount,
-			const Light* lights,
-			const size_t offset = 0) = 0;
+  _NODISCARD virtual size_t pushTexture(const size_t textureCount,
+                                        const TextureInfo* textures) = 0;
 
-		_NODISCARD virtual size_t getAligned(const size_t buffer, const size_t toBeAligned) const = 0;
+  _NODISCARD virtual size_t pushLights(const size_t lightCount,
+                                       const Light* lights,
+                                       const size_t offset = 0) = 0;
 
-		_NODISCARD virtual size_t getAligned(const DataType type) const = 0;
+  _NODISCARD virtual size_t getAligned(const size_t buffer,
+                                       const size_t toBeAligned) const = 0;
 
-		_NODISCARD GameGraphicsModule* getGraphicsModule() const { return graphicsModule; };
+  _NODISCARD virtual size_t getAligned(const DataType type) const = 0;
 
-		_NODISCARD shader::ShaderAPI* getShaderAPI() const { return this->shaderAPI; }
+  _NODISCARD GameGraphicsModule* getGraphicsModule() const {
+    return graphicsModule;
+  };
 
-		_NODISCARD virtual glm::vec2 getRenderExtent() const = 0;
+  _NODISCARD shader::ShaderAPI* getShaderAPI() const { return this->shaderAPI; }
 
-	};
+  _NODISCARD virtual glm::vec2 getRenderExtent() const = 0;
 
-} // namespace tge::graphics
+  _NODISCARD virtual std::vector<char> getImageData(
+      const size_t imageId, CacheIndex* = nullptr) = 0;
+};
+
+}  // namespace tge::graphics

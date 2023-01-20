@@ -20,6 +20,7 @@ namespace tge::io
   {
     switch (Msg)
     {
+    case WM_MBUTTONDOWN:
     case WM_MOUSEMOVE:
     {
       const auto xParam = GET_X_LPARAM(lParam);

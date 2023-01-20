@@ -124,6 +124,13 @@ constexpr size_t DATA_ONLY_BUFFER = 0;
 constexpr size_t TEXTURE_ONLY_BUFFER = 1;
 constexpr size_t DATA_CHANGE_ONLY_BUFFER = 2;
 
+struct InternalImageInfo {
+  Format format;
+  Extent2D ex;
+  ImageUsageFlags usage = ImageUsageFlagBits::eColorAttachment;
+  SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
+};
+
 class VulkanGraphicsModule : public APILayer {
  public:
   Instance instance;
@@ -173,6 +180,7 @@ class VulkanGraphicsModule : public APILayer {
   std::vector<vk::PipelineLayout> materialToLayout;
   std::vector<std::vector<RenderInfo>> renderInfosForRetry;
   std::vector<Material> materialsForRetry;
+  std::vector<InternalImageInfo> internalimageInfos;
 
   size_t firstImage;
   size_t depthImage;
@@ -237,6 +245,9 @@ class VulkanGraphicsModule : public APILayer {
   size_t getAligned(const DataType type) const override;
 
   glm::vec2 getRenderExtent() const override;
+
+  std::vector<char> getImageData(const size_t imageId,
+                                 CacheIndex *cacheIndex = nullptr) override;
 };
 
 }  // namespace tge::graphics

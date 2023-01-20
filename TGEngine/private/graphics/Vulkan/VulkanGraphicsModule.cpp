@@ -386,15 +386,15 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
             bufferUsage,
         SharingMode::eExclusive);
     const auto localBuffer = device.createBuffer(bufferLocalCreateInfo);
-    bufferList.push_back(localBuffer);
     const auto memRequLocal = device.getBufferMemoryRequirements(localBuffer);
 
     const auto offsetedSize =
         aligned(memRequLocal.size, memRequLocal.alignment);
     bufferAlignedSize[i] = offsetedSize;
-    bufferOffset.push_back(actualMemory);
     actualMemory += offsetedSize;
 
+    bufferOffset.push_back(actualMemory);
+    bufferList.push_back(localBuffer);
     bufferSizeList.push_back(offsetedSize);
     alignment.push_back(memRequLocal.alignment);
   }
@@ -492,13 +492,6 @@ size_t VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
   return position;
 }
 
-struct InternalImageInfo {
-  Format format;
-  Extent2D ex;
-  ImageUsageFlags usage = ImageUsageFlagBits::eColorAttachment;
-  SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
-};
-
 inline size_t createInternalImages(
     VulkanGraphicsModule* vgm, const std::vector<InternalImageInfo>& imagesIn) {
   std::vector<std::tuple<ImageViewCreateInfo, size_t>> memorys;
@@ -536,6 +529,8 @@ inline size_t createInternalImages(
 
     memorys.push_back(std::make_tuple(depthImageViewCreateInfo, wholeSize));
     wholeSize += imageMemReq.size;
+
+    vgm->internalimageInfos.push_back(img);
   }
 
   const MemoryAllocateInfo memAllocInfo(wholeSize, vgm->memoryTypeDeviceLocal);
@@ -548,7 +543,6 @@ inline size_t createInternalImages(
     const auto depthImageView = vgm->device.createImageView(image);
     vgm->textureImageViews.push_back(depthImageView);
   }
-
   return firstIndex;
 }
 
@@ -742,9 +736,9 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   const PipelineDynamicStateCreateInfo dynamicStateInfo({}, states);
 
   GraphicsPipelineCreateInfo graphicsPipeline(
-      {}, createInfos, &visci, &inputAssemblyCreateInfo, {},
-      &vsci, &rsci, &msci, {}, &colorBlendState, &dynamicStateInfo, nullptr,
-      vgm->renderpass, 1);
+      {}, createInfos, &visci, &inputAssemblyCreateInfo, {}, &vsci, &rsci,
+      &msci, {}, &colorBlendState, &dynamicStateInfo, nullptr, vgm->renderpass,
+      1);
   vgm->lightMat = Material(pipe);
   sapi->addToMaterial(&vgm->lightMat, &graphicsPipeline);
 
@@ -815,16 +809,19 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
       {vgm->depthFormat, ext, ImageUsageFlagBits::eDepthStencilAttachment},
       {vgm->format.format, ext,
        ImageUsageFlagBits::eColorAttachment |
-           ImageUsageFlagBits::eInputAttachment},
+           ImageUsageFlagBits::eInputAttachment | ImageUsageFlagBits::eTransferSrc},
       {Format::eR8G8B8A8Snorm, ext,
        ImageUsageFlagBits::eColorAttachment |
-           ImageUsageFlagBits::eInputAttachment},
+           ImageUsageFlagBits::eInputAttachment |
+           ImageUsageFlagBits::eTransferSrc},
       {Format::eR32Sfloat, ext,
        ImageUsageFlagBits::eColorAttachment |
-           ImageUsageFlagBits::eInputAttachment},
+           ImageUsageFlagBits::eInputAttachment |
+           ImageUsageFlagBits::eTransferSrc},
       {Format::eR32Sfloat, ext,
        ImageUsageFlagBits::eColorAttachment |
-           ImageUsageFlagBits::eInputAttachment}};
+           ImageUsageFlagBits::eInputAttachment |
+           ImageUsageFlagBits::eTransferSrc}};
 
   vgm->firstImage = createInternalImages(vgm, intImageInfo);
   vgm->depthImage = vgm->firstImage;
@@ -1354,5 +1351,74 @@ glm::vec2 VulkanGraphicsModule::getRenderExtent() const {
 }
 
 APILayer* getNewVulkanModule() { return new VulkanGraphicsModule(); }
+
+std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
+                                                     CacheIndex* index) {
+  const auto currentImage = textureImages[imageId];
+  const auto requireMents = device.getImageMemoryRequirements(currentImage);
+
+  Buffer dataBuffer;
+  DeviceMemory memoryBuffer;
+  if (index == nullptr || index->buffer == SIZE_MAX) {
+    const BufferCreateInfo bufferCreateInfo({}, requireMents.size,
+                                            BufferUsageFlagBits::eTransferDst);
+    dataBuffer = device.createBuffer(bufferCreateInfo);
+
+    const auto requireBuffer = device.getBufferMemoryRequirements(dataBuffer);
+
+    const MemoryAllocateInfo allocateInfo(requireBuffer.size,
+                                          memoryTypeHostVisibleCoherent);
+    memoryBuffer = device.allocateMemory(allocateInfo);
+    device.bindBufferMemory(dataBuffer, memoryBuffer, 0);
+
+    if (index != nullptr) {
+      index->buffer = bufferList.size();
+      index->memory = bufferMemoryList.size();
+      bufferOffset.push_back(0);
+      bufferList.push_back(dataBuffer);
+      bufferSizeList.push_back(requireBuffer.size);
+      bufferMemoryList.push_back(memoryBuffer);
+      alignment.push_back(1);
+    }
+  } else if (index != nullptr) {
+    dataBuffer = bufferList[index->buffer];
+    memoryBuffer = bufferMemoryList[index->memory];
+  }
+
+  const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
+  const CommandBufferBeginInfo info({});
+  std::lock_guard lg(secondarySync->handle);
+  primarySync->begin(buffer, info);
+
+  constexpr ImageSubresourceRange range(ImageAspectFlagBits::eColor, 0, 1, 0, 1);
+
+  waitForImageTransition(buffer, ImageLayout::eSharedPresentKHR,
+                         ImageLayout::eTransferSrcOptimal, currentImage, range);
+
+  const auto oldInfo = internalimageInfos[imageId];
+  constexpr ImageSubresourceLayers layers(ImageAspectFlagBits::eColor, 0, 0, 1);
+  const BufferImageCopy imageInfo(0, 0, 0, layers, {},
+                                  {oldInfo.ex.width, oldInfo.ex.height, 1});
+  buffer.copyImageToBuffer(currentImage, ImageLayout::eTransferSrcOptimal, dataBuffer,
+                           imageInfo);
+
+  waitForImageTransition(buffer, ImageLayout::eTransferSrcOptimal,
+                         ImageLayout::eSharedPresentKHR, currentImage, range);
+
+  const SubmitInfo submit({}, {}, buffer, {});
+  primarySync->endSubmitAndWait(submit);
+
+  std::vector<char> vector(requireMents.size);
+  const char* readMemory =
+      (char*)device.mapMemory(memoryBuffer, 0, requireMents.size);
+  std::copy(readMemory, (readMemory + requireMents.size), vector.begin());
+  device.unmapMemory(memoryBuffer);
+
+  if (index != nullptr) {
+    device.freeMemory(memoryBuffer);
+    device.destroyBuffer(dataBuffer);
+  }
+  return vector;
+}
 
 }  // namespace tge::graphics
