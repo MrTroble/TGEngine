@@ -217,6 +217,8 @@ class VulkanGraphicsModule : public APILayer {
 
   void destroy() override;
 
+  size_t removeRender(const size_t renderInfoCount, const size_t* renderIDs);
+
   size_t pushMaterials(const size_t materialcount, const Material *materials,
                        const size_t offset = SIZE_MAX) override;
 
@@ -226,7 +228,7 @@ class VulkanGraphicsModule : public APILayer {
   void changeData(const size_t bufferIndex, const void *data,
                   const size_t dataSizes, const size_t offset = 0) override;
 
-  void pushRender(const size_t renderInfoCount, const RenderInfo *renderInfos,
+  size_t pushRender(const size_t renderInfoCount, const RenderInfo *renderInfos,
                   const size_t offset = 0) override;
 
   size_t pushSampler(const SamplerInfo &sampler) override;

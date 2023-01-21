@@ -117,7 +117,9 @@ class APILayer : public main::Module {  // Interface
     changeData(bufferIndex, (const void*)data, dataSizes, offset);
   }
 
-  virtual void pushRender(const size_t renderInfoCount,
+  virtual size_t removeRender(const size_t renderInfoCount, const size_t* renderIDs) = 0;
+
+  virtual size_t pushRender(const size_t renderInfoCount,
                           const RenderInfo* renderInfos,
                           const size_t offset = 0) = 0;
 

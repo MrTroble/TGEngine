@@ -231,7 +231,7 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
   throw std::runtime_error("Error shader translation not implemented!");
 }
 
-void VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
+size_t VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                       const RenderInfo* renderInfos,
                                       const size_t offset) {
   EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
@@ -264,8 +264,8 @@ void VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
         std::fill(offsets.begin(), offsets.end(), 0);
         cmdBuf.bindVertexBuffers(0, vertexBuffer, offsets);
       } else {
-        TGE_EXPECT_N(vertexBuffer.size() == info.vertexOffsets.size(),
-                     "Size is not equal!");
+        TGE_EXPECT(vertexBuffer.size() == info.vertexOffsets.size(),
+                     "Size is not equal!", SIZE_MAX);
         cmdBuf.bindVertexBuffers(0, vertexBuffer.size(), vertexBuffer.data(),
                                  (DeviceSize*)info.vertexOffsets.data());
       }
@@ -308,6 +308,7 @@ void VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     renderInfosForRetry.resize(indexIn + 1);
   renderInfosForRetry[indexIn] =
       std::vector(renderInfos, renderInfos + renderInfoCount);
+  return indexIn;
 }
 
 inline BufferUsageFlags getUsageFlagsFromDataType(const DataType type) {
@@ -1238,10 +1239,17 @@ void VulkanGraphicsModule::tick(double time) {
         clearValue);
     currentBuffer.beginRenderPass(renderPassBeginInfo,
                                   SubpassContents::eSecondaryCommandBuffers);
-
-    if (!secondaryCommandBuffer.empty()) {
+    {
       std::lock_guard lg(commandBufferRecording);
-      currentBuffer.executeCommands(secondaryCommandBuffer);
+      std::vector<CommandBuffer> bufferToExecute;
+      bufferToExecute.reserve(secondaryCommandBuffer.size());
+      for (const auto currentBuffer : secondaryCommandBuffer) {
+        if (currentBuffer)
+            bufferToExecute.push_back(currentBuffer);
+      }
+      if (!bufferToExecute.empty()) {
+        currentBuffer.executeCommands(bufferToExecute);
+      }
     }
 
     currentBuffer.nextSubpass(SubpassContents::eInline);
@@ -1344,6 +1352,17 @@ void VulkanGraphicsModule::destroy() {
 #endif
   instance.destroy();
   delete shaderAPI;
+}
+
+size_t VulkanGraphicsModule::removeRender(const size_t renderInfoCount,
+                                          const size_t* renderIDs) {
+  std::lock_guard lg(commandBufferRecording);
+  for (size_t i = 0; i < renderInfoCount; i++) {
+    const auto id = renderIDs[i];
+    renderInfosForRetry[id].clear();
+    secondaryCommandBuffer[id] = nullptr;
+  }
+  return size_t();
 }
 
 glm::vec2 VulkanGraphicsModule::getRenderExtent() const {
