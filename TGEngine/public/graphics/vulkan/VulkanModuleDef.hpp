@@ -21,6 +21,7 @@
 #include "../GameGraphicsModule.hpp"
 #include "VulkanShaderModule.hpp"
 #include "VulkanShaderPipe.hpp"
+#include "../../DataHolder.hpp"
 #undef None
 #undef Bool
 
@@ -131,6 +132,8 @@ struct InternalImageInfo {
   SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
 };
 
+using BufferHolderType = DataHolder5<Buffer, DeviceMemory, size_t, size_t, size_t>;
+
 class VulkanGraphicsModule : public APILayer {
  public:
   Instance instance;
@@ -162,11 +165,9 @@ class VulkanGraphicsModule : public APILayer {
   std::vector<ShaderModule> shaderModules;
   uint32_t memoryTypeHostVisibleCoherent;
   uint32_t memoryTypeDeviceLocal;
-  std::vector<Buffer> bufferList;
-  std::vector<size_t> bufferSizeList;
-  std::vector<size_t> bufferOffset;
-  std::vector<size_t> alignment;
-  std::vector<DeviceMemory> bufferMemoryList;
+
+  BufferHolderType bufferDataHolder;
+
   Viewport viewport;
   std::vector<CommandBuffer> secondaryCommandBuffer;
   std::mutex commandBufferRecording;  // protects secondaryCommandBuffer from

@@ -21,7 +21,6 @@ enum class IndexSize { UINT16, UINT32, NONE };
 
 struct CacheIndex {
   size_t buffer = SIZE_MAX;
-  size_t memory = SIZE_MAX;
 };
 
 struct PushConstRanges {
