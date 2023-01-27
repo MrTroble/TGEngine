@@ -15,6 +15,7 @@ struct MouseEvent {
   int x;
   int y;
   int pressed;
+  bool releasedOrPressed;
 };
 
 class IOModule : public tge::main::Module {

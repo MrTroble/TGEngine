@@ -59,12 +59,14 @@ struct DataHolderBase {
       allocation[id] = ids[i];
       idList[i] = id;
     }
-    size_t returnID = lastSize;
+    size_t returnID = maxValue;
     if (!idMap.empty()) {
       returnID = maxValue;
       for (const auto id : idList) {
         idMap[maxValue++] = id;
       }
+    } else {
+      maxValue += count;
     }
     return std::make_pair(lastSize, returnID);
   }

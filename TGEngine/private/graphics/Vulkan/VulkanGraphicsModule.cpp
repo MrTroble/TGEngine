@@ -1105,7 +1105,7 @@ main::Error VulkanGraphicsModule::init() {
   const std::array attachments = {
       AttachmentDescription(
           {}, depthFormat, SampleCountFlagBits::e1, AttachmentLoadOp::eClear,
-          AttachmentStoreOp::eDontCare, AttachmentLoadOp::eDontCare,
+          AttachmentStoreOp::eStore, AttachmentLoadOp::eDontCare,
           AttachmentStoreOp::eDontCare, ImageLayout::eUndefined,
           ImageLayout::eDepthStencilAttachmentOptimal),
       AttachmentDescription(
@@ -1115,17 +1115,17 @@ main::Error VulkanGraphicsModule::init() {
           ImageLayout::eSharedPresentKHR),
       AttachmentDescription(
           {}, Format::eR8G8B8A8Snorm, SampleCountFlagBits::e1,
-          AttachmentLoadOp::eClear, AttachmentStoreOp::eDontCare,
+          AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
           AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
           ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
       AttachmentDescription(
           {}, Format::eR32Sfloat, SampleCountFlagBits::e1,
-          AttachmentLoadOp::eClear, AttachmentStoreOp::eDontCare,
+          AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
           AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
           ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
       AttachmentDescription(
           {}, Format::eR32Sfloat, SampleCountFlagBits::e1,
-          AttachmentLoadOp::eClear, AttachmentStoreOp::eDontCare,
+          AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
           AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
           ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
       AttachmentDescription(
@@ -1390,12 +1390,14 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
 
     if (index != nullptr) {
       constexpr size_t zero = 0;
-      bufferDataHolder.add(1, &dataBuffer, &memoryBuffer, &requireBuffer.size,
+      index->buffer = bufferDataHolder.add(1, &dataBuffer, &memoryBuffer,
+                                 &requireBuffer.size,
                            &zero, &requireBuffer.alignment);
     }
   } else if (index != nullptr) {
-    dataBuffer = bufferDataHolder.allocation1[index->buffer];
-    memoryBuffer = bufferDataHolder.allocation2[index->buffer];
+    dataBuffer =
+        bufferDataHolder.get(bufferDataHolder.allocation1, index->buffer);
+    memoryBuffer = bufferDataHolder.get(bufferDataHolder.allocation2, index->buffer);
   }
 
   const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
@@ -1411,7 +1413,8 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
 
   const auto oldInfo = internalimageInfos[imageId];
   constexpr ImageSubresourceLayers layers(ImageAspectFlagBits::eColor, 0, 0, 1);
-  const BufferImageCopy imageInfo(0, 0, 0, layers, {},
+  const BufferImageCopy imageInfo(0, 0, 0,
+                                  layers, {},
                                   {oldInfo.ex.width, oldInfo.ex.height, 1});
   buffer.copyImageToBuffer(currentImage, ImageLayout::eTransferSrcOptimal,
                            dataBuffer, imageInfo);
@@ -1428,7 +1431,7 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
   std::copy(readMemory, (readMemory + requireMents.size), vector.begin());
   device.unmapMemory(memoryBuffer);
 
-  if (index != nullptr) {
+  if (index == nullptr) {
     device.freeMemory(memoryBuffer);
     device.destroyBuffer(dataBuffer);
   }

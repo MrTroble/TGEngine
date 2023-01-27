@@ -20,13 +20,15 @@ namespace tge::io
   {
     switch (Msg)
     {
+    case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
+    case WM_RBUTTONDOWN:
     case WM_MOUSEMOVE:
     {
       const auto xParam = GET_X_LPARAM(lParam);
       const auto yParam = GET_Y_LPARAM(lParam);
       for (const auto io : ios)
-        io->mouseEvent({xParam, yParam, (int)wParam});
+        io->mouseEvent({xParam, yParam, (int)wParam, true});
     }
     break;
     case WM_MOUSEWHEEL:
