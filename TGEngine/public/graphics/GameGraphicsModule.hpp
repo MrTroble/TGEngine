@@ -29,6 +29,7 @@ struct NodeInfo {
 
 struct FeatureSet {
   bool wideLines = false;
+  int anisotropicfiltering = INT_MAX;
 };
 
 enum class LoadType {

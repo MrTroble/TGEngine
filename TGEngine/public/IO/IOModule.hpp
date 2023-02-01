@@ -7,6 +7,12 @@ namespace tge::io {
 	constexpr auto SCROLL = 0x10000000;
 	constexpr auto MIDDLE_MOUSE = 0x00000010;
 
+enum class PressMode {
+	CLICKED,
+	RELEASED,
+	HOLD
+};
+
 struct KeyboardEvent {
   unsigned int signal;
 };
@@ -15,7 +21,8 @@ struct MouseEvent {
   int x;
   int y;
   int pressed;
-  bool releasedOrPressed;
+  int additional;
+  PressMode pressMode;
 };
 
 class IOModule : public tge::main::Module {
@@ -23,9 +30,9 @@ class IOModule : public tge::main::Module {
 public:
   main::Error init() override;
 
-  virtual void mouseEvent(const MouseEvent event) = 0;
+  virtual void mouseEvent(const MouseEvent& event) = 0;
 
-  virtual void keyboardEvent(const KeyboardEvent event) = 0;
+  virtual void keyboardEvent(const KeyboardEvent& event) = 0;
 };
 
 constexpr auto KC_LBUTTON = 0x01;

@@ -165,7 +165,7 @@ class VulkanGraphicsModule : public APILayer {
   std::vector<ShaderModule> shaderModules;
   uint32_t memoryTypeHostVisibleCoherent;
   uint32_t memoryTypeDeviceLocal;
-
+  vk::PhysicalDeviceLimits deviceLimits;
   BufferHolderType bufferDataHolder;
 
   Viewport viewport;

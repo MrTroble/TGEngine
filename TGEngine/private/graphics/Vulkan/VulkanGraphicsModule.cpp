@@ -481,11 +481,13 @@ void VulkanGraphicsModule::changeData(const size_t bufferIndex,
 
 size_t VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
   const auto position = this->sampler.size();
+  const auto anisotropy =
+      std::min((float)sampler.anisotropy, deviceLimits.maxSamplerAnisotropy);
   const SamplerCreateInfo samplerCreateInfo(
       {}, (Filter)sampler.minFilter, (Filter)sampler.magFilter,
       SamplerMipmapMode::eLinear, (SamplerAddressMode)sampler.uMode,
       (SamplerAddressMode)sampler.vMode, (SamplerAddressMode)sampler.vMode, 0,
-      sampler.anisotropy, sampler.anisotropy);
+      anisotropy != 0, anisotropy);
   const auto smplr = device.createSampler(samplerCreateInfo);
   this->sampler.push_back(smplr);
   return position;
@@ -983,12 +985,15 @@ main::Error VulkanGraphicsModule::init() {
       });
   if (fndDevExtItr == devextEndItr) return main::Error::SWAPCHAIN_EXT_NOT_FOUND;
 
+  this->deviceLimits = this->physicalDevice.getProperties().limits;
   const auto vkFeatures = this->physicalDevice.getFeatures();
   if (features.wideLines) features.wideLines = vkFeatures.wideLines;
+  if (!vkFeatures.samplerAnisotropy) features.anisotropicfiltering = 0;
   if (!vkFeatures.independentBlend)
     return main::Error::INDEPENDENT_BLEND_NOT_SUPPORTED;
   vk::PhysicalDeviceFeatures enabledFeatures{};
   enabledFeatures.wideLines = features.wideLines;
+  enabledFeatures.samplerAnisotropy = features.anisotropicfiltering != 0;
   enabledFeatures.independentBlend = VK_TRUE;
 
   const char* name = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
@@ -1391,13 +1396,14 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
     if (index != nullptr) {
       constexpr size_t zero = 0;
       index->buffer = bufferDataHolder.add(1, &dataBuffer, &memoryBuffer,
-                                 &requireBuffer.size,
-                           &zero, &requireBuffer.alignment);
+                                           &requireBuffer.size, &zero,
+                                           &requireBuffer.alignment);
     }
   } else if (index != nullptr) {
     dataBuffer =
         bufferDataHolder.get(bufferDataHolder.allocation1, index->buffer);
-    memoryBuffer = bufferDataHolder.get(bufferDataHolder.allocation2, index->buffer);
+    memoryBuffer =
+        bufferDataHolder.get(bufferDataHolder.allocation2, index->buffer);
   }
 
   const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
@@ -1413,8 +1419,7 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
 
   const auto oldInfo = internalimageInfos[imageId];
   constexpr ImageSubresourceLayers layers(ImageAspectFlagBits::eColor, 0, 0, 1);
-  const BufferImageCopy imageInfo(0, 0, 0,
-                                  layers, {},
+  const BufferImageCopy imageInfo(0, 0, 0, layers, {},
                                   {oldInfo.ex.width, oldInfo.ex.height, 1});
   buffer.copyImageToBuffer(currentImage, ImageLayout::eTransferSrcOptimal,
                            dataBuffer, imageInfo);
