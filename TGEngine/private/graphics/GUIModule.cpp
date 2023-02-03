@@ -25,7 +25,7 @@ using namespace vk;
 
 inline void render(gui::GUIModule *gmod) {
   const RenderPass pass((VkRenderPass)gmod->renderpass);
-  auto vgm = (graphics::VulkanGraphicsModule *)main::getAPILayer();
+  auto vgm = (graphics::VulkanGraphicsModule *)main::getAPILayer()->backend();
   const CommandBuffer buffer = vgm->cmdbuffer[gmod->buffer + vgm->nextImage];
   const Framebuffer frame = ((Framebuffer *)gmod->framebuffer)[vgm->nextImage];
 
@@ -82,7 +82,7 @@ main::Error GUIModule::init() {
   if (!ImGui_ImplX11_Init(winModule->hInstance, winModule->hWnd))
     return main::Error::COULD_NOT_CREATE_WINDOW;
 #endif
-  const auto vmod = (graphics::VulkanGraphicsModule *)api;
+  const auto vmod = (graphics::VulkanGraphicsModule *)api->backend();
 
   const std::array attachments = {AttachmentDescription(
       {}, vmod->format.format, SampleCountFlagBits::e1, AttachmentLoadOp::eLoad,
@@ -186,7 +186,7 @@ main::Error GUIModule::init() {
 void GUIModule::tick(double deltatime) { render(this); }
 
 void GUIModule::destroy() {
-  const auto vmod = (graphics::VulkanGraphicsModule *)main::getAPILayer();
+  const auto vmod = (graphics::VulkanGraphicsModule *)main::getAPILayer()->backend();
   vmod->device.waitIdle();
   ImGui_ImplVulkan_Shutdown();
   vmod->device.destroyDescriptorPool(
@@ -206,7 +206,7 @@ void GUIModule::destroy() {
 }
 
 void GUIModule::recreate() {
-  const auto vmod = (graphics::VulkanGraphicsModule *)main::getAPILayer();
+  const auto vmod = (graphics::VulkanGraphicsModule *)main::getAPILayer()->backend();
 
   if (framebuffer != nullptr) {
     for (size_t i = 0; i < vmod->swapchainImageviews.size(); i++) {

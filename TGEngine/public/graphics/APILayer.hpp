@@ -146,6 +146,10 @@ class APILayer : public main::Module {  // Interface
 
   _NODISCARD virtual std::vector<char> getImageData(
       const size_t imageId, CacheIndex* = nullptr) = 0;
+
+  virtual APILayer* backend() { 
+      return this;
+  }
 };
 
 }  // namespace tge::graphics

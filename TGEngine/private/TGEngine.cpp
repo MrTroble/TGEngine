@@ -1,7 +1,9 @@
 #include "../public/TGEngine.hpp"
-#include "../public/graphics/vulkan/VulkanGraphicsModule.hpp"
-#include "../public/graphics/GUIModule.hpp"
+
 #include "../public/Util.hpp"
+#include "../public/graphics/GUIModule.hpp"
+#include "../public/graphics/PerformanceTestAPI.hpp"
+#include "../public/graphics/vulkan/VulkanGraphicsModule.hpp"
 
 namespace tge::main {
 
@@ -15,19 +17,20 @@ graphics::GameGraphicsModule *gameModule = nullptr;
 graphics::WindowModule *winModule = nullptr;
 
 void fireRecreate() {
-    for (Module* modul : modules) {
-        modul->recreate();
-    }
+  for (Module *modul : modules) {
+    modul->recreate();
+  }
 }
 
 Error init(const graphics::FeatureSet &featureSet) {
-  if (isInitialized)
-    return error = Error::ALREADY_INITIALIZED;
+  if (isInitialized) return error = Error::ALREADY_INITIALIZED;
   winModule = new graphics::WindowModule();
   modules.push_back(winModule);
-  usedApiLayer = graphics::getNewVulkanModule();
+  usedApiLayer = new graphics::PerformanceMessuringAPILayer(
+      graphics::getNewVulkanModule());
   modules.push_back(usedApiLayer);
-  gameModule = new graphics::GameGraphicsModule(usedApiLayer, winModule, featureSet);
+  gameModule =
+      new graphics::GameGraphicsModule(usedApiLayer, winModule, featureSet);
   usedApiLayer->setGameGraphicsModule(gameModule);
   modules.push_back(gameModule);
 
@@ -38,28 +41,23 @@ Error init(const graphics::FeatureSet &featureSet) {
 
   for (auto mod : modules) {
     error = mod->init();
-    if (error != Error::NONE)
-      return error;
+    if (error != Error::NONE) return error;
   }
   isInitialized = true;
   return error = Error::NONE;
 }
 
 Error start() {
-  if (!isInitialized)
-    return error = Error::NOT_INITIALIZED;
-  if (isRunning)
-    return error = Error::ALREADY_RUNNING;
+  if (!isInitialized) return error = Error::NOT_INITIALIZED;
+  if (isRunning) return error = Error::ALREADY_RUNNING;
 
   using namespace std::chrono;
   auto startpoint = steady_clock::now();
   double deltatime = 0;
   isRunning = true;
   for (;;) {
-    if (util::exitRequest || winModule->closeRequest)
-      break;
-    for (auto mod : modules)
-      mod->tick(deltatime);
+    if (util::exitRequest || winModule->closeRequest) break;
+    for (auto mod : modules) mod->tick(deltatime);
 
     auto endpoint = steady_clock::now();
     deltatime = duration_cast<duration<double>>(endpoint - startpoint).count();
@@ -85,4 +83,4 @@ graphics::APILayer *getAPILayer() { return usedApiLayer; }
 
 graphics::GameGraphicsModule *getGameGraphicsModule() { return gameModule; }
 
-} // namespace tge::main
+}  // namespace tge::main
