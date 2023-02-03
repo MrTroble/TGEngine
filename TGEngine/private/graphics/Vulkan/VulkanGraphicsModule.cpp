@@ -1329,9 +1329,10 @@ void VulkanGraphicsModule::destroy() {
     device.freeMemory(std::get<0>(*itr));
   for (const auto imView : textureImageViews) device.destroyImageView(imView);
   for (const auto samp : sampler) device.destroySampler(samp);
-  const auto endMem = std::end(bufferDataHolder.allocation2);
-  auto memItr = std::unique(std::begin(bufferDataHolder.allocation2), endMem);
-  for (; memItr != endMem; memItr++) device.freeMemory(*memItr);
+  auto memItr = std::begin(bufferDataHolder.allocation2);
+  const auto memEnd =
+      std::unique(memItr, std::end(bufferDataHolder.allocation2));
+  for (; memItr != memEnd; memItr++) device.freeMemory(*memItr);
   for (const auto buf : bufferDataHolder.allocation1) device.destroyBuffer(buf);
   for (const auto pipe : pipelines) device.destroyPipeline(pipe);
   for (const auto shader : shaderModules) device.destroyShaderModule(shader);

@@ -500,6 +500,23 @@ main::Error GameGraphicsModule::init() {
   defaultPipe = apiLayer->loadShader(MaterialType::None);
   const Material defMat(defaultPipe);
   defaultMaterial = apiLayer->pushMaterials(1, &defMat);
+
+  TextureInfo info;
+  info.width = BGAL::width;
+  info.height = BGAL::height;
+  info.channel = 4;
+  info.size = info.width * info.height * info.channel;
+  auto data = BGAL::header_data;
+  info.data = new uint8_t[info.size];
+  for (size_t i = 0; i < info.width * info.height; i++) {
+    std::array<uint8_t, 3> color;
+    HEADER_PIXEL(data, color);
+    info.data[i * 4 + 0] = color[0];
+    info.data[i * 4 + 1] = color[1];
+    info.data[i * 4 + 2] = color[2];
+    info.data[i * 4 + 3] = 255;
+  }
+  defaultTextureID = apiLayer->pushTexture(1, &info);
   return main::Error::NONE;
 }
 
@@ -530,32 +547,13 @@ void GameGraphicsModule::tick(double time) {
 
 void GameGraphicsModule::destroy() {}
 
-const TextureInfo defaultTextureInfo() {
-  TextureInfo info;
-  info.width = BGAL::width;
-  info.height = BGAL::height;
-  info.channel = 4;
-  info.size = info.width * info.height * info.channel;
-  auto data = BGAL::header_data;
-  info.data = new uint8_t[info.size];
-  for (size_t i = 0; i < info.width * info.height; i++) {
-    std::array<uint8_t, 3> color;
-    HEADER_PIXEL(data, color);
-    info.data[i * 4 + 0] = color[0];
-    info.data[i * 4 + 1] = color[1];
-    info.data[i * 4 + 2] = color[2];
-    info.data[i * 4 + 3] = 255;
-  }
-  return info;
-}
-
 std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>> &data) {
   std::vector<TextureInfo> textureInfos;
   textureInfos.reserve(data.size());
   for (const auto &dataIn : data) {
     if (dataIn.empty()) {
-      printf("[WARN]: Found empty texture!\n");
-      textureInfos.push_back(defaultTextureInfo());
+      printf("[ERR]: Found empty texture!\n");
+      exit(-1);
       continue;
     }
     TextureInfo info;
@@ -565,7 +563,7 @@ std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>> &data) {
     info.size = info.width * info.height * info.channel;
     if (info.channel == 3) {
       printf("Texture with 3 channels not supported!\n");
-      textureInfos.push_back(defaultTextureInfo());
+      exit(-1);
       continue;
     }
     textureInfos.push_back(info);
@@ -908,8 +906,8 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
   textureInfos.reserve(data.size());
   for (const auto &ddsVec : data) {
     if (ddsVec.empty()) {
-      printf("[WARN]: Found empty texture!\n");
-      textureInfos.push_back(defaultTextureInfo());
+      printf("[ERR]: Found empty texture!\n");
+      exit(-1);
       continue;
     }
     uint8_t *ddsData = (uint8_t *)ddsVec.data();
@@ -948,14 +946,45 @@ uint32_t GameGraphicsModule::loadTextures(
   return apiLayer->pushTexture(textureInfos.size(), textureInfos.data());
 }
 
-uint32_t GameGraphicsModule::loadTextures(const std::vector<std::string> &names,
-                                          const LoadType type) {
+std::vector<size_t> GameGraphicsModule::loadTextures(
+    const std::vector<std::string> &names, const LoadType type) {
+  const auto amount = names.size();
+  std::vector<size_t> localtextureIDs(amount);
   std::vector<std::vector<char>> data;
-  data.reserve(names.size());
-  for (const auto &name : names) {
-    data.push_back(util::wholeFile(name));
+  data.reserve(amount);
+  for (size_t i = 0; i < amount; i++) {
+    const auto &name = names[i];
+    {
+      std::lock_guard guard(protectTexture);
+      auto found = textureMap.find(name);
+      if (found != std::end(textureMap)) {
+        localtextureIDs[i] = found->second;
+        continue;
+      }
+    }
+    const auto file = util::wholeFile(name);
+    if (file.empty()) {
+      localtextureIDs[i] = defaultTextureID;
+      continue;
+    }
+    data.push_back(file);
+    localtextureIDs[i] = SIZE_MAX;
   }
-  return loadTextures(data, type);
+  if (!data.empty()) {
+    const auto startTexture = loadTextures(data, type);
+    for (size_t i = 0; i < data.size(); i++) {
+      size_t nameID = 0;
+      for (size_t& id : localtextureIDs) {
+        if (id == SIZE_MAX) {
+          id = startTexture + i;
+          textureMap[names[nameID]] = id;
+          break;
+        }
+        nameID++;
+      }
+    }
+  }
+  return localtextureIDs;
 }
 
 size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,

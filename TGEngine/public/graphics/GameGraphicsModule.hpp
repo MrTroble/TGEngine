@@ -12,6 +12,7 @@
 #include <glm/gtx/quaternion.hpp>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace tge::graphics {
 
@@ -48,11 +49,14 @@ class GameGraphicsModule : public main::Module {
   std::vector<NodeTransform> node;
   std::vector<size_t> parents;
   std::vector<size_t> bindingID;
-  std::vector<char> status; // jesus fuck not going to use a bool here
+  std::vector<char> status;
   size_t dataID = UINT64_MAX;
   uint32_t alignment = 1;
+  size_t defaultTextureID;
 
 public:
+  std::mutex protectTexture;
+  std::unordered_map<std::string, size_t> textureMap;
   size_t defaultMaterial;
   tge::shader::ShaderPipe defaultPipe;
   FeatureSet features;
@@ -70,7 +74,8 @@ public:
 
   _NODISCARD uint32_t loadTextures(const std::vector<std::vector<char>> &data, const LoadType type = LoadType::STBI);
 
-  _NODISCARD uint32_t loadTextures(const std::vector<std::string> &names, const LoadType type= LoadType::STBI);
+  std::vector<size_t> loadTextures(const std::vector<std::string> &names,
+                                      const LoadType type = LoadType::STBI);
 
   _NODISCARD size_t addNode(const NodeInfo *nodeInfos, const size_t count);
   
