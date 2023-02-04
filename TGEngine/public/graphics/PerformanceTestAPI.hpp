@@ -8,9 +8,15 @@ struct PrintableCounter {
   size_t hitCount = 0;
   std::mutex mutex;
 
+  std::string fullDebug() {
+    std::lock_guard lg(mutex);
+    return std::format("[{}: overallTime={}, hitCount={}, averageTime={}]",
+                       name, time, hitCount, time / (double)hitCount);
+  }
+
   void print() {
-    printf("[%s: overallTime=%lf, hitCount=%d, averageTime=%lf]\n", name.c_str(),
-           time, hitCount, time / (double)hitCount);
+    const auto string = fullDebug();
+    printf("%s\n", string.c_str());
   }
 };
 
@@ -46,28 +52,33 @@ class PerformanceMessuringAPILayer : public APILayer {
 
   ~PerformanceMessuringAPILayer() { delete api; }
 
-  main::Error init() { 
-      api->setGameGraphicsModule(this->getGraphicsModule());
-      return api->init(); 
+  main::Error init() {
+    api->setGameGraphicsModule(this->getGraphicsModule());
+    return api->init();
   }
 
   void tick(double deltatime) { api->tick(deltatime); }
 
+  std::string getDebug() {
+    return materialCounter.fullDebug() + "\n" + dataCounter.fullDebug() + "\n" +
+           renderCounter.fullDebug() + "\n" + textureCounter.fullDebug() + "\n";
+  }
+
   void print() {
-      materialCounter.print();
-      dataCounter.print();
-      renderCounter.print();
-      textureCounter.print();
+    materialCounter.print();
+    dataCounter.print();
+    renderCounter.print();
+    textureCounter.print();
   }
 
-  void destroy() { 
-      api->destroy();
-      print();
+  void destroy() {
+    api->destroy();
+    print();
   }
 
-  void recreate() { 
-      api->recreate();
-      print();
+  void recreate() {
+    api->recreate();
+    print();
   }
 
   _NODISCARD virtual void* loadShader(const MaterialType type) {
@@ -141,8 +152,6 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->getImageData(imageId, cache);
   }
 
-  virtual APILayer* backend() { 
-      return api->backend(); 
-  }
+  virtual APILayer* backend() { return api->backend(); }
 };
 }  // namespace tge::graphics
