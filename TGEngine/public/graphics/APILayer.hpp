@@ -4,6 +4,7 @@
 
 #include <glm/glm.hpp>
 #include <vector>
+#include <mutex>
 
 #include "../Module.hpp"
 #include "Material.hpp"
@@ -16,6 +17,20 @@ enum class ShaderType;
 namespace tge::graphics {
 
 class GameGraphicsModule;
+class APILayer;
+
+struct EntryHolder {
+  size_t internalHandle;
+  size_t referenceID;
+
+  EntryHolder() : internalHandle(SIZE_MAX), referenceID(SIZE_MAX) {}
+
+  EntryHolder(APILayer* api, const size_t internalHandle);
+};
+
+struct PipelineHolder : public EntryHolder {
+    using EntryHolder::EntryHolder;
+};
 
 enum class IndexSize { UINT16, UINT32, NONE };
 
@@ -31,7 +46,7 @@ struct PushConstRanges {
 struct RenderInfo {
   std::vector<size_t> vertexBuffer;
   size_t indexBuffer;
-  size_t materialId = SIZE_MAX;
+  PipelineHolder materialId;
   size_t indexCount;
   size_t instanceCount = 1;
   size_t indexOffset = 0;
@@ -87,8 +102,17 @@ class APILayer : public main::Module {  // Interface
  protected:
   GameGraphicsModule* graphicsModule = nullptr;
   shader::ShaderAPI* shaderAPI;
+  std::vector<size_t> referenceCounter;
+  std::mutex referenceCounterMutex;
 
  public:
+  size_t nextCounter() {
+    std::lock_guard lg(referenceCounterMutex);
+    const auto currentCount = referenceCounter.size();
+    referenceCounter.push_back(1);
+    return currentCount;
+  }
+
   void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
     this->graphicsModule = graphicsModule;
   }
@@ -100,9 +124,9 @@ class APILayer : public main::Module {  // Interface
   _NODISCARD virtual void* loadShader(
       const MaterialType type) = 0;  // Legacy support
 
-  _NODISCARD virtual size_t pushMaterials(const size_t materialcount,
-                                          const Material* materials,
-                                          const size_t offset = SIZE_MAX) = 0;
+  _NODISCARD virtual std::vector<PipelineHolder> pushMaterials(
+      const size_t materialcount, const Material* materials,
+      const size_t offset = SIZE_MAX) = 0;
 
   _NODISCARD virtual size_t pushData(const size_t dataCount, void* data,
                                      const size_t* dataSizes,
@@ -116,11 +140,12 @@ class APILayer : public main::Module {  // Interface
     changeData(bufferIndex, (const void*)data, dataSizes, offset);
   }
 
-  virtual size_t removeRender(const size_t renderInfoCount, const size_t* renderIDs) = 0;
+  virtual size_t removeRender(const size_t renderInfoCount,
+                              const size_t* renderIDs) = 0;
 
   virtual size_t pushRender(const size_t renderInfoCount,
-                          const RenderInfo* renderInfos,
-                          const size_t offset = 0) = 0;
+                            const RenderInfo* renderInfos,
+                            const size_t offset = 0) = 0;
 
   _NODISCARD virtual size_t pushSampler(const SamplerInfo& sampler) = 0;
 
@@ -144,12 +169,10 @@ class APILayer : public main::Module {  // Interface
 
   _NODISCARD virtual glm::vec2 getRenderExtent() const = 0;
 
-  _NODISCARD virtual std::vector<char> getImageData(
-      const size_t imageId, CacheIndex* = nullptr) = 0;
+  _NODISCARD virtual std::vector<char> getImageData(const size_t imageId,
+                                                    CacheIndex* = nullptr) = 0;
 
-  virtual APILayer* backend() { 
-      return this;
-  }
+  virtual APILayer* backend() { return this; }
 };
 
 }  // namespace tge::graphics

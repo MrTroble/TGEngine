@@ -18,10 +18,10 @@
 #include <vulkan/vulkan.hpp>
 
 #include "../../../public/Module.hpp"
+#include "../../DataHolder.hpp"
 #include "../GameGraphicsModule.hpp"
 #include "VulkanShaderModule.hpp"
 #include "VulkanShaderPipe.hpp"
-#include "../../DataHolder.hpp"
 #undef None
 #undef Bool
 
@@ -64,7 +64,7 @@ struct QueueSync {
     }
   }
 
-  void waitAndDisarm() { 
+  void waitAndDisarm() {
     internalWaitStopWithoutUnlock();
     handle.unlock();
   }
@@ -132,7 +132,8 @@ struct InternalImageInfo {
   SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
 };
 
-using BufferHolderType = DataHolder5<Buffer, DeviceMemory, size_t, size_t, size_t>;
+using BufferHolderType =
+    DataHolder5<Buffer, DeviceMemory, size_t, size_t, size_t>;
 
 class VulkanGraphicsModule : public APILayer {
  public:
@@ -218,10 +219,11 @@ class VulkanGraphicsModule : public APILayer {
 
   void destroy() override;
 
-  size_t removeRender(const size_t renderInfoCount, const size_t* renderIDs);
+  size_t removeRender(const size_t renderInfoCount, const size_t *renderIDs);
 
-  size_t pushMaterials(const size_t materialcount, const Material *materials,
-                       const size_t offset = SIZE_MAX) override;
+  std::vector<PipelineHolder> pushMaterials(
+      const size_t materialcount, const Material *materials,
+      const size_t offset = SIZE_MAX) override;
 
   size_t pushData(const size_t dataCount, void *data, const size_t *dataSizes,
                   const DataType type) override;
@@ -230,7 +232,7 @@ class VulkanGraphicsModule : public APILayer {
                   const size_t dataSizes, const size_t offset = 0) override;
 
   size_t pushRender(const size_t renderInfoCount, const RenderInfo *renderInfos,
-                  const size_t offset = 0) override;
+                    const size_t offset = 0) override;
 
   size_t pushSampler(const SamplerInfo &sampler) override;
 

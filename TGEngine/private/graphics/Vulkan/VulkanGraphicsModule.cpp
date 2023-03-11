@@ -122,9 +122,9 @@ inline void getOrCreate(
   }
 }
 
-size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
-                                           const Material* materials,
-                                           const size_t offset) {
+std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
+    const size_t materialcount, const Material* materials,
+    const size_t offset) {
   EXPECT(materialcount != 0 && materials != nullptr);
 
   const Rect2D scissor({0, 0},
@@ -213,13 +213,19 @@ size_t VulkanGraphicsModule::pushMaterials(const size_t materialcount,
     const auto currentPipe = pipelines[i];
     if (currentPipe) device.destroy(currentPipe);
   }
-  std::copy(piperesult.value.cbegin(), piperesult.value.cend(),
-            pipelines.begin() + indexOffset);
+
+  const auto copyToOffset = pipelines.begin() + indexOffset;
+  std::copy(piperesult.value.cbegin(), piperesult.value.cend(), copyToOffset);
 
   for (size_t i = 0; i < materialcount; i++) {
     materialsForRetry[i + indexOffset] = materials[i];
   }
-  return indexOffset;
+
+  std::vector<PipelineHolder> holder(materialcount);
+  for (size_t i = 0; i < materialcount; i++) {
+    holder[i] = PipelineHolder(this, i + indexOffset);
+  }
+  return holder;
 }
 
 inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
@@ -272,18 +278,18 @@ size_t VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     if (info.bindingID != UINT64_MAX) {
       shaderAPI->addToRender(&info.bindingID, 1, (void*)&cmdBuf);
     } else {
-      const auto binding =
-          shaderAPI->createBindings(shaderPipes[info.materialId]);
+      const auto binding = shaderAPI->createBindings(
+          shaderPipes[info.materialId.internalHandle]);
       shaderAPI->addToRender(&binding, 1, (void*)&cmdBuf);
     }
 
     cmdBuf.bindPipeline(PipelineBindPoint::eGraphics,
-                        pipelines[info.materialId]);
+                        pipelines[info.materialId.internalHandle]);
 
     for (const auto& range : info.constRanges) {
       VulkanShaderModule* shaderMod = (VulkanShaderModule*)shaderAPI;
       cmdBuf.pushConstants(
-          this->materialToLayout[info.materialId], shaderToVulkan(range.type),
+          this->materialToLayout[info.materialId.internalHandle], shaderToVulkan(range.type),
           0, range.pushConstData.size(), range.pushConstData.data());
     }
 

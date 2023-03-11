@@ -57,7 +57,7 @@ class GameGraphicsModule : public main::Module {
 public:
   std::mutex protectTexture;
   std::unordered_map<std::string, size_t> textureMap;
-  size_t defaultMaterial;
+  PipelineHolder defaultMaterial;
   tge::shader::ShaderPipe defaultPipe;
   FeatureSet features;
 

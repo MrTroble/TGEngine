@@ -85,7 +85,7 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->loadShader(type);
   }
 
-  _NODISCARD virtual size_t pushMaterials(const size_t materialcount,
+  _NODISCARD virtual std::vector<PipelineHolder> pushMaterials(const size_t materialcount,
                                           const Material* materials,
                                           const size_t offset = SIZE_MAX) {
     TimingAdder adder(materialCounter);
