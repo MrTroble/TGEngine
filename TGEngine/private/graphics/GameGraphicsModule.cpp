@@ -321,7 +321,8 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
 main::Error GameGraphicsModule::init() {
   const auto size = this->node.size();
   glm::mat4 projView = this->projectionMatrix * this->viewMatrix;
-  modelMatrices.reserve(UINT16_MAX);
+  modelMatrices.resize(UINT16_MAX);
+  std::fill(begin(modelMatrices), end(modelMatrices), glm::mat4(1));
   this->alignment = (uint32_t)ceil(
       this->apiLayer->getAligned(tge::graphics::DataType::Uniform) /
       sizeof(glm::mat4));
@@ -338,10 +339,11 @@ main::Error GameGraphicsModule::init() {
       modelMatrices[i * alignment] = mMatrix;
     }
   }
+  nextNode = size;
 
   std::array mvpsPtr = {(const uint8_t *)modelMatrices.data(),
                         (const uint8_t *)&projView};
-  std::array arrSize = {UINT16_MAX * sizeof(glm::mat4), sizeof(glm::mat4)};
+  std::array arrSize = {modelMatrices.size() * sizeof(glm::mat4), sizeof(glm::mat4)};
   dataID = apiLayer->pushData(mvpsPtr.size(), mvpsPtr.data(), arrSize.data(),
                               DataType::Uniform);
   defaultPipe = apiLayer->loadShader(MaterialType::None);
@@ -849,10 +851,10 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
                          glm::scale(nodeI.transforms.scale) *
                          glm::toMat4(nodeI.transforms.rotation);
     if (nodeI.parent < nodeIndex) {
-      modelMatrices.push_back(modelMatrices[nodeI.parent] * mMatrix);
+      modelMatrices[nextNode++] = modelMatrices[nodeI.parent] * mMatrix;
       parents.push_back(nodeI.parent);
     } else {
-      modelMatrices.push_back(mMatrix);
+      modelMatrices[nextNode++] = mMatrix;
       parents.push_back(UINT64_MAX);
     }
     status.push_back(0);

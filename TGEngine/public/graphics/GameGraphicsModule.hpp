@@ -45,6 +45,7 @@ class GameGraphicsModule : public main::Module {
 
   glm::mat4 projectionMatrix;
   glm::mat4 viewMatrix;
+  size_t nextNode = 0;
   std::vector<glm::mat4> modelMatrices;
   std::vector<NodeTransform> node;
   std::vector<size_t> parents;

@@ -829,6 +829,10 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
       {Format::eR32Sfloat, ext,
        ImageUsageFlagBits::eColorAttachment |
            ImageUsageFlagBits::eInputAttachment |
+           ImageUsageFlagBits::eTransferSrc},
+      {vgm->format.format, ext,
+       ImageUsageFlagBits::eColorAttachment |
+           ImageUsageFlagBits::eInputAttachment |
            ImageUsageFlagBits::eTransferSrc}};
 
   vgm->firstImage = createInternalImages(vgm, intImageInfo);

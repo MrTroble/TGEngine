@@ -41,8 +41,8 @@ extern Result verror;
 
 struct QueueSync {
   Device device;
-  Queue queue;
   Fence fence;
+  Queue queue;
   bool armed = false;
   std::mutex handle;
 
@@ -219,7 +219,7 @@ class VulkanGraphicsModule : public APILayer {
 
   void destroy() override;
 
-  size_t removeRender(const size_t renderInfoCount, const size_t *renderIDs);
+  size_t removeRender(const size_t renderInfoCount, const size_t *renderIDs) override;
 
   std::vector<PipelineHolder> pushMaterials(
       const size_t materialcount, const Material *materials,

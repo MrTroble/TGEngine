@@ -24,7 +24,7 @@
 #include <format>
 #else
 #include <sstream>
-#endif // SPR_USE_FORMAT_LIB
+#endif  // SPR_USE_FORMAT_LIB
 
 #include <functional>
 #include <map>
@@ -45,20 +45,19 @@
 #define SPR_NODISCARD
 #endif
 
-#define SPR_OPTIONAL_FROM(v1)                                                  \
-  const auto eItr##v1 = end(nlohmann_json_j);                                  \
-  const auto itr##v1 = nlohmann_json_j.find(#v1);                              \
-  if (eItr##v1 != itr##v1)                                                     \
-    (*itr##v1).get_to(nlohmann_json_t.v1);
+#define SPR_OPTIONAL_FROM(v1)                     \
+  const auto eItr##v1 = end(nlohmann_json_j);     \
+  const auto itr##v1 = nlohmann_json_j.find(#v1); \
+  if (eItr##v1 != itr##v1) (*itr##v1).get_to(nlohmann_json_t.v1);
 
-#define SPR_OPTIONAL_TO(v1)                                                    \
-  if (!((bool)nlohmann_json_t.v1)) {                                           \
-    NLOHMANN_JSON_TO(v1);                                                      \
+#define SPR_OPTIONAL_TO(v1)          \
+  if (!((bool)nlohmann_json_t.v1)) { \
+    NLOHMANN_JSON_TO(v1);            \
   }
 
-#define SPR_OPTIONAL_TO_L(v1)                                                  \
-  if (!((bool)nlohmann_json_t.v1.empty())) {                                   \
-    NLOHMANN_JSON_TO(v1);                                                      \
+#define SPR_OPTIONAL_TO_L(v1)                \
+  if (!((bool)nlohmann_json_t.v1.empty())) { \
+    NLOHMANN_JSON_TO(v1);                    \
   }
 
 #if !defined(SPR_NO_GLSL) && !defined(SPR_NO_GLSL_INCLUDE)
@@ -113,7 +112,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(EShTargetLanguageVersion,
                                  {EShTargetSpv_1_4, "spv_1_4"},
                                  {EShTargetSpv_1_5, "spv_1_5"},
                              });
-} // namespace glslang
+}  // namespace glslang
 #endif
 
 namespace permute {
@@ -138,8 +137,7 @@ SPR_NODISCARD inline bool isInDependency(T &dependency, T &dependsOn) {
   const auto endItr = end(dependency);
   for (auto target : dependsOn) {
     auto itr = begin(dependency);
-    if (std::find(itr, endItr, target) == endItr)
-      return false;
+    if (std::find(itr, endItr, target) == endItr) return false;
   }
   return true;
 }
@@ -178,16 +176,15 @@ struct GenerateOutput {
 };
 
 class PermuteText {
-public:
-  SPR_NODISCARD inline static GenerateOutput
-  generate(const GenerateInput input) {
+ public:
+  SPR_NODISCARD inline static GenerateOutput generate(
+      const GenerateInput input) {
     std::vector<std::string> buffer;
     buffer.reserve(input.codes.size());
     for (const auto &code : input.codes) {
       if (isRequired(code.flags) || code.dependsOn.empty() ||
           isInDependency(input.dependencies, code.dependsOn)) {
-        for (const auto &codePart : code.code)
-          buffer.push_back(codePart);
+        for (const auto &codePart : code.code) buffer.push_back(codePart);
       }
     }
     return {buffer, OutputType::TEXT};
@@ -195,8 +192,7 @@ public:
 };
 
 inline std::string postProcess(std::string &codePart, const lookup &callback) {
-  if (callback.empty())
-    return codePart;
+  if (callback.empty()) return codePart;
   auto eItr = end(codePart);
   auto startWordItr = eItr;
   auto paramStartItr = eItr;
@@ -290,14 +286,14 @@ SPR_STATIC std::string next(const std::string &input) {
 SPR_STATIC lookup glslLookup
 #ifndef SPR_NO_STATIC
     = {{"next", next}}
-#endif // SPR_STATIC
+#endif  // SPR_STATIC
 ;
 
 class ShaderTraverser;
 static std::vector<permute::ShaderTraverser *> traverser;
 
 class ShaderTraverser {
-public:
+ public:
   ShaderTraverser() { permute::traverser.push_back(this); }
 
   ~ShaderTraverser() {
@@ -335,7 +331,7 @@ public:
 namespace impl {
 
 class ShaderTraverser : public glslang::TIntermTraverser {
-public:
+ public:
   permute::ShaderTraverser *traverser;
 
   ShaderTraverser(permute::ShaderTraverser *traverser) : traverser(traverser) {}
@@ -371,146 +367,143 @@ public:
   }
 };
 
-} // namespace impl
+}  // namespace impl
 
 #ifdef SPR_MATERIALX
 class PermuteMaterialX {
-public:
-  SPR_NODISCARD inline static GenerateOutput
-  generate(const GenerateInput input) {
+ public:
+  SPR_NODISCARD inline static GenerateOutput generate(
+      const GenerateInput input) {
     auto generator = MaterialX::GlslShaderGenerator::create();
     auto doc = MaterialX::Document::createDocument();
     generator->registerShaderMetadata() auto shader = generator->generate("", );
   }
 };
-#endif // SPR_NO_MATERIALX
+#endif  // SPR_NO_MATERIALX
 
-inline TBuiltInResource InitResources()
-{
-    TBuiltInResource Resources{};
-    Resources.maxLights = 32;
-    Resources.maxClipPlanes = 6;
-    Resources.maxTextureUnits = 32;
-    Resources.maxTextureCoords = 32;
-    Resources.maxVertexAttribs = 64;
-    Resources.maxVertexUniformComponents = 4096;
-    Resources.maxVaryingFloats = 64;
-    Resources.maxVertexTextureImageUnits = 32;
-    Resources.maxCombinedTextureImageUnits = 80;
-    Resources.maxTextureImageUnits = 32;
-    Resources.maxFragmentUniformComponents = 4096;
-    Resources.maxDrawBuffers = 32;
-    Resources.maxVertexUniformVectors = 128;
-    Resources.maxVaryingVectors = 8;
-    Resources.maxFragmentUniformVectors = 16;
-    Resources.maxVertexOutputVectors = 16;
-    Resources.maxFragmentInputVectors = 15;
-    Resources.minProgramTexelOffset = -8;
-    Resources.maxProgramTexelOffset = 7;
-    Resources.maxClipDistances = 8;
-    Resources.maxComputeWorkGroupCountX = 65535;
-    Resources.maxComputeWorkGroupCountY = 65535;
-    Resources.maxComputeWorkGroupCountZ = 65535;
-    Resources.maxComputeWorkGroupSizeX = 1024;
-    Resources.maxComputeWorkGroupSizeY = 1024;
-    Resources.maxComputeWorkGroupSizeZ = 64;
-    Resources.maxComputeUniformComponents = 1024;
-    Resources.maxComputeTextureImageUnits = 16;
-    Resources.maxComputeImageUniforms = 8;
-    Resources.maxComputeAtomicCounters = 8;
-    Resources.maxComputeAtomicCounterBuffers = 1;
-    Resources.maxVaryingComponents = 60;
-    Resources.maxVertexOutputComponents = 64;
-    Resources.maxGeometryInputComponents = 64;
-    Resources.maxGeometryOutputComponents = 128;
-    Resources.maxFragmentInputComponents = 128;
-    Resources.maxImageUnits = 8;
-    Resources.maxCombinedImageUnitsAndFragmentOutputs = 8;
-    Resources.maxCombinedShaderOutputResources = 8;
-    Resources.maxImageSamples = 0;
-    Resources.maxVertexImageUniforms = 0;
-    Resources.maxTessControlImageUniforms = 0;
-    Resources.maxTessEvaluationImageUniforms = 0;
-    Resources.maxGeometryImageUniforms = 0;
-    Resources.maxFragmentImageUniforms = 8;
-    Resources.maxCombinedImageUniforms = 8;
-    Resources.maxGeometryTextureImageUnits = 16;
-    Resources.maxGeometryOutputVertices = 256;
-    Resources.maxGeometryTotalOutputComponents = 1024;
-    Resources.maxGeometryUniformComponents = 1024;
-    Resources.maxGeometryVaryingComponents = 64;
-    Resources.maxTessControlInputComponents = 128;
-    Resources.maxTessControlOutputComponents = 128;
-    Resources.maxTessControlTextureImageUnits = 16;
-    Resources.maxTessControlUniformComponents = 1024;
-    Resources.maxTessControlTotalOutputComponents = 4096;
-    Resources.maxTessEvaluationInputComponents = 128;
-    Resources.maxTessEvaluationOutputComponents = 128;
-    Resources.maxTessEvaluationTextureImageUnits = 16;
-    Resources.maxTessEvaluationUniformComponents = 1024;
-    Resources.maxTessPatchComponents = 120;
-    Resources.maxPatchVertices = 32;
-    Resources.maxTessGenLevel = 64;
-    Resources.maxViewports = 16;
-    Resources.maxVertexAtomicCounters = 0;
-    Resources.maxTessControlAtomicCounters = 0;
-    Resources.maxTessEvaluationAtomicCounters = 0;
-    Resources.maxGeometryAtomicCounters = 0;
-    Resources.maxFragmentAtomicCounters = 8;
-    Resources.maxCombinedAtomicCounters = 8;
-    Resources.maxAtomicCounterBindings = 1;
-    Resources.maxVertexAtomicCounterBuffers = 0;
-    Resources.maxTessControlAtomicCounterBuffers = 0;
-    Resources.maxTessEvaluationAtomicCounterBuffers = 0;
-    Resources.maxGeometryAtomicCounterBuffers = 0;
-    Resources.maxFragmentAtomicCounterBuffers = 1;
-    Resources.maxCombinedAtomicCounterBuffers = 1;
-    Resources.maxAtomicCounterBufferSize = 16384;
-    Resources.maxTransformFeedbackBuffers = 4;
-    Resources.maxTransformFeedbackInterleavedComponents = 64;
-    Resources.maxCullDistances = 8;
-    Resources.maxCombinedClipAndCullDistances = 8;
-    Resources.maxSamples = 4;
-    Resources.maxMeshOutputVerticesNV = 256;
-    Resources.maxMeshOutputPrimitivesNV = 512;
-    Resources.maxMeshWorkGroupSizeX_NV = 32;
-    Resources.maxMeshWorkGroupSizeY_NV = 1;
-    Resources.maxMeshWorkGroupSizeZ_NV = 1;
-    Resources.maxTaskWorkGroupSizeX_NV = 32;
-    Resources.maxTaskWorkGroupSizeY_NV = 1;
-    Resources.maxTaskWorkGroupSizeZ_NV = 1;
-    Resources.maxMeshViewCountNV = 4;
+inline TBuiltInResource InitResources() {
+  TBuiltInResource Resources{};
+  Resources.maxLights = 32;
+  Resources.maxClipPlanes = 6;
+  Resources.maxTextureUnits = 32;
+  Resources.maxTextureCoords = 32;
+  Resources.maxVertexAttribs = 64;
+  Resources.maxVertexUniformComponents = 4096;
+  Resources.maxVaryingFloats = 64;
+  Resources.maxVertexTextureImageUnits = 32;
+  Resources.maxCombinedTextureImageUnits = 80;
+  Resources.maxTextureImageUnits = 32;
+  Resources.maxFragmentUniformComponents = 4096;
+  Resources.maxDrawBuffers = 32;
+  Resources.maxVertexUniformVectors = 128;
+  Resources.maxVaryingVectors = 8;
+  Resources.maxFragmentUniformVectors = 16;
+  Resources.maxVertexOutputVectors = 16;
+  Resources.maxFragmentInputVectors = 15;
+  Resources.minProgramTexelOffset = -8;
+  Resources.maxProgramTexelOffset = 7;
+  Resources.maxClipDistances = 8;
+  Resources.maxComputeWorkGroupCountX = 65535;
+  Resources.maxComputeWorkGroupCountY = 65535;
+  Resources.maxComputeWorkGroupCountZ = 65535;
+  Resources.maxComputeWorkGroupSizeX = 1024;
+  Resources.maxComputeWorkGroupSizeY = 1024;
+  Resources.maxComputeWorkGroupSizeZ = 64;
+  Resources.maxComputeUniformComponents = 1024;
+  Resources.maxComputeTextureImageUnits = 16;
+  Resources.maxComputeImageUniforms = 8;
+  Resources.maxComputeAtomicCounters = 8;
+  Resources.maxComputeAtomicCounterBuffers = 1;
+  Resources.maxVaryingComponents = 60;
+  Resources.maxVertexOutputComponents = 64;
+  Resources.maxGeometryInputComponents = 64;
+  Resources.maxGeometryOutputComponents = 128;
+  Resources.maxFragmentInputComponents = 128;
+  Resources.maxImageUnits = 8;
+  Resources.maxCombinedImageUnitsAndFragmentOutputs = 8;
+  Resources.maxCombinedShaderOutputResources = 8;
+  Resources.maxImageSamples = 0;
+  Resources.maxVertexImageUniforms = 0;
+  Resources.maxTessControlImageUniforms = 0;
+  Resources.maxTessEvaluationImageUniforms = 0;
+  Resources.maxGeometryImageUniforms = 0;
+  Resources.maxFragmentImageUniforms = 8;
+  Resources.maxCombinedImageUniforms = 8;
+  Resources.maxGeometryTextureImageUnits = 16;
+  Resources.maxGeometryOutputVertices = 256;
+  Resources.maxGeometryTotalOutputComponents = 1024;
+  Resources.maxGeometryUniformComponents = 1024;
+  Resources.maxGeometryVaryingComponents = 64;
+  Resources.maxTessControlInputComponents = 128;
+  Resources.maxTessControlOutputComponents = 128;
+  Resources.maxTessControlTextureImageUnits = 16;
+  Resources.maxTessControlUniformComponents = 1024;
+  Resources.maxTessControlTotalOutputComponents = 4096;
+  Resources.maxTessEvaluationInputComponents = 128;
+  Resources.maxTessEvaluationOutputComponents = 128;
+  Resources.maxTessEvaluationTextureImageUnits = 16;
+  Resources.maxTessEvaluationUniformComponents = 1024;
+  Resources.maxTessPatchComponents = 120;
+  Resources.maxPatchVertices = 32;
+  Resources.maxTessGenLevel = 64;
+  Resources.maxViewports = 16;
+  Resources.maxVertexAtomicCounters = 0;
+  Resources.maxTessControlAtomicCounters = 0;
+  Resources.maxTessEvaluationAtomicCounters = 0;
+  Resources.maxGeometryAtomicCounters = 0;
+  Resources.maxFragmentAtomicCounters = 8;
+  Resources.maxCombinedAtomicCounters = 8;
+  Resources.maxAtomicCounterBindings = 1;
+  Resources.maxVertexAtomicCounterBuffers = 0;
+  Resources.maxTessControlAtomicCounterBuffers = 0;
+  Resources.maxTessEvaluationAtomicCounterBuffers = 0;
+  Resources.maxGeometryAtomicCounterBuffers = 0;
+  Resources.maxFragmentAtomicCounterBuffers = 1;
+  Resources.maxCombinedAtomicCounterBuffers = 1;
+  Resources.maxAtomicCounterBufferSize = 16384;
+  Resources.maxTransformFeedbackBuffers = 4;
+  Resources.maxTransformFeedbackInterleavedComponents = 64;
+  Resources.maxCullDistances = 8;
+  Resources.maxCombinedClipAndCullDistances = 8;
+  Resources.maxSamples = 4;
+  Resources.maxMeshOutputVerticesNV = 256;
+  Resources.maxMeshOutputPrimitivesNV = 512;
+  Resources.maxMeshWorkGroupSizeX_NV = 32;
+  Resources.maxMeshWorkGroupSizeY_NV = 1;
+  Resources.maxMeshWorkGroupSizeZ_NV = 1;
+  Resources.maxTaskWorkGroupSizeX_NV = 32;
+  Resources.maxTaskWorkGroupSizeY_NV = 1;
+  Resources.maxTaskWorkGroupSizeZ_NV = 1;
+  Resources.maxMeshViewCountNV = 4;
 
-    Resources.limits.nonInductiveForLoops = 1;
-    Resources.limits.whileLoops = 1;
-    Resources.limits.doWhileLoops = 1;
-    Resources.limits.generalUniformIndexing = 1;
-    Resources.limits.generalAttributeMatrixVectorIndexing = 1;
-    Resources.limits.generalVaryingIndexing = 1;
-    Resources.limits.generalSamplerIndexing = 1;
-    Resources.limits.generalVariableIndexing = 1;
-    Resources.limits.generalConstantMatrixVectorIndexing = 1;
+  Resources.limits.nonInductiveForLoops = 1;
+  Resources.limits.whileLoops = 1;
+  Resources.limits.doWhileLoops = 1;
+  Resources.limits.generalUniformIndexing = 1;
+  Resources.limits.generalAttributeMatrixVectorIndexing = 1;
+  Resources.limits.generalVaryingIndexing = 1;
+  Resources.limits.generalSamplerIndexing = 1;
+  Resources.limits.generalVariableIndexing = 1;
+  Resources.limits.generalConstantMatrixVectorIndexing = 1;
 
-    return Resources;
+  return Resources;
 }
 const TBuiltInResource DefaultTBuiltInResource = InitResources();
 
-
 class PermuteGLSL {
-public:
-  SPR_NODISCARD inline static GenerateOutput
-  generate(const GenerateInput input) {
+ public:
+  SPR_NODISCARD inline static GenerateOutput generate(
+      const GenerateInput input) {
     lookupCounter.clear();
     auto output = PermuteText::generate(input);
-    if (output.type == OutputType::ERROR)
-      return output;
+    if (output.type == OutputType::ERROR) return output;
     try {
       postProcess(output.output, glslLookup);
 #if defined(DEBUG) && !defined(SPR_NO_DEBUG_OUTPUT)
       for (auto &str : output.output) {
         printf("%s\n", str.c_str());
       }
-#endif // DEBUG
+#endif  // DEBUG
       auto stringPtr = output.output;
       std::vector<const char *> cstrings;
       cstrings.resize(stringPtr.size());
@@ -525,15 +518,14 @@ public:
       shader->setEnvClient(settings.targetClient, settings.targetVersion);
       shader->setEnvTarget(settings.targetLanguage,
                            settings.targetLanguageVersion);
-      if (!shader->parse(&DefaultTBuiltInResource, 450, EProfile::ENoProfile, false, false,
-                         EShMessages::EShMsgVulkanRules)) {
+      if (!shader->parse(&DefaultTBuiltInResource, 450, EProfile::ENoProfile,
+                         false, false, EShMessages::EShMsgVulkanRules)) {
         return {{shader->getInfoLog()}, OutputType::ERROR};
       }
       const auto interm = shader->getIntermediate();
       const auto node = interm->getTreeRoot();
       for (const auto travPtr : traverser) {
-        if (!travPtr->isValid(settings))
-          continue;
+        if (!travPtr->isValid(settings)) continue;
         impl::ShaderTraverser trav(travPtr);
         node->traverse(&trav);
         travPtr->postProcess();
@@ -546,23 +538,22 @@ public:
       return {{"Could not parse glsl settings!", std::string(e.what())},
               OutputType::ERROR};
     }
-    return {{"Undefined error!"},
-            OutputType::ERROR};
+    return {{"Undefined error!"}, OutputType::ERROR};
   }
 };
 
 #endif
 
-template <class T> class Permute {
-
-private:
+template <class T>
+class Permute {
+ private:
   std::vector<ShaderCodes> codes;
   nlohmann::json settings;
   GenerateOutput output;
 
-public:
-  SPR_NODISCARD inline bool
-  generate(const std::vector<std::string> &dependencies = {}) {
+ public:
+  SPR_NODISCARD inline bool generate(
+      const std::vector<std::string> &dependencies = {}) {
     const GenerateInput input = {codes, dependencies, settings};
     output = T::generate(input);
     return success();
@@ -577,8 +568,7 @@ public:
   }
 
   SPR_NODISCARD inline std::vector<unsigned int> getBinary() const {
-    if (output.type != OutputType::BINARY)
-      return {};
+    if (output.type != OutputType::BINARY) return {};
     return output.data;
   }
 
@@ -586,7 +576,8 @@ public:
 
   SPR_NODISCARD inline void *getCostumData() const { return output.costumData; }
 
-  template <class Settings> SPR_NODISCARD inline Settings getSettings() const {
+  template <class Settings>
+  SPR_NODISCARD inline Settings getSettings() const {
     return settings.get<Settings>();
   }
 
@@ -609,19 +600,20 @@ public:
   }
 };
 
-template <class T> inline Permute<T> fromJson(const nlohmann::json &json) {
+template <class T>
+inline Permute<T> fromJson(const nlohmann::json &json) {
   return json.get<Permute<T>>();
 }
 
 #ifndef SPR_NO_FSTREAM
-template <class T> inline Permute<T> fromFile(const std::string &path) {
+template <class T>
+inline Permute<T> fromFile(const std::string &path) {
   std::ifstream inputfile(path);
-  if (!inputfile.good())
-    throw std::runtime_error("File not found!");
+  if (!inputfile.good()) throw std::runtime_error("File not found!");
   nlohmann::json json;
   inputfile >> json;
   return fromJson<T>(json);
 }
 #endif
 
-} // namespace permute
+}  // namespace permute
