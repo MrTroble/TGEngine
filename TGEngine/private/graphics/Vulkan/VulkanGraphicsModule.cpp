@@ -238,7 +238,7 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
   throw std::runtime_error("Error shader translation not implemented!");
 }
 
-size_t VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
+TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                         const RenderInfo* renderInfos,
                                         const size_t offset) {
   EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
@@ -269,7 +269,7 @@ size_t VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
         cmdBuf.bindVertexBuffers(0, vertexBuffer, offsets);
       } else {
         TGE_EXPECT(vertexBuffer.size() == info.vertexOffsets.size(),
-                   "Size is not equal!", SIZE_MAX);
+                   "Size is not equal!", {});
         cmdBuf.bindVertexBuffers(0, vertexBuffer.size(), vertexBuffer.data(),
                                  (DeviceSize*)info.vertexOffsets.data());
       }
@@ -313,7 +313,7 @@ size_t VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     renderInfosForRetry.resize(indexIn + 1);
   renderInfosForRetry[indexIn] =
       std::vector(renderInfos, renderInfos + renderInfoCount);
-  return indexIn;
+  return TRenderHolder(this, indexIn);
 }
 
 inline BufferUsageFlags getUsageFlagsFromDataType(const DataType type) {
@@ -1368,15 +1368,14 @@ void VulkanGraphicsModule::destroy() {
   delete shaderAPI;
 }
 
-size_t VulkanGraphicsModule::removeRender(const size_t renderInfoCount,
-                                          const size_t* renderIDs) {
+void VulkanGraphicsModule::removeRender(const size_t renderInfoCount,
+                                        const TRenderHolder* renderIDs) {
   std::lock_guard lg(commandBufferRecording);
   for (size_t i = 0; i < renderInfoCount; i++) {
-    const auto id = renderIDs[i];
+    const auto id = renderIDs[i].internalHandle;
     renderInfosForRetry[id].clear();
     secondaryCommandBuffer[id] = nullptr;
   }
-  return size_t();
 }
 
 glm::vec2 VulkanGraphicsModule::getRenderExtent() const {
@@ -1418,7 +1417,7 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
   }
 
   const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
-  const CommandBufferBeginInfo info({});
+  static constexpr CommandBufferBeginInfo info;
   std::lock_guard lg(secondarySync->handle);
   primarySync->begin(buffer, info);
 

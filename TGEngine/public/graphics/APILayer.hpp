@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <mutex>
+#include <functional>
 
 #include "../Module.hpp"
 #include "Material.hpp"
@@ -26,11 +27,25 @@ struct EntryHolder {
   EntryHolder() : internalHandle(SIZE_MAX), referenceID(SIZE_MAX) {}
 
   EntryHolder(APILayer* api, const size_t internalHandle);
+
+  [[nodiscard]] inline operator bool() const {
+      return internalHandle != SIZE_MAX;
+  }
+
+  [[nodiscard]] inline bool operator==(const EntryHolder& holder) const {
+      return this->internalHandle == holder.internalHandle;
+  }
 };
 
 struct PipelineHolder : public EntryHolder {
     using EntryHolder::EntryHolder;
 };
+
+#define DEFINE_HOLDER(name) \
+  struct T ##name## Holder : public EntryHolder { using EntryHolder::EntryHolder; \
+}
+
+DEFINE_HOLDER(Render);
 
 enum class IndexSize { UINT16, UINT32, NONE };
 
@@ -140,10 +155,10 @@ class APILayer : public main::Module {  // Interface
     changeData(bufferIndex, (const void*)data, dataSizes, offset);
   }
 
-  virtual size_t removeRender(const size_t renderInfoCount,
-                              const size_t* renderIDs) = 0;
+  virtual void removeRender(const size_t renderInfoCount,
+                              const TRenderHolder* renderIDs) = 0;
 
-  virtual size_t pushRender(const size_t renderInfoCount,
+  virtual TRenderHolder pushRender(const size_t renderInfoCount,
                             const RenderInfo* renderInfos,
                             const size_t offset = 0) = 0;
 
@@ -176,3 +191,12 @@ class APILayer : public main::Module {  // Interface
 };
 
 }  // namespace tge::graphics
+
+namespace std {
+template <>
+struct std::hash<tge::graphics::EntryHolder> {
+  std::size_t operator()(tge::graphics::EntryHolder const& s) const noexcept {
+    return std::hash<size_t>{}(s.internalHandle);
+  }
+};
+}  // namespace std
