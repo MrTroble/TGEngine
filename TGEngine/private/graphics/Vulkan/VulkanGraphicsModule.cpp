@@ -160,7 +160,7 @@ std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
   std::vector<PipelineInputAssemblyStateCreateInfo> input;
   input.resize(materialcount);
 
-  const auto indexOffset = offset == SIZE_MAX ? pipelines.size() : offset;
+  const auto indexOffset = offset == INVALID_SIZE_T ? pipelines.size() : offset;
   this->materialToLayout.resize(indexOffset + materialcount);
 
   std::vector<PipelineRasterizationStateCreateInfo> rasterizationInfos(
@@ -186,7 +186,7 @@ std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
 
     input[i] = PipelineInputAssemblyStateCreateInfo(
         {},
-        material.primitiveType == UINT32_MAX
+        material.primitiveType == INVALID_UINT32
             ? PrimitiveTopology::eTriangleList
             : (PrimitiveTopology)(material.primitiveType),
         false);
@@ -275,7 +275,7 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
       }
     }
 
-    if (info.bindingID != UINT64_MAX) {
+    if (info.bindingID != INVALID_SIZE_T) {
       shaderAPI->addToRender(&info.bindingID, 1, (void*)&cmdBuf);
     } else {
       const auto binding = shaderAPI->createBindings(
@@ -341,8 +341,6 @@ inline size_t aligned(const size_t size, const size_t align) {
   const auto alignmentOffset = size % align;
   return size + (align - alignmentOffset) % align;
 }
-
-constexpr PipelineStageFlags ALL_COMMANDS = PipelineStageFlagBits::eAllCommands;
 
 size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
                                       const size_t* dataSizes,
@@ -485,7 +483,7 @@ void VulkanGraphicsModule::changeData(const size_t bufferIndex,
   device.destroyBuffer(intermBuffer);
 }
 
-size_t VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
+TSamplerHolder VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
   const auto position = this->sampler.size();
   const auto anisotropy =
       std::min((float)sampler.anisotropy, deviceLimits.maxSamplerAnisotropy);
@@ -496,7 +494,7 @@ size_t VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
       anisotropy != 0, anisotropy);
   const auto smplr = device.createSampler(samplerCreateInfo);
   this->sampler.push_back(smplr);
-  return position;
+  return TSamplerHolder(this, position);
 }
 
 inline size_t createInternalImages(
@@ -675,28 +673,20 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 
 inline void updateDescriptors(VulkanGraphicsModule* vgm,
                               shader::ShaderAPI* sapi) {
-  const std::array bindingInfos = {
-      BindingInfo{0,
-                  vgm->lightBindings,
-                  BindingType::InputAttachment,
-                  {vgm->albedoImage, UINT64_MAX}},
-      BindingInfo{1,
-                  vgm->lightBindings,
-                  BindingType::InputAttachment,
-                  {vgm->normalImage, UINT64_MAX}},
-      BindingInfo{2,
-                  vgm->lightBindings,
-                  BindingType::InputAttachment,
-                  {vgm->roughnessMetallicImage, UINT64_MAX}},
-      BindingInfo{3,
-                  vgm->lightBindings,
-                  BindingType::InputAttachment,
-                  {vgm->position, UINT64_MAX}},
-      BindingInfo{4,
-                  vgm->lightBindings,
-                  BindingType::UniformBuffer,
-                  {vgm->lightData, VK_WHOLE_SIZE, 0}}};
-
+  std::array<BindingInfo, 5> bindingInfos;
+  for (size_t i = 0; i < 4; i++) {
+    bindingInfos[i].type = BindingType::InputAttachment;
+    bindingInfos[i].bindingSet = vgm->lightBindings;
+    bindingInfos[i].binding = i;
+    bindingInfos[i].data.texture.texture = vgm->firstImage + i + 1;
+    bindingInfos[i].data.texture.sampler = TSamplerHolder();
+  }
+  bindingInfos[4].type = BindingType::UniformBuffer;
+  bindingInfos[4].bindingSet = vgm->lightBindings;
+  bindingInfos[4].binding = 4;
+  bindingInfos[4].data.buffer.dataID = vgm->lightData;
+  bindingInfos[4].data.buffer.size = VK_WHOLE_SIZE;
+  bindingInfos[4].data.buffer.offset = 0;
   sapi->bindData(bindingInfos.data(), bindingInfos.size());
 }
 
@@ -873,7 +863,7 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
     vgm->framebuffer.push_back(
         vgm->device.createFramebuffer(framebufferCreateInfo));
   }
-  if (vgm->lightPipe != UINT32_MAX) {
+  if (vgm->lightPipe != INVALID_UINT32) {
     const auto sapi = vgm->getShaderAPI();
     updateDescriptors(vgm, sapi);
   }
@@ -1219,7 +1209,7 @@ main::Error VulkanGraphicsModule::init() {
   createLightPass(this);
 
   auto nextimage =
-      device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
+      device.acquireNextImageKHR(swapchain, INVALID_SIZE_T, waitSemaphore, {});
   VERROR(nextimage.result);
   this->nextImage = nextimage.value;
 
@@ -1309,7 +1299,7 @@ void VulkanGraphicsModule::tick(double time) {
   if (checkAndRecreate(this, result)) {
     currentBuffer.reset();
     auto nextimage =
-        device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
+        device.acquireNextImageKHR(swapchain, INVALID_SIZE_T, waitSemaphore, {});
     this->nextImage = nextimage.value;
     if (this->nextImage > 2) printf("WTF!");
     return;
@@ -1317,7 +1307,7 @@ void VulkanGraphicsModule::tick(double time) {
 
   while (true) {
     auto nextimage =
-        device.acquireNextImageKHR(swapchain, UINT64_MAX, waitSemaphore, {});
+        device.acquireNextImageKHR(swapchain, INVALID_SIZE_T, waitSemaphore, {});
     this->nextImage = nextimage.value;
     if (!checkAndRecreate(this, nextimage.result)) break;
   }
@@ -1391,7 +1381,7 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
 
   Buffer dataBuffer;
   DeviceMemory memoryBuffer;
-  if (index == nullptr || index->buffer == SIZE_MAX) {
+  if (index == nullptr || index->buffer == INVALID_SIZE_T) {
     const BufferCreateInfo bufferCreateInfo({}, requireMents.size,
                                             BufferUsageFlagBits::eTransferDst);
     dataBuffer = device.createBuffer(bufferCreateInfo);

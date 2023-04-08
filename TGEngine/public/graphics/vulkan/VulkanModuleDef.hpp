@@ -57,7 +57,7 @@ struct QueueSync {
   void internalWaitStopWithoutUnlock() {
     handle.lock();
     if (armed) {
-      const auto result2 = device.waitForFences(fence, true, UINT64_MAX);
+      const auto result2 = device.waitForFences(fence, true, INVALID_SIZE_T);
       VERROR(result2);
       device.resetFences(fence);
       armed = false;
@@ -89,7 +89,7 @@ struct QueueSync {
   void submitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
     internalWaitStopWithoutUnlock();
     queue.submit(submitInfos, fence);
-    const auto result = device.waitForFences(fence, true, UINT64_MAX);
+    const auto result = device.waitForFences(fence, true, INVALID_SIZE_T);
     VERROR(result);
     device.resetFences(fence);
     handle.unlock();
@@ -102,12 +102,12 @@ struct QueueSync {
       }
     }
     if (armed) {
-      const auto result = device.waitForFences(fence, true, UINT64_MAX);
+      const auto result = device.waitForFences(fence, true, INVALID_SIZE_T);
       VERROR(result);
       device.resetFences(fence);
     }
     queue.submit(submitInfos, fence);
-    const auto result = device.waitForFences(fence, true, UINT64_MAX);
+    const auto result = device.waitForFences(fence, true, INVALID_SIZE_T);
     VERROR(result);
     device.resetFences(fence);
     handle.unlock();
@@ -193,7 +193,7 @@ class VulkanGraphicsModule : public APILayer {
   size_t attachmentCount;
 
   size_t lightData;
-  size_t lightPipe = UINT32_MAX;
+  size_t lightPipe = INVALID_UINT32;
   size_t lightBindings;
   Material lightMat;
 
@@ -224,7 +224,7 @@ class VulkanGraphicsModule : public APILayer {
 
   std::vector<PipelineHolder> pushMaterials(
       const size_t materialcount, const Material *materials,
-      const size_t offset = SIZE_MAX) override;
+      const size_t offset = INVALID_SIZE_T) override;
 
   size_t pushData(const size_t dataCount, void *data, const size_t *dataSizes,
                   const DataType type) override;
@@ -236,7 +236,7 @@ class VulkanGraphicsModule : public APILayer {
                            const RenderInfo *renderInfos,
                     const size_t offset = 0) override;
 
-  size_t pushSampler(const SamplerInfo &sampler) override;
+  TSamplerHolder pushSampler(const SamplerInfo &sampler) override;
 
   size_t pushTexture(const size_t textureCount,
                      const TextureInfo *textures) override;

@@ -243,7 +243,7 @@ void __implCreateDescSets(VulkanShaderPipe* shaderPipe,
     vsm->pipeLayouts.push_back(pipeLayout);
     shaderPipe->layoutID = vsm->pipeLayouts.size() - 1;
   } else {
-    shaderPipe->layoutID = UINT64_MAX;
+    shaderPipe->layoutID = INVALID_SIZE_T;
   }
 }
 
@@ -526,7 +526,7 @@ ShaderPipe VulkanShaderModule::createShaderPipe(
 size_t VulkanShaderModule::createBindings(ShaderPipe pipe, const size_t count) {
   VulkanShaderPipe* shaderPipe = (VulkanShaderPipe*)pipe;
   const auto layout = shaderPipe->layoutID;
-  if (layout == UINT64_MAX) return UINT64_MAX;
+  if (layout == INVALID_SIZE_T) return INVALID_SIZE_T;
   std::vector<DescriptorSetLayout> layouts(count);
   std::fill(layouts.begin(), layouts.end(), this->setLayouts[layout]);
   const DescriptorSetAllocateInfo allocInfo(this->descPools[layout], count,
@@ -553,16 +553,24 @@ size_t VulkanShaderModule::createBindings(ShaderPipe pipe, const size_t count) {
           bInfo.push_back(b);
         }
       }
+      BindingInfo binding;
+      binding.type = BindingType::Texture;
+      binding.binding = 1;
       for (size_t i = 0; i < count; i++) {
-        const auto nID = nextID + i;
-        for (size_t i = 0; i < 5; i++) {
-          bInfo.push_back({1u, nID, BindingType::Texture, {5u, UINT64_MAX}, i});
-        }
+        binding.bindingSet = nextID + i;
         for (size_t i = 5; i < vgm->textureImages.size(); i++) {
-          bInfo.push_back({1u, nID, BindingType::Texture, {i, UINT64_MAX}, i});
+          binding.arrayID = i;
+          bInfo.push_back(binding);
+        }
+        binding.data.texture.texture =
+            vgm->getGraphicsModule()->defaultTextureID;
+        for (size_t i = 0; i < 5; i++) {
+          binding.arrayID = i;
+          bInfo.push_back(binding);
         }
         for (size_t i = vgm->textureImages.size(); i < 255; i++) {
-          bInfo.push_back({1u, nID, BindingType::Texture, {5u, UINT64_MAX}, i});
+          binding.arrayID = i;
+          bInfo.push_back(binding);
         }
       }
 
@@ -588,6 +596,7 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
   imgInfo.resize(count);
   for (size_t i = 0; i < count; i++) {
     const auto& cinfo = info[i];
+    DEBUG_EXPECT(cinfo);
     switch (cinfo.type) {
       case BindingType::Storage:
       case BindingType::UniformBuffer: {
@@ -608,9 +617,9 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
       case BindingType::InputAttachment: {
         const auto& tex = cinfo.data.texture;
         imgInfo[i] = DescriptorImageInfo(
-            tex.sampler == UINT64_MAX ? vk::Sampler()
-                                      : vgm->sampler[tex.sampler],
-            tex.texture == UINT64_MAX ? vk::ImageView()
+            (bool)tex.sampler ? vgm->sampler[tex.sampler.internalHandle]
+                              : vk::Sampler(),
+            tex.texture == INVALID_SIZE_T ? vk::ImageView()
                                       : vgm->textureImageViews[tex.texture],
             ImageLayout::eShaderReadOnlyOptimal);
         set.push_back(WriteDescriptorSet(
@@ -654,23 +663,10 @@ void VulkanShaderModule::addToMaterial(const graphics::Material* material,
   using namespace tge::graphics;
   const auto vkPipe = ((VulkanShaderPipe*)material->costumShaderData);
   const auto layOut = vkPipe->layoutID;
-  if (layOut != UINT64_MAX) [[likely]] {
+  if (layOut != INVALID_SIZE_T) [[likely]] {
     ((GraphicsPipelineCreateInfo*)customData)->setLayout(pipeLayouts[layOut]);
   } else {
     ((GraphicsPipelineCreateInfo*)customData)->setLayout(defaultLayout);
-  }
-
-  // LEGACY
-  if (material->type == MaterialType::TextureOnly) {  // Legacy support
-    const auto texMat = material->data.textureMaterial;
-    if (layOut == UINT64_MAX) return;
-    if (defaultbindings.size() <= layOut) {
-      defaultbindings.resize(layOut + 1);
-    }
-    defaultbindings[layOut] = {{0,
-                                UINT64_MAX,
-                                BindingType::Sampler,
-                                {texMat.textureIndex, texMat.samplerIndex}}};
   }
 }
 

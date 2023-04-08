@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "ElementHolder.hpp"
 
 namespace tge::graphics {
 
@@ -11,25 +12,15 @@ using Color = float[4];
 enum class MaterialType { None, TextureOnly };
 constexpr MaterialType MAX_TYPE = MaterialType::TextureOnly;
 
-struct TextureMaterial {
-  uint32_t textureIndex;
-  uint32_t samplerIndex;
-};
-
 struct Material {
-
-  Material(const TextureMaterial texture, APILayer *layer);
 
   Material(void *costumShaderData) : costumShaderData(costumShaderData) {}
 
   Material() = default;
 
   MaterialType type = MaterialType::None;
-  union data {
-    TextureMaterial textureMaterial;
-  } data;
   void *costumShaderData = nullptr; // API dependent
   bool doubleSided = false;
-  uint32_t primitiveType = UINT32_MAX;
+  uint32_t primitiveType = INVALID_UINT32;
 };
 } // namespace tge::graphics

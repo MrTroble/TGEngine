@@ -26,7 +26,7 @@ struct VulkanShaderPipe {
   PipelineVertexInputStateCreateInfo inputStateCreateInfo;
   std::vector<DescriptorSetLayoutBinding> descriptorLayoutBindings;
   std::vector<PushConstantRange> constranges;
-  size_t layoutID = UINT64_MAX;
+  size_t layoutID = INVALID_SIZE_T;
   bool needsDefaultBindings = true;
 
   std::mutex pipeMutex;

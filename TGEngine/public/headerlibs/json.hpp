@@ -18295,7 +18295,7 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
     > An implementation may set limits on the range and precision of numbers.
 
     When the default type is used, the maximal integer number that can be
-    stored is `18446744073709551615` (UINT64_MAX) and the minimal integer
+    stored is `18446744073709551615` (INVALID_SIZE_T) and the minimal integer
     number that can be stored is `0`. Integer numbers that are out of range
     will yield over/underflow when used in a constructor. During
     deserialization, too large or small integer numbers will be automatically
@@ -18307,7 +18307,7 @@ class basic_json // NOLINT(cppcoreguidelines-special-member-functions,hicpp-spec
     > that implementations will agree exactly on their numeric values.
 
     As this range is a subrange (when considered in conjunction with the
-    number_integer_t type) of the exactly supported range [0, UINT64_MAX],
+    number_integer_t type) of the exactly supported range [0, INVALID_SIZE_T],
     this class's integer type is interoperable.
 
     #### Storage

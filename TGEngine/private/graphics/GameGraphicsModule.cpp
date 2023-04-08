@@ -56,27 +56,26 @@ inline vk::Format getFormatFromStride(uint32_t stride) {
   }
 }
 
-inline size_t loadSampler(const Model &model, APILayer *apiLayer) {
-  size_t samplerIndex = -1;
+inline std::vector<TSamplerHolder> loadSampler(const Model &model, APILayer *apiLayer) {
+  std::vector<TSamplerHolder> samplerHolder;
   for (const auto &smplr : model.samplers) {
     const SamplerInfo samplerInfo = {
         gltfToAPI(smplr.minFilter, FilterSetting::LINEAR),
         gltfToAPI(smplr.minFilter, FilterSetting::LINEAR),
         gltfToAPI(smplr.wrapS, AddressMode::REPEAT),
         gltfToAPI(smplr.wrapT, AddressMode::REPEAT)};
-    samplerIndex = apiLayer->pushSampler(samplerInfo);
+    samplerHolder.push_back(apiLayer->pushSampler(samplerInfo));
   }
-  samplerIndex -= model.samplers.size() - 1;
 
   if (!model.images.empty()) {
     if (model.samplers.empty()) {  // default sampler
       const SamplerInfo samplerInfo = {
           FilterSetting::LINEAR, FilterSetting::LINEAR, AddressMode::REPEAT,
           AddressMode::REPEAT};
-      samplerIndex = apiLayer->pushSampler(samplerInfo);
+      samplerHolder.push_back(apiLayer->pushSampler(samplerInfo));
     }
   }
-  return samplerIndex;
+  return samplerHolder;
 }
 
 inline size_t loadTexturesFM(const Model &model, APILayer *apiLayer) {
@@ -146,7 +145,7 @@ inline void pushRender(const Model &model, APILayer *apiLayer,
     const auto oItr = std::find_if(
         bItr, eItr, [idx = i](const Node &node) { return node.mesh == idx; });
     const auto nID =
-        oItr != eItr ? std::distance(bItr, oItr) + nodeID : UINT64_MAX;
+        oItr != eItr ? std::distance(bItr, oItr) + nodeID : INVALID_SIZE_T;
     const auto bID = bindings[nID];
     for (const auto &prim : mesh.primitives) {
       std::vector<std::tuple<int, int, int>> strides;
@@ -248,7 +247,7 @@ inline size_t loadNodes(const Model &model, APILayer *apiLayer,
       }
     }
     for (auto &nInfo : nodeInfos) {
-      if (nInfo.parent == UINT64_MAX) {
+      if (nInfo.parent == INVALID_SIZE_T) {
         nInfo.parent = nextNodeID;
       }
     }
@@ -294,7 +293,7 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
   if (!rst) {
     printf("[GLTF][ERR]: Loading failed\n[GLTF][ERR]: %s\n[GLTF][WARN]: %s\n",
            error.c_str(), warning.c_str());
-    return UINT64_MAX;
+    return INVALID_SIZE_T;
   }
 
   if (!warning.empty()) {
@@ -775,7 +774,7 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
 
 uint32_t GameGraphicsModule::loadTextures(
     const std::vector<std::vector<char>> &data, const LoadType type) {
-  if (data.empty()) return UINT32_MAX;
+  if (data.empty()) return INVALID_UINT32;
   std::vector<TextureInfo> textureInfos;
 
   util::OnExit onExit([tinfos = &textureInfos, type = type] {
@@ -817,14 +816,14 @@ std::vector<size_t> GameGraphicsModule::loadTextures(
       continue;
     }
     data.push_back(file);
-    localtextureIDs[i] = SIZE_MAX;
+    localtextureIDs[i] = INVALID_SIZE_T;
   }
   if (!data.empty()) {
     const auto startTexture = loadTextures(data, type);
     for (size_t i = 0; i < data.size(); i++) {
       size_t nameID = 0;
       for (size_t& id : localtextureIDs) {
-        if (id == SIZE_MAX) {
+        if (id == INVALID_SIZE_T) {
           id = startTexture + i;
           textureMap[names[nameID]] = id;
           break;
@@ -855,21 +854,25 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
       parents.push_back(nodeI.parent);
     } else {
       modelMatrices[nextNode++] = mMatrix;
-      parents.push_back(UINT64_MAX);
+      parents.push_back(INVALID_SIZE_T);
     }
     status.push_back(0);
-    if (nodeI.bindingID != UINT64_MAX) [[likely]] {
+    if (nodeI.bindingID != INVALID_SIZE_T) [[likely]] {
       const auto mvp = modelMatrices[nodeID];
       const auto off = sizeof(mvp) * (nodeID + i) * alignment;
       apiLayer->changeData(dataID, (const uint8_t *)&mvp, sizeof(mvp), off);
-      bindings.push_back({2,
-                          nodeI.bindingID,
-                          shader::BindingType::UniformBuffer,
-                          {dataID, sizeof(mvp), off}});
-      bindings.push_back({3,
-                          nodeI.bindingID,
-                          shader::BindingType::UniformBuffer,
-                          {dataID + 1, sizeof(mvp), 0}});
+      shader::BindingInfo binding;
+      binding.bindingSet = nodeI.bindingID;
+      binding.type = shader::BindingType::UniformBuffer;
+      binding.data.buffer.size = sizeof(mvp);
+      binding.data.buffer.dataID = dataID;
+      binding.data.buffer.offset = off;
+      binding.binding = 2;
+      bindings.push_back(binding);
+      binding.binding = 3;
+      binding.data.buffer.dataID = dataID + 1;
+      binding.data.buffer.offset = 0;
+      bindings.push_back(binding);
     }
     bindingID.push_back(nodeI.bindingID);
   }

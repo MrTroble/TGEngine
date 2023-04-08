@@ -23,9 +23,9 @@ struct NodeTransform {
 };
 
 struct NodeInfo {
-  size_t bindingID = UINT64_MAX;
+  size_t bindingID = INVALID_SIZE_T;
   NodeTransform transforms = {};
-  size_t parent = UINT64_MAX;
+  size_t parent = INVALID_SIZE_T;
 };
 
 struct FeatureSet {
@@ -51,11 +51,11 @@ class GameGraphicsModule : public main::Module {
   std::vector<size_t> parents;
   std::vector<size_t> bindingID;
   std::vector<char> status;
-  size_t dataID = UINT64_MAX;
+  size_t dataID = INVALID_SIZE_T;
   uint32_t alignment = 1;
-  size_t defaultTextureID;
 
 public:
+  size_t defaultTextureID;
   std::mutex protectTexture;
   std::unordered_map<std::string, size_t> textureMap;
   PipelineHolder defaultMaterial;

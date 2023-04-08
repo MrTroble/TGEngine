@@ -85,9 +85,9 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->loadShader(type);
   }
 
-  _NODISCARD virtual std::vector<PipelineHolder> pushMaterials(const size_t materialcount,
-                                          const Material* materials,
-      const size_t offset = SIZE_MAX) override {
+  _NODISCARD virtual std::vector<PipelineHolder> pushMaterials(
+      const size_t materialcount, const Material* materials,
+      const size_t offset = INVALID_SIZE_T) override {
     TimingAdder adder(materialCounter);
     const auto rtc = api->pushMaterials(materialcount, materials, offset);
     return rtc;
@@ -108,18 +108,19 @@ class PerformanceMessuringAPILayer : public APILayer {
   }
 
   virtual void removeRender(const size_t renderInfoCount,
-                              const TRenderHolder* renderIDs) override {
+                            const TRenderHolder* renderIDs) override {
     return api->removeRender(renderInfoCount, renderIDs);
   }
 
-  virtual TRenderHolder pushRender(const size_t renderInfoCount,
-                            const RenderInfo* renderInfos,
-                                   const size_t offset = 0) override {
+  [[nodiscard]] virtual TRenderHolder pushRender(
+      const size_t renderInfoCount, const RenderInfo* renderInfos,
+      const size_t offset = 0) override {
     TimingAdder adder(renderCounter);
     return api->pushRender(renderInfoCount, renderInfos);
   }
 
-  _NODISCARD virtual size_t pushSampler(const SamplerInfo& sampler) override {
+  _NODISCARD virtual TSamplerHolder pushSampler(
+      const SamplerInfo& sampler) override {
     return api->pushSampler(sampler);
   }
 
@@ -135,7 +136,8 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->pushLights(lightCount, lights, offset);
   }
 
-  _NODISCARD virtual size_t getAligned(const size_t buffer, const size_t toBeAligned) const override {
+  _NODISCARD virtual size_t getAligned(
+      const size_t buffer, const size_t toBeAligned) const override {
     return api->getAligned(buffer, toBeAligned);
   }
 

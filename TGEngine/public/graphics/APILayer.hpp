@@ -2,12 +2,13 @@
 
 #include <stdint.h>
 
-#include <glm/glm.hpp>
-#include <vector>
-#include <mutex>
 #include <functional>
+#include <glm/glm.hpp>
+#include <mutex>
+#include <vector>
 
 #include "../Module.hpp"
+#include "ElementHolder.hpp"
 #include "Material.hpp"
 
 namespace tge::shader {
@@ -18,39 +19,11 @@ enum class ShaderType;
 namespace tge::graphics {
 
 class GameGraphicsModule;
-class APILayer;
-
-struct EntryHolder {
-  size_t internalHandle;
-  size_t referenceID;
-
-  EntryHolder() : internalHandle(SIZE_MAX), referenceID(SIZE_MAX) {}
-
-  EntryHolder(APILayer* api, const size_t internalHandle);
-
-  [[nodiscard]] inline operator bool() const {
-      return internalHandle != SIZE_MAX;
-  }
-
-  [[nodiscard]] inline bool operator==(const EntryHolder& holder) const {
-      return this->internalHandle == holder.internalHandle;
-  }
-};
-
-struct PipelineHolder : public EntryHolder {
-    using EntryHolder::EntryHolder;
-};
-
-#define DEFINE_HOLDER(name) \
-  struct T ##name## Holder : public EntryHolder { using EntryHolder::EntryHolder; \
-}
-
-DEFINE_HOLDER(Render);
 
 enum class IndexSize { UINT16, UINT32, NONE };
 
 struct CacheIndex {
-  size_t buffer = SIZE_MAX;
+  size_t buffer = INVALID_SIZE_T;
 };
 
 struct PushConstRanges {
@@ -67,7 +40,7 @@ struct RenderInfo {
   size_t indexOffset = 0;
   IndexSize indexSize = IndexSize::UINT32;
   std::vector<size_t> vertexOffsets;
-  size_t bindingID = UINT64_MAX;
+  size_t bindingID = INVALID_SIZE_T;
   size_t firstInstance = 0;
   std::vector<PushConstRanges> constRanges;
 };
@@ -121,7 +94,7 @@ class APILayer : public main::Module {  // Interface
   std::mutex referenceCounterMutex;
 
  public:
-  size_t nextCounter() {
+  [[nodiscard]] size_t nextCounter() {
     std::lock_guard lg(referenceCounterMutex);
     const auto currentCount = referenceCounter.size();
     referenceCounter.push_back(1);
@@ -136,16 +109,16 @@ class APILayer : public main::Module {  // Interface
 
   virtual ~APILayer() {}
 
-  _NODISCARD virtual void* loadShader(
+  [[nodiscard]] virtual void* loadShader(
       const MaterialType type) = 0;  // Legacy support
 
-  _NODISCARD virtual std::vector<PipelineHolder> pushMaterials(
+  [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
       const size_t materialcount, const Material* materials,
-      const size_t offset = SIZE_MAX) = 0;
+      const size_t offset = INVALID_SIZE_T) = 0;
 
-  _NODISCARD virtual size_t pushData(const size_t dataCount, void* data,
-                                     const size_t* dataSizes,
-                                     const DataType type) = 0;
+  [[nodiscard]] virtual size_t pushData(const size_t dataCount, void* data,
+                                        const size_t* dataSizes,
+                                        const DataType type) = 0;
 
   virtual void changeData(const size_t bufferIndex, const void* data,
                           const size_t dataSizes, const size_t offset = 0) = 0;
@@ -156,47 +129,40 @@ class APILayer : public main::Module {  // Interface
   }
 
   virtual void removeRender(const size_t renderInfoCount,
-                              const TRenderHolder* renderIDs) = 0;
+                            const TRenderHolder* renderIDs) = 0;
 
-  virtual TRenderHolder pushRender(const size_t renderInfoCount,
-                            const RenderInfo* renderInfos,
-                            const size_t offset = 0) = 0;
+  [[nodiscard]] virtual TRenderHolder pushRender(const size_t renderInfoCount,
+                                                 const RenderInfo* renderInfos,
+                                                 const size_t offset = 0) = 0;
 
-  _NODISCARD virtual size_t pushSampler(const SamplerInfo& sampler) = 0;
+  [[nodiscard]] virtual TSamplerHolder pushSampler(const SamplerInfo& sampler) = 0;
 
-  _NODISCARD virtual size_t pushTexture(const size_t textureCount,
-                                        const TextureInfo* textures) = 0;
+  [[nodiscard]] virtual size_t pushTexture(const size_t textureCount,
+                                           const TextureInfo* textures) = 0;
 
-  _NODISCARD virtual size_t pushLights(const size_t lightCount,
-                                       const Light* lights,
-                                       const size_t offset = 0) = 0;
+  [[nodiscard]] virtual size_t pushLights(const size_t lightCount,
+                                          const Light* lights,
+                                          const size_t offset = 0) = 0;
 
-  _NODISCARD virtual size_t getAligned(const size_t buffer,
-                                       const size_t toBeAligned) const = 0;
+  [[nodiscard]] virtual size_t getAligned(const size_t buffer,
+                                          const size_t toBeAligned) const = 0;
 
-  _NODISCARD virtual size_t getAligned(const DataType type) const = 0;
+  [[nodiscard]] virtual size_t getAligned(const DataType type) const = 0;
 
-  _NODISCARD GameGraphicsModule* getGraphicsModule() const {
+  [[nodiscard]] GameGraphicsModule* getGraphicsModule() const {
     return graphicsModule;
   };
 
-  _NODISCARD shader::ShaderAPI* getShaderAPI() const { return this->shaderAPI; }
+  [[nodiscard]] shader::ShaderAPI* getShaderAPI() const {
+    return this->shaderAPI;
+  }
 
-  _NODISCARD virtual glm::vec2 getRenderExtent() const = 0;
+  [[nodiscard]] virtual glm::vec2 getRenderExtent() const = 0;
 
-  _NODISCARD virtual std::vector<char> getImageData(const size_t imageId,
-                                                    CacheIndex* = nullptr) = 0;
+  [[nodiscard]] virtual std::vector<char> getImageData(
+      const size_t imageId, CacheIndex* = nullptr) = 0;
 
-  virtual APILayer* backend() { return this; }
+  [[nodiscard]] virtual APILayer* backend() { return this; }
 };
 
 }  // namespace tge::graphics
-
-namespace std {
-template <>
-struct std::hash<tge::graphics::EntryHolder> {
-  std::size_t operator()(tge::graphics::EntryHolder const& s) const noexcept {
-    return std::hash<size_t>{}(s.internalHandle);
-  }
-};
-}  // namespace std
