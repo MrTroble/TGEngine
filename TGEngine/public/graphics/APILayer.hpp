@@ -101,16 +101,13 @@ class APILayer : public main::Module {  // Interface
     return currentCount;
   }
 
-  void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
+  inline void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
     this->graphicsModule = graphicsModule;
   }
 
   APILayer(shader::ShaderAPI* shaderAPI) : shaderAPI(shaderAPI) {}
 
   virtual ~APILayer() {}
-
-  [[nodiscard]] virtual void* loadShader(
-      const MaterialType type) = 0;  // Legacy support
 
   [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
       const size_t materialcount, const Material* materials,
@@ -153,7 +150,7 @@ class APILayer : public main::Module {  // Interface
     return graphicsModule;
   };
 
-  [[nodiscard]] shader::ShaderAPI* getShaderAPI() const {
+  [[nodiscard]] inline shader::ShaderAPI* getShaderAPI() const {
     return this->shaderAPI;
   }
 

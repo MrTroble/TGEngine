@@ -244,8 +244,6 @@ class VulkanGraphicsModule : public APILayer {
   size_t pushLights(const size_t lightCount, const Light *lights,
                     const size_t offset = 0) override;
 
-  void *loadShader(const MaterialType type) override;
-
   size_t getAligned(const size_t buffer,
                     const size_t toBeAligned = 0) const override;
 

@@ -325,7 +325,8 @@ main::Error GameGraphicsModule::init() {
   std::array arrSize = {modelMatrices.size() * sizeof(glm::mat4), sizeof(glm::mat4)};
   dataID = apiLayer->pushData(mvpsPtr.size(), mvpsPtr.data(), arrSize.data(),
                               DataType::Uniform);
-  defaultPipe = apiLayer->loadShader(MaterialType::None);
+  defaultPipe = apiLayer->getShaderAPI()->loadShaderPipeAndCompile(
+      {"assets/testvec4.vert", "assets/test.frag"});
   const Material defMat(defaultPipe);
   defaultMaterial = apiLayer->pushMaterials(1, &defMat)[0];
 

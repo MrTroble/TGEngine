@@ -6,7 +6,6 @@
 #include "GameShaderModule.hpp"
 #include "Material.hpp"
 #include "WindowModule.hpp"
-#include "stdint.h"
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>

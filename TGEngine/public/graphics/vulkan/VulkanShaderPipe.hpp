@@ -15,10 +15,6 @@ inline std::string operator""_str(const char *chr,
   return std::string(chr, size);
 }
 
-const std::array shaderNames = {
-    std::vector({"assets/testvec4.vert"_str, "assets/test.frag"_str}),
-    std::vector({"assets/testUV.vert"_str, "assets/testTexture.frag"_str})};
-
 struct VulkanShaderPipe {
   std::vector<std::pair<std::vector<uint32_t>, ShaderStageFlagBits>> shader;
   std::vector<VertexInputBindingDescription> vertexInputBindings;

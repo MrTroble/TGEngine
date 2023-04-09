@@ -81,10 +81,6 @@ class PerformanceMessuringAPILayer : public APILayer {
     print();
   }
 
-  _NODISCARD virtual void* loadShader(const MaterialType type) override {
-    return api->loadShader(type);
-  }
-
   _NODISCARD virtual std::vector<PipelineHolder> pushMaterials(
       const size_t materialcount, const Material* materials,
       const size_t offset = INVALID_SIZE_T) override {

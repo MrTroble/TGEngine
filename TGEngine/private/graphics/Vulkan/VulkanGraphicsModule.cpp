@@ -89,14 +89,6 @@ size_t VulkanGraphicsModule::getAligned(const size_t buffer,
   return toBeAligned + (align - rest);
 }
 
-void* VulkanGraphicsModule::loadShader(const MaterialType type) {
-  EXPECT(((size_t)type) <= (size_t)MAX_TYPE);
-  const auto idx = (size_t)type;
-  auto& vert = shaderNames[idx];
-  const auto ptr = shaderAPI->loadShaderPipeAndCompile(vert);
-  return ptr;
-}
-
 inline void getOrCreate(
     VulkanGraphicsModule* module, VulkanShaderPipe* shaderPipe,
     std::vector<PipelineShaderStageCreateInfo>& currentStages) {
