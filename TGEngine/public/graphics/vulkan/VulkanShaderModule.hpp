@@ -37,9 +37,6 @@ namespace tge::shader {
 		ShaderPipe compile(
 			const std::vector<ShaderInfo>& shadernames) override;
 
-		ShaderPipe createShaderPipe(const ShaderCreateInfo* shaderCreateInfo,
-			const size_t shaderCount) override;
-
 		size_t createBindings(ShaderPipe pipe, const size_t count = 1) override;
 
 		void changeInputBindings(const ShaderPipe pipe, const size_t bindingID,

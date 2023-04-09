@@ -96,26 +96,6 @@ inline size_t loadTexturesFM(const Model &model, APILayer *apiLayer) {
   return -1;
 }
 
-inline shader::IOType inputTypeFromGLTF(int type) {
-  namespace s = shader;
-  switch (type) {
-    case TINYGLTF_TYPE_VEC2:
-      return s::IOType::VEC2;
-    case TINYGLTF_TYPE_VEC3:
-      return s::IOType::VEC3;
-    case TINYGLTF_TYPE_VEC4:
-      return s::IOType::VEC4;
-    case TINYGLTF_TYPE_MAT4:
-      return s::IOType::MAT4;
-    case TINYGLTF_TYPE_MAT3:
-      return s::IOType::MAT3;
-    case TINYGLTF_TYPE_SCALAR:
-      return s::IOType::FLOAT;
-    default:
-      throw std::runtime_error("Type not found in GLTF translation!");
-  }
-}
-
 inline size_t loadDataBuffers(const Model &model, APILayer *apiLayer) {
   std::vector<uint8_t *> ptr;
   ptr.reserve(model.buffers.size());
