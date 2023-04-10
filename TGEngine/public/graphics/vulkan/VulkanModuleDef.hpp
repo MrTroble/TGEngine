@@ -238,7 +238,7 @@ class VulkanGraphicsModule : public APILayer {
 
   TSamplerHolder pushSampler(const SamplerInfo &sampler) override;
 
-  size_t pushTexture(const size_t textureCount,
+  std::vector<TTextureHolder> pushTexture(const size_t textureCount,
                      const TextureInfo *textures) override;
 
   size_t pushLights(const size_t lightCount, const Light *lights,

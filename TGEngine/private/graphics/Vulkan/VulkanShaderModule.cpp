@@ -410,8 +410,8 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
         imgInfo[i] = DescriptorImageInfo(
             (bool)tex.sampler ? vgm->sampler[tex.sampler.internalHandle]
                               : vk::Sampler(),
-            tex.texture == INVALID_SIZE_T ? vk::ImageView()
-                                      : vgm->textureImageViews[tex.texture],
+            (bool)tex.texture ? vgm->textureImageViews[tex.texture.internalHandle]
+                              : vk::ImageView(),
             ImageLayout::eShaderReadOnlyOptimal);
         set.push_back(WriteDescriptorSet(
             descSets[cinfo.bindingSet], cinfo.binding, cinfo.arrayID, 1,

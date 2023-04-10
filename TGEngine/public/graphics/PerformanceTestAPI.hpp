@@ -120,8 +120,8 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->pushSampler(sampler);
   }
 
-  _NODISCARD virtual size_t pushTexture(const size_t textureCount,
-                                        const TextureInfo* textures) override {
+  _NODISCARD virtual std::vector<TTextureHolder> pushTexture(
+      const size_t textureCount, const TextureInfo* textures) override {
     TimingAdder adder(textureCounter);
     return api->pushTexture(textureCount, textures);
   }

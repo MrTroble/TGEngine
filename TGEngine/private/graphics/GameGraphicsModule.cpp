@@ -56,7 +56,8 @@ inline vk::Format getFormatFromStride(uint32_t stride) {
   }
 }
 
-inline std::vector<TSamplerHolder> loadSampler(const Model &model, APILayer *apiLayer) {
+inline std::vector<TSamplerHolder> loadSampler(const Model &model,
+                                               APILayer *apiLayer) {
   std::vector<TSamplerHolder> samplerHolder;
   for (const auto &smplr : model.samplers) {
     const SamplerInfo samplerInfo = {
@@ -78,7 +79,8 @@ inline std::vector<TSamplerHolder> loadSampler(const Model &model, APILayer *api
   return samplerHolder;
 }
 
-inline size_t loadTexturesFM(const Model &model, APILayer *apiLayer) {
+inline std::vector<TTextureHolder> loadTexturesFM(const Model &model,
+                                                  APILayer *apiLayer) {
   std::vector<TextureInfo> textureInfos;
   textureInfos.reserve(model.images.size());
   for (const auto &img : model.images) {
@@ -93,7 +95,7 @@ inline size_t loadTexturesFM(const Model &model, APILayer *apiLayer) {
   }
   if (!textureInfos.empty())
     return apiLayer->pushTexture(textureInfos.size(), textureInfos.data());
-  return -1;
+  return {};
 }
 
 inline size_t loadDataBuffers(const Model &model, APILayer *apiLayer) {
@@ -174,7 +176,7 @@ inline void pushRender(const Model &model, APILayer *apiLayer,
         const RenderInfo renderInfo = {
             bufferIndicies,
             0,
-            materialId[prim.material == -1 ? 0:prim.material],
+            materialId[prim.material == -1 ? 0 : prim.material],
             0,
             1,
             vertAccesor.count,
@@ -287,7 +289,8 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
   const auto dataId = loadDataBuffers(model, apiLayer);
 
   std::vector<shader::ShaderPipe> createdShader;
-  std::vector<PipelineHolder> materials(model.materials.size());  // TODO fix this
+  std::vector<PipelineHolder> materials(
+      model.materials.size());  // TODO fix this
   std::fill(begin(materials), end(materials), defaultMaterial);
 
   const auto nId = loadNodes(model, apiLayer, node.size(), this, createdShader);
@@ -322,7 +325,8 @@ main::Error GameGraphicsModule::init() {
 
   std::array mvpsPtr = {(const uint8_t *)modelMatrices.data(),
                         (const uint8_t *)&projView};
-  std::array arrSize = {modelMatrices.size() * sizeof(glm::mat4), sizeof(glm::mat4)};
+  std::array arrSize = {modelMatrices.size() * sizeof(glm::mat4),
+                        sizeof(glm::mat4)};
   dataID = apiLayer->pushData(mvpsPtr.size(), mvpsPtr.data(), arrSize.data(),
                               DataType::Uniform);
   defaultPipe = apiLayer->getShaderAPI()->loadShaderPipeAndCompile(
@@ -345,7 +349,7 @@ main::Error GameGraphicsModule::init() {
     info.data[i * 4 + 2] = color[2];
     info.data[i * 4 + 3] = 255;
   }
-  defaultTextureID = apiLayer->pushTexture(1, &info);
+  defaultTextureID = apiLayer->pushTexture(1, &info)[0];
   return main::Error::NONE;
 }
 
@@ -753,9 +757,9 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
   return textureInfos;
 }
 
-uint32_t GameGraphicsModule::loadTextures(
+std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
     const std::vector<std::vector<char>> &data, const LoadType type) {
-  if (data.empty()) return INVALID_UINT32;
+  if (data.empty()) return {};
   std::vector<TextureInfo> textureInfos;
 
   util::OnExit onExit([tinfos = &textureInfos, type = type] {
@@ -775,10 +779,10 @@ uint32_t GameGraphicsModule::loadTextures(
   return apiLayer->pushTexture(textureInfos.size(), textureInfos.data());
 }
 
-std::vector<size_t> GameGraphicsModule::loadTextures(
+std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
     const std::vector<std::string> &names, const LoadType type) {
   const auto amount = names.size();
-  std::vector<size_t> localtextureIDs(amount);
+  std::vector<TTextureHolder> localtextureIDs(amount);
   std::vector<std::vector<char>> data;
   data.reserve(amount);
   for (size_t i = 0; i < amount; i++) {
@@ -797,18 +801,15 @@ std::vector<size_t> GameGraphicsModule::loadTextures(
       continue;
     }
     data.push_back(file);
-    localtextureIDs[i] = INVALID_SIZE_T;
+    localtextureIDs[i] = TTextureHolder();
   }
   if (!data.empty()) {
     const auto startTexture = loadTextures(data, type);
-    for (size_t i = 0; i < data.size(); i++) {
-      size_t nameID = 0;
-      for (size_t& id : localtextureIDs) {
-        if (id == INVALID_SIZE_T) {
-          id = startTexture + i;
-          textureMap[names[nameID]] = id;
-          break;
-        }
+    size_t nameID = 0;
+    for (size_t i = 0; i < names.size(); i++) {
+      if (!textureMap.contains(names[i])) {
+        textureMap[names[i]] = startTexture[nameID];
+        localtextureIDs[i] = startTexture[nameID];
         nameID++;
       }
     }

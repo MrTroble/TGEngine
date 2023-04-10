@@ -231,8 +231,8 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
 }
 
 TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
-                                        const RenderInfo* renderInfos,
-                                        const size_t offset) {
+                                               const RenderInfo* renderInfos,
+                                               const size_t offset) {
   EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
   const std::lock_guard onExitUnlock(commandBufferRecording);
 
@@ -281,8 +281,9 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     for (const auto& range : info.constRanges) {
       VulkanShaderModule* shaderMod = (VulkanShaderModule*)shaderAPI;
       cmdBuf.pushConstants(
-          this->materialToLayout[info.materialId.internalHandle], shaderToVulkan(range.type),
-          0, range.pushConstData.size(), range.pushConstData.data());
+          this->materialToLayout[info.materialId.internalHandle],
+          shaderToVulkan(range.type), 0, range.pushConstData.size(),
+          range.pushConstData.data());
     }
 
     if (info.indexSize != IndexSize::NONE) [[likely]] {
@@ -543,8 +544,8 @@ inline size_t createInternalImages(
   return firstIndex;
 }
 
-size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
-                                         const TextureInfo* textures) {
+std::vector<TTextureHolder> VulkanGraphicsModule::pushTexture(
+    const size_t textureCount, const TextureInfo* textures) {
   EXPECT(textureCount != 0 && textures != nullptr);
 
   const size_t firstIndex = textureImages.size();
@@ -631,7 +632,12 @@ size_t VulkanGraphicsModule::pushTexture(const size_t textureCount,
 
   const SubmitInfo info({}, {}, cmd);
   secondarySync->endSubmitAndWait(info);
-  return firstIndex;
+  std::vector<TTextureHolder> textureHolder;
+  textureHolder.resize(textureCount);
+  for (size_t i = 0; i < textureCount; i++) {
+    textureHolder[i] = TTextureHolder(this, i + firstIndex);
+  }
+  return textureHolder;
 }
 
 size_t VulkanGraphicsModule::pushLights(const size_t lightCount,
@@ -666,11 +672,13 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 inline void updateDescriptors(VulkanGraphicsModule* vgm,
                               shader::ShaderAPI* sapi) {
   std::array<BindingInfo, 5> bindingInfos;
+  TTextureHolder holder; 
   for (size_t i = 0; i < 4; i++) {
     bindingInfos[i].type = BindingType::InputAttachment;
     bindingInfos[i].bindingSet = vgm->lightBindings;
     bindingInfos[i].binding = i;
-    bindingInfos[i].data.texture.texture = vgm->firstImage + i + 1;
+    holder.internalHandle = vgm->firstImage + i + 1;
+    bindingInfos[i].data.texture.texture = holder;
     bindingInfos[i].data.texture.sampler = TSamplerHolder();
   }
   bindingInfos[4].type = BindingType::UniformBuffer;
@@ -1290,16 +1298,16 @@ void VulkanGraphicsModule::tick(double time) {
   }
   if (checkAndRecreate(this, result)) {
     currentBuffer.reset();
-    auto nextimage =
-        device.acquireNextImageKHR(swapchain, INVALID_SIZE_T, waitSemaphore, {});
+    auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
+                                                waitSemaphore, {});
     this->nextImage = nextimage.value;
     if (this->nextImage > 2) printf("WTF!");
     return;
   }
 
   while (true) {
-    auto nextimage =
-        device.acquireNextImageKHR(swapchain, INVALID_SIZE_T, waitSemaphore, {});
+    auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
+                                                waitSemaphore, {});
     this->nextImage = nextimage.value;
     if (!checkAndRecreate(this, nextimage.result)) break;
   }

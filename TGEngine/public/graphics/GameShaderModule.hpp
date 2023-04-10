@@ -31,7 +31,7 @@ struct BufferBindingData {
 };
 
 struct TextureBindingData {
-  size_t texture = INVALID_SIZE_T;
+  graphics::TTextureHolder texture;
   graphics::TSamplerHolder sampler;
 };
 
@@ -79,7 +79,7 @@ inline void debugExpect(const BindingInfo& info) {
   debugExpect(
       (info.type != BindingType::Texture &&
        info.type != BindingType::InputAttachment) ||
-          info.data.texture.texture != INVALID_SIZE_T,
+          (bool)info.data.texture.texture,
       "Texture id not correct with texture or input attachment binding type!");
   debugExpect((info.type != BindingType::UniformBuffer &&
                info.type != BindingType::Storage) ||

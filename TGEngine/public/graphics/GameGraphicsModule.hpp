@@ -1,17 +1,18 @@
 #pragma once
 
+#include <glm/geometric.hpp>
+#include <glm/glm.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "../../public/Error.hpp"
 #include "../../public/Module.hpp"
 #include "APILayer.hpp"
 #include "GameShaderModule.hpp"
 #include "Material.hpp"
 #include "WindowModule.hpp"
-#include <glm/geometric.hpp>
-#include <glm/glm.hpp>
-#include <glm/gtx/quaternion.hpp>
-#include <string>
-#include <vector>
-#include <unordered_map>
 
 namespace tge::graphics {
 
@@ -32,13 +33,9 @@ struct FeatureSet {
   int anisotropicfiltering = INT_MAX;
 };
 
-enum class LoadType {
-    STBI,
-    DDSPP
-};
+enum class LoadType { STBI, DDSPP };
 
 class GameGraphicsModule : public main::Module {
-
   APILayer *apiLayer;
   WindowModule *windowModule;
 
@@ -53,15 +50,16 @@ class GameGraphicsModule : public main::Module {
   size_t dataID = INVALID_SIZE_T;
   uint32_t alignment = 1;
 
-public:
-  size_t defaultTextureID;
+ public:
+  TTextureHolder defaultTextureID;
   std::mutex protectTexture;
-  std::unordered_map<std::string, size_t> textureMap;
+  std::unordered_map<std::string, TTextureHolder> textureMap;
   PipelineHolder defaultMaterial;
   tge::shader::ShaderPipe defaultPipe;
   FeatureSet features;
 
-  GameGraphicsModule(APILayer *apiLayer, WindowModule *winModule, const FeatureSet &set = {});
+  GameGraphicsModule(APILayer *apiLayer, WindowModule *winModule,
+                     const FeatureSet &set = {});
 
   _NODISCARD size_t loadModel(const std::vector<char> &data, const bool binary,
                               const std::string &baseDir,
@@ -72,16 +70,17 @@ public:
     return loadModel(data, binary, "");
   }
 
-  _NODISCARD uint32_t loadTextures(const std::vector<std::vector<char>> &data, const LoadType type = LoadType::STBI);
+  [[nodiscard]] std::vector<TTextureHolder> loadTextures(
+      const std::vector<std::vector<char>> &data,
+      const LoadType type = LoadType::STBI);
 
-  std::vector<size_t> loadTextures(const std::vector<std::string> &names,
-                                      const LoadType type = LoadType::STBI);
+  [[nodiscard]] std::vector<TTextureHolder> loadTextures(
+      const std::vector<std::string> &names,
+      const LoadType type = LoadType::STBI);
 
   _NODISCARD size_t addNode(const NodeInfo *nodeInfos, const size_t count);
-  
-  _NODISCARD size_t nextNodeID() {
-      return node.size();
-  }
+
+  _NODISCARD size_t nextNodeID() { return node.size(); }
 
   void updateTransform(const size_t nodeID, const NodeTransform &transform);
 
@@ -107,4 +106,4 @@ public:
   _NODISCARD WindowModule *getWindowModule() { return windowModule; }
 };
 
-} // namespace tge::graphics
+}  // namespace tge::graphics

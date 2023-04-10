@@ -1,9 +1,6 @@
-/*  GIMP header image file format (RGB): C:\Users\nifro\source\repos\NewRepo\TGEngine\TGEngine\private\graphics\BGAL.h  */
 namespace BGAL{
-static unsigned int width = 200;
-static unsigned int height = 150;
-
-/*  Call this macro repeatedly.  After each use, the pixel data can be extracted  */
+static constexpr unsigned int width = 200;
+static constexpr unsigned int height = 150;
 
 #define HEADER_PIXEL(data,pixel) {\
 pixel[0] = (((data[0] - 33) << 2) | ((data[1] - 33) >> 4)); \

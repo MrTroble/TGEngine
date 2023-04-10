@@ -132,10 +132,11 @@ class APILayer : public main::Module {  // Interface
                                                  const RenderInfo* renderInfos,
                                                  const size_t offset = 0) = 0;
 
-  [[nodiscard]] virtual TSamplerHolder pushSampler(const SamplerInfo& sampler) = 0;
+  [[nodiscard]] virtual TSamplerHolder pushSampler(
+      const SamplerInfo& sampler) = 0;
 
-  [[nodiscard]] virtual size_t pushTexture(const size_t textureCount,
-                                           const TextureInfo* textures) = 0;
+  [[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
+      const size_t textureCount, const TextureInfo* textures) = 0;
 
   [[nodiscard]] virtual size_t pushLights(const size_t lightCount,
                                           const Light* lights,

@@ -36,6 +36,7 @@ struct PipelineHolder : public EntryHolder {
 
 DEFINE_HOLDER(Render);
 DEFINE_HOLDER(Sampler);
+DEFINE_HOLDER(Texture);
 
 }  // namespace tge::graphics
 
