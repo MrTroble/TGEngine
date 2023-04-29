@@ -23,7 +23,7 @@ class GameGraphicsModule;
 enum class IndexSize { UINT16, UINT32, NONE };
 
 struct CacheIndex {
-  size_t buffer = INVALID_SIZE_T;
+  TDataHolder buffer;
 };
 
 struct PushConstRanges {
@@ -32,8 +32,8 @@ struct PushConstRanges {
 };
 
 struct RenderInfo {
-  std::vector<size_t> vertexBuffer;
-  size_t indexBuffer;
+  std::vector<TDataHolder> vertexBuffer;
+  TDataHolder indexBuffer;
   PipelineHolder materialId;
   size_t indexCount;
   size_t instanceCount = 1;
@@ -84,7 +84,20 @@ struct Light {
       : pos(pos), color(color), intensity(intensity) {}
 };
 
-enum class DataType { IndexData, VertexData, VertexIndexData, Uniform, All };
+enum class DataType { IndexData, VertexData, VertexIndexData, Uniform, All, Invalid };
+
+struct BufferInfo {
+  void* data = nullptr;
+  size_t size = INVALID_SIZE_T;
+  DataType type = DataType::Invalid;
+};
+
+struct BufferChange {
+  TDataHolder holder;
+  void* data = nullptr;
+  size_t size = INVALID_SIZE_T;
+  size_t offset = 0;
+};
 
 class APILayer : public main::Module {  // Interface
  protected:
@@ -113,17 +126,10 @@ class APILayer : public main::Module {  // Interface
       const size_t materialcount, const Material* materials,
       const size_t offset = INVALID_SIZE_T) = 0;
 
-  [[nodiscard]] virtual size_t pushData(const size_t dataCount, void* data,
-                                        const size_t* dataSizes,
-                                        const DataType type) = 0;
+  [[nodiscard]] virtual std::vector<TDataHolder> pushData(
+      const size_t dataCount, const BufferInfo* bufferInfo) = 0;
 
-  virtual void changeData(const size_t bufferIndex, const void* data,
-                          const size_t dataSizes, const size_t offset = 0) = 0;
-
-  void changeData(const size_t bufferIndex, void* data, const size_t dataSizes,
-                  const size_t offset = 0) {
-    changeData(bufferIndex, (const void*)data, dataSizes, offset);
-  }
+  virtual void changeData(const size_t sizes, const BufferChange* changeInfos) = 0;
 
   virtual void removeRender(const size_t renderInfoCount,
                             const TRenderHolder* renderIDs) = 0;

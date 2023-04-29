@@ -89,18 +89,15 @@ class PerformanceMessuringAPILayer : public APILayer {
     return rtc;
   };
 
-  _NODISCARD virtual size_t pushData(const size_t dataCount, void* data,
-                                     const size_t* dataSizes,
-                                     const DataType type) override {
+  _NODISCARD virtual std::vector<TDataHolder> pushData(
+      const size_t dataCount, const BufferInfo* bufferInfo) override {
     TimingAdder adder(dataCounter);
-    const auto rtc = api->pushData(dataCount, data, dataSizes, type);
+    const auto rtc = api->pushData(dataCount, bufferInfo);
     return rtc;
   }
 
-  virtual void changeData(const size_t bufferIndex, const void* data,
-                          const size_t dataSizes,
-                          const size_t offset = 0) override {
-    return api->changeData(bufferIndex, data, dataSizes, offset);
+  virtual void changeData(const size_t dataCount, const BufferChange* change) override {
+    return api->changeData(dataCount, change);
   }
 
   virtual void removeRender(const size_t renderInfoCount,

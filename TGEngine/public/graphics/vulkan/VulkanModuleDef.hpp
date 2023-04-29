@@ -192,7 +192,7 @@ class VulkanGraphicsModule : public APILayer {
   size_t position;
   size_t attachmentCount;
 
-  size_t lightData;
+  TDataHolder lightData;
   size_t lightPipe = INVALID_UINT32;
   size_t lightBindings;
   Material lightMat;
@@ -226,11 +226,10 @@ class VulkanGraphicsModule : public APILayer {
       const size_t materialcount, const Material *materials,
       const size_t offset = INVALID_SIZE_T) override;
 
-  size_t pushData(const size_t dataCount, void *data, const size_t *dataSizes,
-                  const DataType type) override;
+  std::vector<TDataHolder> pushData(const size_t dataCount,
+                                    const BufferInfo *bufferInfo) override;
 
-  void changeData(const size_t bufferIndex, const void *data,
-                  const size_t dataSizes, const size_t offset = 0) override;
+  void changeData(const size_t sizes, const BufferChange *changeInfos) override;
 
   TRenderHolder pushRender(const size_t renderInfoCount,
                            const RenderInfo *renderInfos,

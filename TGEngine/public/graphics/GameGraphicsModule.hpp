@@ -38,6 +38,7 @@ enum class LoadType { STBI, DDSPP };
 class GameGraphicsModule : public main::Module {
   APILayer *apiLayer;
   WindowModule *windowModule;
+  glm::mat4 projectionView;
 
   glm::mat4 projectionMatrix;
   glm::mat4 viewMatrix;
@@ -47,8 +48,10 @@ class GameGraphicsModule : public main::Module {
   std::vector<size_t> parents;
   std::vector<size_t> bindingID;
   std::vector<char> status;
-  size_t dataID = INVALID_SIZE_T;
+  TDataHolder projection;
+  TDataHolder modelHolder;
   uint32_t alignment = 1;
+  std::vector<BufferChange> bufferChange;
 
  public:
   TTextureHolder defaultTextureID;

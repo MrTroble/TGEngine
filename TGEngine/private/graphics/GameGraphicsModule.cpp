@@ -98,23 +98,19 @@ inline std::vector<TTextureHolder> loadTexturesFM(const Model &model,
   return {};
 }
 
-inline size_t loadDataBuffers(const Model &model, APILayer *apiLayer) {
-  std::vector<uint8_t *> ptr;
-  ptr.reserve(model.buffers.size());
-  std::vector<size_t> sizes;
-  sizes.reserve(ptr.capacity());
+inline std::vector<TDataHolder> loadDataBuffers(const Model &model,
+                                                APILayer *apiLayer) {
+  std::vector<BufferInfo> infoBuffer;
+  infoBuffer.reserve(model.buffers.size());
   for (const auto &buffer : model.buffers) {
-    const auto ptrto = (uint8_t *)buffer.data.data();
-    ptr.push_back(ptrto);
-    sizes.push_back(buffer.data.size());
+    infoBuffer.push_back({(uint8_t *)buffer.data.data(), buffer.data.size(),
+                          DataType::VertexIndexData});
   }
-
-  return apiLayer->pushData(ptr.size(), ptr.data(), sizes.data(),
-                            DataType::VertexIndexData);
+  return apiLayer->pushData(infoBuffer.size(), infoBuffer.data());
 }
 
 inline void pushRender(const Model &model, APILayer *apiLayer,
-                       const size_t dataId,
+                       const std::vector<TDataHolder>& dataId,
                        const std::vector<PipelineHolder> &materialId,
                        const size_t nodeID,
                        const std::vector<size_t> bindings) {
@@ -130,13 +126,13 @@ inline void pushRender(const Model &model, APILayer *apiLayer,
         oItr != eItr ? std::distance(bItr, oItr) + nodeID : INVALID_SIZE_T;
     const auto bID = bindings[nID];
     for (const auto &prim : mesh.primitives) {
-      std::vector<std::tuple<int, int, int>> strides;
+      std::vector<std::tuple<int, TDataHolder, int>> strides;
       strides.reserve(prim.attributes.size());
 
       for (const auto &attr : prim.attributes) {
         const auto &vertAccesor = model.accessors[attr.second];
         const auto &vertView = model.bufferViews[vertAccesor.bufferView];
-        const auto bufferID = vertView.buffer + dataId;
+        const auto bufferID = dataId[vertView.buffer];
         const auto vertOffset = vertView.byteOffset + vertAccesor.byteOffset;
         strides.push_back(
             std::make_tuple(vertAccesor.type, bufferID, vertOffset));
@@ -144,7 +140,7 @@ inline void pushRender(const Model &model, APILayer *apiLayer,
 
       std::sort(strides.rbegin(), strides.rend(),
                 [](auto x, auto y) { return std::get<0>(x) < std::get<0>(y); });
-      std::vector<size_t> bufferIndicies;
+      std::vector<TDataHolder> bufferIndicies;
       bufferIndicies.reserve(strides.size());
       std::vector<size_t> bufferOffsets;
       bufferOffsets.reserve(bufferIndicies.capacity());
@@ -161,7 +157,7 @@ inline void pushRender(const Model &model, APILayer *apiLayer,
             indexView.byteStride == 4 ? IndexSize::UINT32 : IndexSize::UINT16;
         const RenderInfo renderInfo = {
             bufferIndicies,
-            indexView.buffer + dataId,
+            dataId[indexView.buffer],
             materialId[prim.material == -1 ? 0 : prim.material],
             indexAccesor.count,
             1,
@@ -175,7 +171,7 @@ inline void pushRender(const Model &model, APILayer *apiLayer,
         const auto &vertAccesor = model.accessors[accessorID];
         const RenderInfo renderInfo = {
             bufferIndicies,
-            0,
+            dataId[0],
             materialId[prim.material == -1 ? 0 : prim.material],
             0,
             1,
@@ -323,12 +319,15 @@ main::Error GameGraphicsModule::init() {
   }
   nextNode = size;
 
-  std::array mvpsPtr = {(const uint8_t *)modelMatrices.data(),
-                        (const uint8_t *)&projView};
-  std::array arrSize = {modelMatrices.size() * sizeof(glm::mat4),
-                        sizeof(glm::mat4)};
-  dataID = apiLayer->pushData(mvpsPtr.size(), mvpsPtr.data(), arrSize.data(),
-                              DataType::Uniform);
+  std::array<BufferInfo, 2> bufferInfos = {
+      BufferInfo{modelMatrices.data(), modelMatrices.size() * sizeof(glm::mat4),
+                 DataType::Uniform},
+      BufferInfo{&projView, sizeof(glm::mat4), DataType::Uniform}};
+
+  const auto &bufferList =
+      apiLayer->pushData(bufferInfos.size(), bufferInfos.data());
+  modelHolder = bufferList[0];
+  projection = bufferList[1];
   defaultPipe = apiLayer->getShaderAPI()->loadShaderPipeAndCompile(
       {"assets/testvec4.vert", "assets/test.frag"});
   const Material defMat(defaultPipe);
@@ -350,17 +349,20 @@ main::Error GameGraphicsModule::init() {
     info.data[i * 4 + 3] = 255;
   }
   defaultTextureID = apiLayer->pushTexture(1, &info)[0];
+  bufferChange.reserve(100);
+  bufferChange.push_back({projection, &projectionView, sizeof(glm::mat4), 0});
   return main::Error::NONE;
 }
 
 void GameGraphicsModule::tick(double time) {
   const auto size = this->node.size();
-  const auto projView = this->projectionMatrix * this->viewMatrix;
-  apiLayer->changeData(dataID + 1, (const uint8_t *)&projView,
-                       sizeof(glm::mat4));
+  projectionView = this->projectionMatrix * this->viewMatrix;
+  bool status = false;
+  bufferChange.resize(1);
   for (size_t i = 0; i < size; i++) {
     const auto parantID = this->parents[i];
     if (this->status[i] == 1 || (parantID < size && this->status[parantID])) {
+      status = true;
       const auto &transform = this->node[i];
       const auto mMatrix = glm::translate(transform.translation) *
                            glm::scale(transform.scale) *
@@ -370,12 +372,13 @@ void GameGraphicsModule::tick(double time) {
       } else {
         modelMatrices[i] = mMatrix;
       }
-      apiLayer->changeData(dataID, (const uint8_t *)&modelMatrices[i],
-                           sizeof(glm::mat4),
-                           i * sizeof(glm::mat4) * alignment);
+      bufferChange.push_back({modelHolder, modelMatrices.data(),
+                              sizeof(glm::mat4),
+                              i * sizeof(glm::mat4) * alignment});
     }
   }
-  std::fill(begin(this->status), end(this->status), 0);
+  apiLayer->changeData(bufferChange.size(), bufferChange.data());
+  if (status) std::fill(begin(this->status), end(this->status), 0);
 }
 
 void GameGraphicsModule::destroy() {}
@@ -823,6 +826,7 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
   node.reserve(nodeID + count);
   std::vector<shader::BindingInfo> bindings;
   bindings.reserve(count);
+  std::vector<BufferChange> changeBuffer;
   for (size_t i = 0; i < count; i++) {
     const auto nodeI = nodeInfos[i];
     const auto nodeIndex = (nodeID + i);
@@ -842,22 +846,25 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
     if (nodeI.bindingID != INVALID_SIZE_T) [[likely]] {
       const auto mvp = modelMatrices[nodeID];
       const auto off = sizeof(mvp) * (nodeID + i) * alignment;
-      apiLayer->changeData(dataID, (const uint8_t *)&mvp, sizeof(mvp), off);
+      changeBuffer.push_back({modelHolder, &modelMatrices[nodeID], sizeof(mvp),
+                              sizeof(mvp) * (nodeID + i) * alignment});
       shader::BindingInfo binding;
       binding.bindingSet = nodeI.bindingID;
       binding.type = shader::BindingType::UniformBuffer;
       binding.data.buffer.size = sizeof(mvp);
-      binding.data.buffer.dataID = dataID;
+      binding.data.buffer.dataID = modelHolder;
       binding.data.buffer.offset = off;
       binding.binding = 2;
       bindings.push_back(binding);
       binding.binding = 3;
-      binding.data.buffer.dataID = dataID + 1;
+      binding.data.buffer.dataID = projection;
       binding.data.buffer.offset = 0;
       bindings.push_back(binding);
     }
     bindingID.push_back(nodeI.bindingID);
   }
+  if (!changeBuffer.empty())
+    apiLayer->changeData(changeBuffer.size(), changeBuffer.data());
   apiLayer->getShaderAPI()->bindData(bindings.data(), bindings.size());
   return nodeID;
 }

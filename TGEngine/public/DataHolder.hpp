@@ -21,30 +21,33 @@ struct DataHolderBase {
   std::mutex protectionLock;
   size_t maxValue = 0;
 
-  template <class internaltype>
+  template <class internaltype, class HolderType>
   inline std::vector<internaltype> get(std::vector<internaltype> &allocation,
-                                       const size_t count, const size_t *ids) {
+                                       const size_t count,
+                                       const HolderType *ids) {
     std::lock_guard guard(protectionLock);
     std::vector<internaltype> vector;
     vector.resize(count);
     if (idMap.empty()) {
-      std::transform(ids, ids + count, vector.begin(),
-                     [&](auto input) { return allocation[input]; });
+      std::transform(ids, ids + count, vector.begin(), [&](auto input) {
+        return allocation[input.internalHandle];
+      });
     } else {
-      std::transform(ids, ids + count, vector.begin(),
-                     [&](auto input) { return allocation[idMap[input]]; });
+      std::transform(ids, ids + count, vector.begin(), [&](auto input) {
+        return allocation[idMap[input.internalHandle]];
+      });
     }
     return vector;
   }
 
-  template <class internaltype>
+  template <class internaltype, class HolderType>
   inline internaltype get(std::vector<internaltype> &allocation,
-                          const size_t input) {
+                          const HolderType input) {
     std::lock_guard guard(protectionLock);
     if (idMap.empty()) {
-      return allocation[input];
+      return allocation[input.internalHandle];
     } else {
-      return allocation[idMap[input]];
+      return allocation[idMap[input.internalHandle]];
     }
   }
 
@@ -196,6 +199,12 @@ struct DataHolder5 : public DataHolder4<type1, type2, type3, type4> {
   }
 
   inline auto start(const size_t count) {
+    if (count == 0)
+      return std::tuple<size_t, typename std::vector<type1>::iterator,
+                        typename std::vector<type2>::iterator,
+                        typename std::vector<type3>::iterator,
+                        typename std::vector<type4>::iterator,
+                        typename std::vector<type5>::iterator>{};
     const auto [internalID, returnID] = allocate4(count);
     const auto first =
         std::begin(DataHolderBase<type1>::allocation1) + internalID;

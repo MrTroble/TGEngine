@@ -226,6 +226,8 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
       return vk::ShaderStageFlagBits::eVertex;
     case shader::ShaderType::FRAGMENT:
       return vk::ShaderStageFlagBits::eFragment;
+    default:
+      break;
   }
   throw std::runtime_error("Error shader translation not implemented!");
 }
@@ -335,10 +337,58 @@ inline size_t aligned(const size_t size, const size_t align) {
   return size + (align - alignmentOffset) % align;
 }
 
-size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
-                                      const size_t* dataSizes,
-                                      const DataType type) {
-  EXPECT(dataCount != 0 && data != nullptr && dataSizes != nullptr);
+struct OutputBuffer {
+  vk::Buffer buffer;
+  size_t alignedSize;
+  size_t alignedOffset;
+};
+
+template <bool perma = true>
+inline std::tuple<std::vector<OutputBuffer>, vk::DeviceMemory, size_t>
+internalBuffer(VulkanGraphicsModule* vgm, const size_t dataCount,
+               const BufferCreateInfo* bufferInfo, bool hostVisible = false) {
+  std::vector<OutputBuffer> tempBuffer;
+  tempBuffer.reserve(dataCount);
+
+  auto [returnID, bufferList, bufferMemoryList, bufferSizeList, bufferOffset,
+        alignment] = vgm->bufferDataHolder.start(perma ? dataCount : 0);
+
+  size_t tempMemory = 0;
+
+  for (size_t i = 0; i < dataCount; i++) {
+    const auto& info = bufferInfo[i];
+    const auto intermBuffer = vgm->device.createBuffer(info);
+    const auto memRequ = vgm->device.getBufferMemoryRequirements(intermBuffer);
+    const auto tempOffsetedSize = aligned(memRequ.size, memRequ.alignment);
+    tempBuffer.push_back({intermBuffer, tempOffsetedSize, tempMemory});
+    if constexpr (perma) {
+      bufferOffset[i] = tempMemory;
+      bufferList[i] = intermBuffer;
+      bufferSizeList[i] = tempOffsetedSize;
+      alignment[i] = memRequ.alignment;
+    }
+    tempMemory += tempOffsetedSize;
+  }
+
+  const MemoryAllocateInfo allocLocalInfo(
+      tempMemory, hostVisible ? vgm->memoryTypeHostVisibleCoherent
+                              : vgm->memoryTypeDeviceLocal);
+  const auto memory = vgm->device.allocateMemory(allocLocalInfo);
+  if constexpr (perma) {
+    for (size_t i = 0; i < dataCount; i++) {
+      bufferMemoryList[i] = memory;
+    }
+  }
+  for (size_t i = 0; i < dataCount; i++) {
+    const auto& buffer = tempBuffer[i];
+    vgm->device.bindBufferMemory(buffer.buffer, memory, buffer.alignedOffset);
+  }
+  return std::make_tuple(tempBuffer, memory, returnID);
+}
+
+std::vector<TDataHolder> VulkanGraphicsModule::pushData(
+    const size_t dataCount, const BufferInfo* bufferInfo) {
+  EXPECT(dataCount != 0 && bufferInfo != nullptr);
 
   std::vector<Buffer> tempBuffer;
   tempBuffer.reserve(dataCount);
@@ -356,16 +406,16 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
       CommandBufferUsageFlagBits::eOneTimeSubmit);
   secondarySync->begin(cmdBuf, beginInfo);
 
-  const BufferUsageFlags bufferUsage = getUsageFlagsFromDataType(type);
-
   size_t tempMemory = 0;
   size_t actualMemory = 0;
 
   for (size_t i = 0; i < dataCount; i++) {
-    const auto size = dataSizes[i];
+    const auto& info = bufferInfo[i];
+    const BufferUsageFlags bufferUsage = getUsageFlagsFromDataType(info.type);
 
-    const BufferCreateInfo bufferCreateInfo(
-        {}, size, BufferUsageFlagBits::eTransferSrc, SharingMode::eExclusive);
+    const BufferCreateInfo bufferCreateInfo({}, info.size,
+                                            BufferUsageFlagBits::eTransferSrc,
+                                            SharingMode::eExclusive);
     const auto intermBuffer = device.createBuffer(bufferCreateInfo);
     tempBuffer.push_back(intermBuffer);
     const auto memRequ = device.getBufferMemoryRequirements(intermBuffer);
@@ -374,7 +424,7 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
     tempBufferAlignedSize[i] = tempOffsetedSize;
 
     const BufferCreateInfo bufferLocalCreateInfo(
-        {}, size,
+        {}, info.size,
         BufferUsageFlagBits::eTransferDst | BufferUsageFlagBits::eTransferSrc |
             bufferUsage,
         SharingMode::eExclusive);
@@ -384,6 +434,11 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
     const auto offsetedSize =
         aligned(memRequLocal.size, memRequLocal.alignment);
     bufferAlignedSize[i] = offsetedSize;
+    const auto old = actualMemory;
+    actualMemory = aligned(actualMemory, memRequLocal.alignment);
+    const auto difference = actualMemory - old;
+    if (difference > 0 && i > 0) 
+        bufferAlignedSize[i - 1] += difference;
     actualMemory += offsetedSize;
 
     bufferOffset[i] = actualMemory;
@@ -401,8 +456,8 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
   size_t currentOffset = 0;
   size_t tempCurrentOffset = 0;
   for (size_t i = 0; i < dataCount; i++) {
-    const auto dataptr = ((const uint8_t**)data)[i];
-    const auto size = dataSizes[i];
+    const auto& info = bufferInfo[i];
+    const auto dataptr = (const uint8_t*)info.data;
 
     const auto tempBuf = tempBuffer[i];
     device.bindBufferMemory(tempBuf, hostVisibleMemory, tempCurrentOffset);
@@ -410,7 +465,7 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
     const auto tempCurrentSize = tempBufferAlignedSize[i];
     const auto mappedHandle =
         device.mapMemory(hostVisibleMemory, tempCurrentOffset, tempCurrentSize);
-    memcpy(mappedHandle, dataptr, size);
+    memcpy(mappedHandle, dataptr, info.size);
     device.unmapMemory(hostVisibleMemory);
     tempCurrentOffset += tempCurrentSize;
 
@@ -419,7 +474,7 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
     device.bindBufferMemory(cBuffer, localMem, currentOffset);
     currentOffset += bufferAlignedSize[i];
 
-    const BufferCopy copyInfo(0, 0, size);
+    const BufferCopy copyInfo(0, 0, info.size);
     cmdBuf.copyBuffer(tempBuf, cBuffer, copyInfo);
   }
 
@@ -429,33 +484,35 @@ size_t VulkanGraphicsModule::pushData(const size_t dataCount, void* data,
   device.freeMemory(hostVisibleMemory);
   for (const auto buf : tempBuffer) device.destroyBuffer(buf);
 
-  return returnID;
+  std::vector<TDataHolder> dataHolders(dataCount);
+  for (size_t i = 0; i < dataCount; i++) {
+    dataHolders[i] = TDataHolder(this, returnID + i);
+  }
+  return dataHolders;
 }
 
-void VulkanGraphicsModule::changeData(const size_t bufferIndex,
-                                      const void* data, const size_t dataSizes,
-                                      const size_t offset) {
-  EXPECT(bufferIndex >= 0 &&
-         bufferIndex < this->bufferDataHolder.allocation1.size() &&
-         data != nullptr && dataSizes != 0);
+void VulkanGraphicsModule::changeData(const size_t sizes,
+                                      const BufferChange* changeInfos) {
+  EXPECT(sizes >= 0 && changeInfos != nullptr);
 
-  const BufferCreateInfo bufferCreateInfo({}, dataSizes,
-                                          BufferUsageFlagBits::eTransferSrc,
-                                          SharingMode::eExclusive);
-  const auto intermBuffer = device.createBuffer(bufferCreateInfo);
-  const auto memRequ = device.getBufferMemoryRequirements(intermBuffer);
+  std::vector<BufferCreateInfo> createInfo;
+  createInfo.resize(sizes);
+  for (size_t i = 0; i < sizes; i++) {
+    createInfo[i] = BufferCreateInfo({}, changeInfos[i].size,
+                                     BufferUsageFlagBits::eTransferSrc);
+  }
+  const auto& [bufferList, memory, returnID] =
+      internalBuffer<false>(this, sizes, createInfo.data(), true);
 
-  const MemoryAllocateInfo allocInfo(memRequ.size,
-                                     memoryTypeHostVisibleCoherent);
-  const auto hostVisibleMemory = device.allocateMemory(allocInfo);
-  device.bindBufferMemory(intermBuffer, hostVisibleMemory, 0);
-  const auto mappedHandle =
-      device.mapMemory(hostVisibleMemory, 0, VK_WHOLE_SIZE);
-  glm::mat4 mat = *(glm::mat4*)data;
+  const auto mappedHandle = device.mapMemory(memory, 0, VK_WHOLE_SIZE);
 
-  memcpy(mappedHandle, data, dataSizes);
+  for (size_t i = 0; i < sizes; i++) {
+    const auto& change = changeInfos[i];
+    memcpy(((uint8_t*)mappedHandle) + bufferList[i].alignedOffset, change.data,
+           change.size);
+  }
 
-  device.unmapMemory(hostVisibleMemory);
+  device.unmapMemory(memory);
 
   const auto& cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
@@ -463,17 +520,23 @@ void VulkanGraphicsModule::changeData(const size_t bufferIndex,
       CommandBufferUsageFlagBits::eOneTimeSubmit);
   secondarySync->begin(cmdBuf, beginInfo);
 
-  const BufferCopy copyRegion(0, offset, dataSizes);
+  for (size_t i = 0; i < sizes; i++) {
+    const auto& change = changeInfos[i];
 
-  const auto currentBuffer =
-      this->bufferDataHolder.get(bufferDataHolder.allocation1, bufferIndex);
-  cmdBuf.copyBuffer(intermBuffer, currentBuffer, copyRegion);
+    const BufferCopy copyRegion(0, change.offset, change.size);
+
+    const auto currentBuffer =
+        this->bufferDataHolder.get(bufferDataHolder.allocation1, change.holder);
+    cmdBuf.copyBuffer(bufferList[i].buffer, currentBuffer, copyRegion);
+  }
 
   const SubmitInfo info({}, {}, cmdBuf);
   secondarySync->endSubmitAndWait(info);
 
-  device.freeMemory(hostVisibleMemory);
-  device.destroyBuffer(intermBuffer);
+  device.freeMemory(memory);
+  for (const auto& buffer : bufferList) {
+    device.destroyBuffer(buffer.buffer);
+  }
 }
 
 TSamplerHolder VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
@@ -646,7 +709,11 @@ size_t VulkanGraphicsModule::pushLights(const size_t lightCount,
   EXPECT(lightCount + offset < 50 && lights != nullptr);
   this->lights.lightCount = offset + lightCount;
   std::copy(lights, lights + lightCount, this->lights.lights + offset);
-  changeData(lightData, &this->lights, sizeof(this->lights));
+  BufferChange changeInfo;
+  changeInfo.data = &this->lights;
+  changeInfo.holder = lightData;
+  changeInfo.size = sizeof(this->lights);
+  changeData(1, &changeInfo);
   return this->lights.lightCount;
 }
 
@@ -672,7 +739,7 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 inline void updateDescriptors(VulkanGraphicsModule* vgm,
                               shader::ShaderAPI* sapi) {
   std::array<BindingInfo, 5> bindingInfos;
-  TTextureHolder holder; 
+  TTextureHolder holder;
   for (size_t i = 0; i < 4; i++) {
     bindingInfos[i].type = BindingType::InputAttachment;
     bindingInfos[i].bindingSet = vgm->lightBindings;
@@ -698,9 +765,11 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   vgm->shaderPipes.push_back(pipe);
   vgm->lightBindings = sapi->createBindings(pipe, 1);
 
-  auto ptr = &vgm->lights;
-  auto sizeOfLight = sizeof(vgm->lights);
-  vgm->lightData = vgm->pushData(1, &ptr, &sizeOfLight, DataType::Uniform);
+  BufferInfo bufferInfo;
+  bufferInfo.data = &vgm->lights;
+  bufferInfo.size = sizeof(vgm->lights);
+  bufferInfo.type = DataType::Uniform;
+  vgm->lightData = vgm->pushData(1, &bufferInfo)[0];
 
   updateDescriptors(vgm, sapi);
 
@@ -1381,7 +1450,7 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
 
   Buffer dataBuffer;
   DeviceMemory memoryBuffer;
-  if (index == nullptr || index->buffer == INVALID_SIZE_T) {
+  if (index == nullptr || (bool)index->buffer) {
     const BufferCreateInfo bufferCreateInfo({}, requireMents.size,
                                             BufferUsageFlagBits::eTransferDst);
     dataBuffer = device.createBuffer(bufferCreateInfo);
@@ -1395,9 +1464,10 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
 
     if (index != nullptr) {
       constexpr size_t zero = 0;
-      index->buffer = bufferDataHolder.add(1, &dataBuffer, &memoryBuffer,
+      const auto id = bufferDataHolder.add(1, &dataBuffer, &memoryBuffer,
                                            &requireBuffer.size, &zero,
                                            &requireBuffer.alignment);
+      index->buffer = TDataHolder(this, id);
     }
   } else if (index != nullptr) {
     dataBuffer =

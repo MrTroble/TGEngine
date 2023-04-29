@@ -25,7 +25,7 @@ enum BindingType {
 };
 
 struct BufferBindingData {
-  size_t dataID = INVALID_SIZE_T;
+  graphics::TDataHolder dataID;
   size_t size = INVALID_SIZE_T;
   size_t offset = 0;
 };
@@ -83,7 +83,7 @@ inline void debugExpect(const BindingInfo& info) {
       "Texture id not correct with texture or input attachment binding type!");
   debugExpect((info.type != BindingType::UniformBuffer &&
                info.type != BindingType::Storage) ||
-                  info.data.buffer.dataID != INVALID_SIZE_T,
+                  (bool)info.data.buffer.dataID,
               "Data id not correct with buffer binding type!");
   debugExpect((info.type != BindingType::UniformBuffer &&
                info.type != BindingType::Storage) ||
