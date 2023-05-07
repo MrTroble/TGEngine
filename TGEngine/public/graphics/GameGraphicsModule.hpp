@@ -52,6 +52,7 @@ class GameGraphicsModule : public main::Module {
   TDataHolder modelHolder;
   uint32_t alignment = 1;
   std::vector<BufferChange> bufferChange;
+  std::mutex protectNodes;
 
  public:
   TTextureHolder defaultTextureID;

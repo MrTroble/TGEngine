@@ -355,6 +355,7 @@ main::Error GameGraphicsModule::init() {
 }
 
 void GameGraphicsModule::tick(double time) {
+  std::lock_guard guard(protectNodes);
   const auto size = this->node.size();
   projectionView = this->projectionMatrix * this->viewMatrix;
   bool status = false;
@@ -822,6 +823,7 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
 
 size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
                                    const size_t count) {
+  std::lock_guard guard(protectNodes);
   const auto nodeID = node.size();
   node.reserve(nodeID + count);
   std::vector<shader::BindingInfo> bindings;
