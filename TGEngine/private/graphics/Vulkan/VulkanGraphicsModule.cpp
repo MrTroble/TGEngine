@@ -1448,26 +1448,21 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
   const auto currentImage = textureImages[imageId];
   const auto requireMents = device.getImageMemoryRequirements(currentImage);
 
-  Buffer dataBuffer;
-  DeviceMemory memoryBuffer;
-  if (index == nullptr || (bool)index->buffer) {
+  Buffer dataBuffer(nullptr);
+  DeviceMemory memoryBuffer(nullptr);
+  if (index == nullptr || !index->buffer) {
     const BufferCreateInfo bufferCreateInfo({}, requireMents.size,
                                             BufferUsageFlagBits::eTransferDst);
-    dataBuffer = device.createBuffer(bufferCreateInfo);
-
-    const auto requireBuffer = device.getBufferMemoryRequirements(dataBuffer);
-
-    const MemoryAllocateInfo allocateInfo(requireBuffer.size,
-                                          memoryTypeHostVisibleCoherent);
-    memoryBuffer = device.allocateMemory(allocateInfo);
-    device.bindBufferMemory(dataBuffer, memoryBuffer, 0);
-
     if (index != nullptr) {
-      constexpr size_t zero = 0;
-      const auto id = bufferDataHolder.add(1, &dataBuffer, &memoryBuffer,
-                                           &requireBuffer.size, &zero,
-                                           &requireBuffer.alignment);
-      index->buffer = TDataHolder(this, id);
+      const auto& [output, memory, returnID] = internalBuffer<true>(this, 1, &bufferCreateInfo, true);
+      dataBuffer = output.back().buffer;
+      memoryBuffer = memory;
+      index->buffer = TDataHolder(this, returnID);
+    } else {
+      const auto& [output, memory, _u] =
+          internalBuffer<false>(this, 1, &bufferCreateInfo, true);
+      dataBuffer = output.back().buffer;
+      memoryBuffer = memory;
     }
   } else if (index != nullptr) {
     dataBuffer =

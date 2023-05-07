@@ -408,10 +408,10 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
       case BindingType::InputAttachment: {
         const auto& tex = cinfo.data.texture;
         imgInfo[i] = DescriptorImageInfo(
-            (bool)tex.sampler ? vgm->sampler[tex.sampler.internalHandle]
-                              : vk::Sampler(),
-            (bool)tex.texture ? vgm->textureImageViews[tex.texture.internalHandle]
-                              : vk::ImageView(),
+            !tex.sampler ? vk::Sampler()
+                         : vgm->sampler[tex.sampler.internalHandle],
+            !tex.texture ? vk::ImageView()
+                         : vgm->textureImageViews[tex.texture.internalHandle],
             ImageLayout::eShaderReadOnlyOptimal);
         set.push_back(WriteDescriptorSet(
             descSets[cinfo.bindingSet], cinfo.binding, cinfo.arrayID, 1,

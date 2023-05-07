@@ -7,15 +7,15 @@ namespace tge::graphics {
 class APILayer;
 
 struct EntryHolder {
-  size_t internalHandle = INVALID_SIZE_T;
-  size_t referenceID = INVALID_SIZE_T;
+  uint32_t internalHandle = INVALID_UINT32;
+  uint32_t referenceID = INVALID_UINT32;
 
   EntryHolder() = default;
 
   EntryHolder(APILayer* api, const size_t internalHandle);
 
-  [[nodiscard]] inline explicit operator bool() const noexcept {
-    return internalHandle != INVALID_SIZE_T;
+  [[nodiscard]] inline bool operator!() const noexcept {
+    return internalHandle == INVALID_UINT32;
   }
 
   [[nodiscard]] inline bool operator==(

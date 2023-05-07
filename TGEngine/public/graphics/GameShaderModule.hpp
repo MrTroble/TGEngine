@@ -74,16 +74,16 @@ inline void debugExpect(const BindingInfo& info) {
   debugExpect(info.bindingSet != INVALID_SIZE_T, "BindingSet not set!");
   debugExpect(info.binding != INVALID_SIZE_T, "Binding not set!");
   debugExpect(
-      info.type != BindingType::Sampler || (bool)info.data.texture.sampler,
+      info.type != BindingType::Sampler || !(!info.data.texture.sampler),
       "Sampler not correct with sampler binding type!");
   debugExpect(
       (info.type != BindingType::Texture &&
        info.type != BindingType::InputAttachment) ||
-          (bool)info.data.texture.texture,
+          !(!info.data.texture.texture),
       "Texture id not correct with texture or input attachment binding type!");
   debugExpect((info.type != BindingType::UniformBuffer &&
                info.type != BindingType::Storage) ||
-                  (bool)info.data.buffer.dataID,
+                  !(!info.data.buffer.dataID),
               "Data id not correct with buffer binding type!");
   debugExpect((info.type != BindingType::UniformBuffer &&
                info.type != BindingType::Storage) ||
