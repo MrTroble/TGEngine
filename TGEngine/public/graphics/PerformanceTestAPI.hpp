@@ -1,5 +1,5 @@
 #include <chrono>
-
+#include <format>
 #include "APILayer.hpp"
 
 struct PrintableCounter {
@@ -10,6 +10,7 @@ struct PrintableCounter {
 
   std::string fullDebug() {
     std::lock_guard lg(mutex);
+    if (hitCount == 0) return "";
     return std::format("[{}: overallTime={}, hitCount={}, averageTime={}]",
                        name, time, hitCount, time / (double)hitCount);
   }
