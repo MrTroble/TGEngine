@@ -1,7 +1,7 @@
 #pragma once
 
+#include <stdint.h>
 #include <limits>
-#include <cstdint>
 
 static constexpr auto forceSemicolon = 0;
 static constexpr size_t INVALID_SIZE_T = std::numeric_limits<size_t>().max();
