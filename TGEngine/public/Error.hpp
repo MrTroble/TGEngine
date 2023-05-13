@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <cstddef>
 #include <limits>
 
 static constexpr auto forceSemicolon = 0;
