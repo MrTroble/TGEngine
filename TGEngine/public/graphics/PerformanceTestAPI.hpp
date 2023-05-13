@@ -81,7 +81,7 @@ class PerformanceMessuringAPILayer : public APILayer {
     print();
   }
 
-  _NODISCARD virtual std::vector<PipelineHolder> pushMaterials(
+  [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
       const size_t materialcount, const Material* materials,
       const size_t offset = INVALID_SIZE_T) override {
     TimingAdder adder(materialCounter);
@@ -89,7 +89,7 @@ class PerformanceMessuringAPILayer : public APILayer {
     return rtc;
   };
 
-  _NODISCARD virtual std::vector<TDataHolder> pushData(
+  [[nodiscard]] virtual std::vector<TDataHolder> pushData(
       const size_t dataCount, const BufferInfo* bufferInfo) override {
     TimingAdder adder(dataCounter);
     const auto rtc = api->pushData(dataCount, bufferInfo);
@@ -112,37 +112,37 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->pushRender(renderInfoCount, renderInfos);
   }
 
-  _NODISCARD virtual TSamplerHolder pushSampler(
+  [[nodiscard]] virtual TSamplerHolder pushSampler(
       const SamplerInfo& sampler) override {
     return api->pushSampler(sampler);
   }
 
-  _NODISCARD virtual std::vector<TTextureHolder> pushTexture(
+  [[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
       const size_t textureCount, const TextureInfo* textures) override {
     TimingAdder adder(textureCounter);
     return api->pushTexture(textureCount, textures);
   }
 
-  _NODISCARD virtual size_t pushLights(const size_t lightCount,
+  [[nodiscard]] virtual size_t pushLights(const size_t lightCount,
                                        const Light* lights,
                                        const size_t offset = 0) override {
     return api->pushLights(lightCount, lights, offset);
   }
 
-  _NODISCARD virtual size_t getAligned(
+  [[nodiscard]] virtual size_t getAligned(
       const size_t buffer, const size_t toBeAligned) const override {
     return api->getAligned(buffer, toBeAligned);
   }
 
-  _NODISCARD virtual size_t getAligned(const DataType type) const override {
+  [[nodiscard]] virtual size_t getAligned(const DataType type) const override {
     return api->getAligned(type);
   }
 
-  _NODISCARD virtual glm::vec2 getRenderExtent() const override {
+  [[nodiscard]] virtual glm::vec2 getRenderExtent() const override {
     return api->getRenderExtent();
   }
 
-  _NODISCARD virtual std::vector<char> getImageData(
+  [[nodiscard]] virtual std::vector<char> getImageData(
       const size_t imageId, CacheIndex* cache = nullptr) override {
     return api->getImageData(imageId, cache);
   }

@@ -65,11 +65,11 @@ class GameGraphicsModule : public main::Module {
   GameGraphicsModule(APILayer *apiLayer, WindowModule *winModule,
                      const FeatureSet &set = {});
 
-  _NODISCARD size_t loadModel(const std::vector<char> &data, const bool binary,
+  [[nodiscard]] size_t loadModel(const std::vector<char> &data, const bool binary,
                               const std::string &baseDir,
                               void *shaderPipe = nullptr);
 
-  _NODISCARD size_t loadModel(const std::vector<char> &data,
+  [[nodiscard]] size_t loadModel(const std::vector<char> &data,
                               const bool binary) {
     return loadModel(data, binary, "");
   }
@@ -82,9 +82,9 @@ class GameGraphicsModule : public main::Module {
       const std::vector<std::string> &names,
       const LoadType type = LoadType::STBI);
 
-  _NODISCARD size_t addNode(const NodeInfo *nodeInfos, const size_t count);
+  [[nodiscard]] size_t addNode(const NodeInfo *nodeInfos, const size_t count);
 
-  _NODISCARD size_t nextNodeID() { return node.size(); }
+  [[nodiscard]] size_t nextNodeID() { return node.size(); }
 
   void updateTransform(const size_t nodeID, const NodeTransform &transform);
 
@@ -105,9 +105,9 @@ class GameGraphicsModule : public main::Module {
 
   void destroy() override;
 
-  _NODISCARD APILayer *getAPILayer() { return apiLayer; }
+  [[nodiscard]] APILayer *getAPILayer() { return apiLayer; }
 
-  _NODISCARD WindowModule *getWindowModule() { return windowModule; }
+  [[nodiscard]] WindowModule *getWindowModule() { return windowModule; }
 };
 
 }  // namespace tge::graphics
