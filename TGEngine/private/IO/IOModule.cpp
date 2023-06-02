@@ -26,7 +26,6 @@ inline void dispatchInputs(WPARAM lParam, int additional, int buttonID) {
 
 #ifdef WIN32
 LRESULT CALLBACK callback(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
-  bool pressed = true;
   switch (Msg) {
     case WM_LBUTTONUP:
       dispatchInputs<PressMode::RELEASED>(lParam, 0, 1);

@@ -307,3 +307,4 @@ dependencies/deps.zip
 /build
 .vscode/settings.json
 /out/build/x64-Debug
+/vcpkg_installed

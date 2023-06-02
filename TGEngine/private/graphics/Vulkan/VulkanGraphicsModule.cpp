@@ -281,7 +281,6 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                         pipelines[info.materialId.internalHandle]);
 
     for (const auto& range : info.constRanges) {
-      VulkanShaderModule* shaderMod = (VulkanShaderModule*)shaderAPI;
       cmdBuf.pushConstants(
           this->materialToLayout[info.materialId.internalHandle],
           shaderToVulkan(range.type), 0, range.pushConstData.size(),

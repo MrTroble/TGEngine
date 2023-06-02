@@ -6,6 +6,14 @@
 #include <chrono>
 #include <vector>
 
+#ifdef WIN32
+constexpr auto END_CHARACTER = '\\';
+#else
+#ifdef __linux__
+constexpr auto END_CHARACTER = '/';
+#endif
+#endif
+
 namespace tge::main {
 
 extern std::vector<Module *> lateModules;

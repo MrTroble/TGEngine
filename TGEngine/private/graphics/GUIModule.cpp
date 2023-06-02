@@ -3,15 +3,16 @@
 #include "../../public/TGEngine.hpp"
 #include "../../public/graphics/WindowModule.hpp"
 #include "../../public/graphics/vulkan/VulkanModuleDef.hpp"
-#if 1
-#include <backends/imgui_impl_vulkan.h>
-#endif  // DEBUG
+
+#include "../../public/imgui/imgui_impl_vulkan.h"
 
 #ifdef WIN32
 #include <Windows.h>
-#include <backends/imgui_impl_win32.h>
-
-#include <backends/imgui_impl_win32.cpp>
+#include "../../public/imgui/imgui_impl_win32.h"
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd,
+                                                             UINT msg,
+                                                             WPARAM wParam,
+                                                             LPARAM lParam);
 #endif
 #ifdef __linux__
 #include "../../public/imgui/imgui_impl_x11.h"

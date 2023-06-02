@@ -74,11 +74,11 @@ class GameGraphicsModule : public main::Module {
     return loadModel(data, binary, "");
   }
 
-  [[nodiscard]] std::vector<TTextureHolder> loadTextures(
+  std::vector<TTextureHolder> loadTextures(
       const std::vector<std::vector<char>> &data,
       const LoadType type = LoadType::STBI);
 
-  [[nodiscard]] std::vector<TTextureHolder> loadTextures(
+  std::vector<TTextureHolder> loadTextures(
       const std::vector<std::string> &names,
       const LoadType type = LoadType::STBI);
 

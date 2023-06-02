@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.12)
+cmake_minimum_required (VERSION 3.15)
 set(CMAKE_CXX_STANDARD 20)
 add_compile_definitions(ENGINE_NAME="TGEngine" ENGINE_VERSION=8388608)
 
@@ -16,30 +16,10 @@ FETCHCONTENT_DECLARE(
   URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
 )
 
-FETCHCONTENT_DECLARE(
-	glm
-	GIT_REPOSITORY https://github.com/g-truc/glm/
-	GIT_TAG 0.9.9.8
-)
-
-FETCHCONTENT_DECLARE(
-	imgui
-	GIT_REPOSITORY https://github.com/ocornut/imgui
-	GIT_TAG v1.88
-)
-
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FETCHCONTENT_MAKEAVAILABLE(googletest)
-FETCHCONTENT_MAKEAVAILABLE(imgui)
-FETCHCONTENT_MAKEAVAILABLE(glm)
 
 set(ENGINE_DATA   
-	"public/TGEngine.hpp"
-	"public/graphics/vulkan/VulkanGraphicsModule.hpp"
-	"public/Module.hpp"
-	"public/Error.hpp"
-	"public/graphics/GameGraphicsModule.hpp"
-	"public/Util.hpp"
 	"private/TGEngine.cpp"
 	"private/Error.cpp"
     "private/graphics/Vulkan/VulkanGraphicsModule.cpp"     
@@ -47,74 +27,39 @@ set(ENGINE_DATA
     "private/Util.cpp"
 	"private/graphics/WindowModule.cpp" 
 	"private/graphics/Vulkan/VulkanShaderModule.cpp" 
-	"public/graphics/vulkan/VulkanShaderModule.hpp"
-	"public/graphics/Material.hpp" 
-	"public/graphics/APILayer.hpp" 
 	"private/graphics/Material.cpp"  
-	"public/IO/IOModule.hpp" 
 	"private/IO/IOModule.cpp"
-    "public/graphics/vulkan/VulkanShaderPipe.hpp" 
-	"public/graphics/GameShaderModule.hpp" 
 	"private/graphics/GUIModule.cpp" 
-	"public/graphics/GUIModule.hpp" 
-	"public/graphics/vulkan/VulkanModuleDef.hpp"
-	"${imgui_SOURCE_DIR}/imconfig.h"
-	"${imgui_SOURCE_DIR}/imgui.cpp"
-	"${imgui_SOURCE_DIR}/imgui.h"
-	"${imgui_SOURCE_DIR}/imgui_demo.cpp"
-	"${imgui_SOURCE_DIR}/imgui_draw.cpp"
-	"${imgui_SOURCE_DIR}/imgui_internal.h"
-	"${imgui_SOURCE_DIR}/imgui_tables.cpp"
-	"${imgui_SOURCE_DIR}/imgui_widgets.cpp"
-	"${imgui_SOURCE_DIR}/imstb_rectpack.h"
-	"${imgui_SOURCE_DIR}/imstb_textedit.h"
-	"${imgui_SOURCE_DIR}/imstb_truetype.h"
-	"${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp"
-    "${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.h"
- "public/headerlibs/ddspp.h" "private/graphics/APILayer.cpp")
+	"private/graphics/APILayer.cpp"
+	"private/imgui/imgui_impl_vulkan.cpp"
+)
 
 if(WIN32)
 list(APPEND ENGINE_DATA
-    "${imgui_SOURCE_DIR}/backends/imgui_impl_win32.cpp"
-	"${imgui_SOURCE_DIR}/backends/imgui_impl_win32.h"
+    "private/imgui/imgui_impl_win32.cpp"
 )
 else()
 list(APPEND ENGINE_DATA
     "private/imgui/imgui_impl_x11.cpp"
-	"public/imgui/imgui_impl_x11.h"
 )
 endif()
 
-add_library (TGEngine STATIC ${ENGINE_DATA})
+add_library(TGEngine STATIC ${ENGINE_DATA})
 
 include(FindVulkan)
+target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan)
 
-if(WIN32)
-if(NOT Vulkan_FOUND)
-message(WARNING "Vulkan SDK instalation not found")
-message("Downloading vulkansdk")
-FETCHCONTENT_DECLARE(
-	vulkansdk
-	URL https://seafile.media-dienste.de/f/85da9d3e98b347a490f6/?dl=1
+find_path(VULKAN_HEADERS_INCLUDE_DIRS "vk_video/vulkan_video_codec_h264std.h")
+target_include_directories(TGEngine PUBLIC ${VULKAN_HEADERS_INCLUDE_DIRS})
 
-	BUILD_COMMAND ""
-)
-FETCHCONTENT_MAKEAVAILABLE(vulkansdk)
-set(ENV{VULKAN_DIR} "${vulkansdk_SOURCE_DIR}/Include")
-target_include_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Include")
-target_link_directories(TGEngine PUBLIC "${vulkansdk_SOURCE_DIR}/Lib")
-else()
-set(ENV{VULKAN_DIR} "${Vulkan_INCLUDE_DIRS}")
-target_include_directories(TGEngine PUBLIC "${Vulkan_INCLUDE_DIRS}")
-target_link_directories(TGEngine PUBLIC "$ENV{VULKAN_SDK}/Lib") 
-endif()
-target_link_libraries(TGEngine PUBLIC vulkan-1)
-else()
-target_link_libraries(TGEngine PUBLIC glslang-default-resource-limits vulkan m ${X11_X11_LIB})
-target_include_directories(TGEngine PUBLIC "usr/include")
-endif()
-target_include_directories(TGEngine PUBLIC "${imgui_SOURCE_DIR}")
-target_link_libraries(TGEngine PUBLIC glslang shaderc_combined SPIRV glm)
+find_package(glm CONFIG REQUIRED)
+target_link_libraries(TGEngine PUBLIC glm::glm)
+
+find_package(glslang CONFIG REQUIRED)
+target_link_libraries(TGEngine PUBLIC glslang::OSDependent glslang::glslang glslang::MachineIndependent glslang::GenericCodeGen glslang::glslang-default-resource-limits glslang::OGLCompiler glslang::SPVRemapper glslang::SPIRV glslang::HLSL)
+
+find_package(imgui CONFIG REQUIRED)
+target_link_libraries(TGEngine PUBLIC imgui::imgui)
 
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>)
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>/..)

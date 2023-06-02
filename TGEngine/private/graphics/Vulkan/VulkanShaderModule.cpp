@@ -4,11 +4,9 @@
 #include "../../../public/Util.hpp"
 #include "../../../public/graphics/vulkan/VulkanModuleDef.hpp"
 #include "../../../public/graphics/vulkan/VulkanShaderPipe.hpp"
-#define ENABLE_OPT 1
 #include <glslang/MachineIndependent/localintermediate.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
-#include <glslang/SPIRV/SpvTools.h>
 
 #include <iostream>
 #include <vulkan/vulkan.hpp>
