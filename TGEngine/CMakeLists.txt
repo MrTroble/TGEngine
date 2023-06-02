@@ -3,7 +3,6 @@ set(CMAKE_CXX_STANDARD 20)
 add_compile_definitions(ENGINE_NAME="TGEngine" ENGINE_VERSION=8388608)
 
 if(WIN32)  
-add_compile_options("/D_ITERATOR_DEBUG_LEVEL=0" "/MD" "/EHa")
 add_link_options("/ignore:4099")
 else()
 include(FindX11)
