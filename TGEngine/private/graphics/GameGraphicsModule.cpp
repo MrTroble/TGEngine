@@ -808,6 +808,7 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
     }
     if (file.empty()) {
       localtextureIDs[i] = defaultTextureID;
+      textureMap[names[i]] = defaultTextureID;
 #ifdef DEBUG
       printf("Error couldn't find asset: %s!\n", name.c_str());
 #endif  // DEBUG
