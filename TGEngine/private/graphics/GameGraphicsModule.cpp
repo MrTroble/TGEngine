@@ -297,6 +297,7 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
 }
 
 main::Error GameGraphicsModule::init() {
+  assetResolver.push_back(&util::wholeFile);
   const auto size = this->node.size();
   glm::mat4 projView = this->projectionMatrix * this->viewMatrix;
   modelMatrices.resize(UINT16_MAX);
@@ -799,9 +800,17 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
         continue;
       }
     }
-    const auto file = util::wholeFile(name);
+    std::vector<char> file;
+    for (auto &function : assetResolver) {
+      file = function(name);
+      if (!file.empty()) 
+          break;
+    }
     if (file.empty()) {
       localtextureIDs[i] = defaultTextureID;
+#ifdef DEBUG
+      printf("Error couldn't find asset: %s!\n", name.c_str());
+#endif  // DEBUG
       continue;
     }
     data.push_back(file);

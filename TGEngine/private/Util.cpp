@@ -27,7 +27,7 @@ namespace tge::util
 			if (!inputstream)
 			{
 #ifdef DEBUG
-				printf("Error couldn't find file: %s!",
+				printf("Error couldn't find file: %s!\n",
 					path.generic_string().c_str());
 #endif // DEBUG
 
