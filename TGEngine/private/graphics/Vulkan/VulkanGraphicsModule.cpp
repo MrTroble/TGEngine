@@ -831,7 +831,7 @@ inline void oneTimeWait(VulkanGraphicsModule* vgm, const size_t count,
                                            1};
   for (size_t i = vgm->firstImage + 1; i < vgm->firstImage + count; i++) {
     waitForImageTransition(cmd, ImageLayout::eUndefined,
-                           ImageLayout::eSharedPresentKHR,
+                           ImageLayout::eShaderReadOnlyOptimal,
                            vgm->textureImages[i], range);
   }
 
@@ -981,8 +981,9 @@ main::Error VulkanGraphicsModule::init() {
     const auto lname = extension.extensionName.data();
     const auto enditr = extensionToEnable.end();
     if (std::find_if(extensionToEnable.begin(), enditr,
-                     [&](auto in) { return strcmp(lname, in) == 0; }) != enditr)
-      extensionEnabled.push_back(lname);
+        [&](auto in) { return strcmp(lname, in) == 0; }) != enditr) {
+        extensionEnabled.push_back(lname);
+    }
   }
 
   const InstanceCreateInfo createInfo(
@@ -1185,22 +1186,22 @@ main::Error VulkanGraphicsModule::init() {
           {}, format.format, SampleCountFlagBits::e1, AttachmentLoadOp::eClear,
           AttachmentStoreOp::eStore, AttachmentLoadOp::eDontCare,
           AttachmentStoreOp::eDontCare, ImageLayout::eUndefined,
-          ImageLayout::eSharedPresentKHR),
+          ImageLayout::eShaderReadOnlyOptimal),
       AttachmentDescription(
           {}, Format::eR8G8B8A8Snorm, SampleCountFlagBits::e1,
           AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
           AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
-          ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
+          ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
       AttachmentDescription(
           {}, Format::eR32Sfloat, SampleCountFlagBits::e1,
           AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
           AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
-          ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
+          ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
       AttachmentDescription(
           {}, Format::eR32Sfloat, SampleCountFlagBits::e1,
           AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
           AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
-          ImageLayout::eUndefined, ImageLayout::eSharedPresentKHR),
+          ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
       AttachmentDescription(
           {}, format.format, SampleCountFlagBits::e1, AttachmentLoadOp::eClear,
           AttachmentStoreOp::eStore, AttachmentLoadOp::eDontCare,

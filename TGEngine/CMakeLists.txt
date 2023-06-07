@@ -48,9 +48,8 @@ add_library(TGEngine STATIC ${ENGINE_DATA})
 
 include(FindVulkan)
 target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan)
-
-find_path(VULKAN_HEADERS_INCLUDE_DIRS "vk_video/vulkan_video_codec_h264std.h")
-target_include_directories(TGEngine PUBLIC ${VULKAN_HEADERS_INCLUDE_DIRS})
+message(${Vulkan_INCLUDE_DIRS})
+target_include_directories(TGEngine PUBLIC ${Vulkan_INCLUDE_DIRS})
 
 find_package(glm CONFIG REQUIRED)
 target_link_libraries(TGEngine PUBLIC glm::glm)
