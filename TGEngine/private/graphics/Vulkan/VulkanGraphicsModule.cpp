@@ -1473,13 +1473,15 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
 
   const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
   static constexpr CommandBufferBeginInfo info;
-  std::lock_guard lg(secondarySync->handle);
+  if (secondarySync != primarySync) {
+    secondarySync->handle.lock();
+  }
   primarySync->begin(buffer, info);
 
   constexpr ImageSubresourceRange range(ImageAspectFlagBits::eColor, 0, 1, 0,
                                         1);
 
-  waitForImageTransition(buffer, ImageLayout::eSharedPresentKHR,
+  waitForImageTransition(buffer, ImageLayout::eShaderReadOnlyOptimal,
                          ImageLayout::eTransferSrcOptimal, currentImage, range);
 
   const auto oldInfo = internalimageInfos[imageId];
@@ -1490,7 +1492,8 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
                            dataBuffer, imageInfo);
 
   waitForImageTransition(buffer, ImageLayout::eTransferSrcOptimal,
-                         ImageLayout::eSharedPresentKHR, currentImage, range);
+                         ImageLayout::eShaderReadOnlyOptimal, currentImage,
+                         range);
 
   const SubmitInfo submit({}, {}, buffer, {});
   primarySync->endSubmitAndWait(submit);
@@ -1504,6 +1507,9 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
   if (index == nullptr) {
     device.freeMemory(memoryBuffer);
     device.destroyBuffer(dataBuffer);
+  }
+  if (secondarySync != primarySync) {
+    secondarySync->handle.unlock();
   }
   return vector;
 }

@@ -45,6 +45,7 @@ struct QueueSync {
   Queue queue;
   bool armed = false;
   std::mutex handle;
+  std::thread::id threadID;
 
   QueueSync() : device(nullptr), fence(nullptr), queue(nullptr) {}
 
@@ -54,19 +55,29 @@ struct QueueSync {
     fence = device.createFence(info);
   }
 
+  void internalUnlock() {
+    threadID = std::thread::id();
+    handle.unlock();
+  }
+
   void internalWaitStopWithoutUnlock() {
-    handle.lock();
-    if (armed) {
-      const auto result2 = device.waitForFences(fence, true, INVALID_SIZE_T);
-      VERROR(result2);
-      device.resetFences(fence);
-      armed = false;
+    if (threadID != std::this_thread::get_id()) {
+      handle.lock();
+      threadID = std::this_thread::get_id();
+      if (armed) {
+        const auto result2 = device.waitForFences(fence, true, INVALID_SIZE_T);
+        VERROR(result2);
+        device.resetFences(fence);
+        armed = false;
+      }
+    } else {
+      printf("Synchronization called within the same thread twice!");
     }
   }
 
   void waitAndDisarm() {
     internalWaitStopWithoutUnlock();
-    handle.unlock();
+    internalUnlock();
   }
 
   void begin(const CommandBuffer buffer, const CommandBufferBeginInfo &info) {
@@ -76,14 +87,14 @@ struct QueueSync {
 
   void end(const CommandBuffer buffer) {
     buffer.end();
-    handle.unlock();
+    internalUnlock();
   }
 
   void submit(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
     internalWaitStopWithoutUnlock();
     queue.submit(submitInfos, fence);
     armed = true;
-    handle.unlock();
+    internalUnlock();
   }
 
   void submitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
@@ -92,7 +103,7 @@ struct QueueSync {
     const auto result = device.waitForFences(fence, true, INVALID_SIZE_T);
     VERROR(result);
     device.resetFences(fence);
-    handle.unlock();
+    internalUnlock();
   }
 
   void endSubmitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
@@ -110,7 +121,7 @@ struct QueueSync {
     const auto result = device.waitForFences(fence, true, INVALID_SIZE_T);
     VERROR(result);
     device.resetFences(fence);
-    handle.unlock();
+    internalUnlock();
   }
 
   Fence getFence() { return fence; }
@@ -118,6 +129,7 @@ struct QueueSync {
   void destroy() {
     std::lock_guard guard(handle);
     device.destroyFence(fence);
+    fence = nullptr;
   }
 };
 
