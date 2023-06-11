@@ -1,12 +1,12 @@
 #pragma once
 
+#include <functional>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <functional>
 
 #include "../../public/Error.hpp"
 #include "../../public/Module.hpp"
@@ -68,18 +68,15 @@ class GameGraphicsModule : public main::Module {
   GameGraphicsModule(APILayer *apiLayer, WindowModule *winModule,
                      const FeatureSet &set = {});
 
-  void addAssetResolver(std::function<std::vector<char>(const std::string &)>&& function) {
+  void addAssetResolver(
+      std::function<std::vector<char>(const std::string &)> &&function) {
     assetResolver.push_back(function);
   }
 
-  [[nodiscard]] size_t loadModel(const std::vector<char> &data, const bool binary,
-                              const std::string &baseDir,
-                              void *shaderPipe = nullptr);
-
   [[nodiscard]] size_t loadModel(const std::vector<char> &data,
-                              const bool binary) {
-    return loadModel(data, binary, "");
-  }
+                                 const bool binary,
+                                 const std::string &baseDir = "",
+                                 void *shaderPipe = nullptr);
 
   std::vector<TTextureHolder> loadTextures(
       const std::vector<std::vector<char>> &data,

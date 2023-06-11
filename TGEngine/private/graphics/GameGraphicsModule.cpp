@@ -303,8 +303,8 @@ main::Error GameGraphicsModule::init() {
   modelMatrices.resize(UINT16_MAX);
   std::fill(begin(modelMatrices), end(modelMatrices), glm::mat4(1));
   this->alignment = (uint32_t)ceil(
-      this->apiLayer->getAligned(tge::graphics::DataType::Uniform) /
-      sizeof(glm::mat4));
+      (double)this->apiLayer->getAligned(tge::graphics::DataType::Uniform) /
+      (double)sizeof(glm::mat4));
   printf("Alignment: %d\n", this->alignment);
   for (size_t i = 0; i < size; i++) {
     const auto &transform = this->node[i];
