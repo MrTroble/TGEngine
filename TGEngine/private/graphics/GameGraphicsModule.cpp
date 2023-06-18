@@ -269,13 +269,14 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
              : loader.LoadASCIIFromString(&model, &error, &warning, data.data(),
                                           data.size(), baseDir);
   if (!rst) {
-    printf("[GLTF][ERR]: Loading failed\n[GLTF][ERR]: %s\n[GLTF][WARN]: %s\n",
-           error.c_str(), warning.c_str());
+    PLOG(plog::error) << "Loading failed\n"
+                      << error << std::endl
+                      << warning << std::endl;
     return INVALID_SIZE_T;
   }
 
   if (!warning.empty()) {
-    printf("[GLTF][WARN]: %s\n", warning.c_str());
+    PLOG(plog::warning) << warning << std::endl;
   }
 
   const auto samplerId = loadSampler(model, apiLayer);
@@ -305,7 +306,7 @@ main::Error GameGraphicsModule::init() {
   this->alignment = (uint32_t)ceil(
       (double)this->apiLayer->getAligned(tge::graphics::DataType::Uniform) /
       (double)sizeof(glm::mat4));
-  printf("Alignment: %d\n", this->alignment);
+  PLOG(plog::verbose) << "Alignment: " << this->alignment << std::endl;
   for (size_t i = 0; i < size; i++) {
     const auto &transform = this->node[i];
     const auto parantID = this->parents[i] * alignment;
@@ -390,7 +391,7 @@ std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>> &data) {
   textureInfos.reserve(data.size());
   for (const auto &dataIn : data) {
     if (dataIn.empty()) {
-      printf("[ERR]: Found empty texture!\n");
+      PLOG(plog::fatal) << "Found empty texture!" << std::endl;
       exit(-1);
       continue;
     }
@@ -400,7 +401,7 @@ std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>> &data) {
                                       (int *)&info.channel, 0);
     info.size = info.width * info.height * info.channel;
     if (info.channel == 3) {
-      printf("Texture with 3 channels not supported!\n");
+      PLOG(plog::fatal) << "Texture with 3 channels not supported!" << std::endl;
       exit(-1);
       continue;
     }
@@ -744,7 +745,8 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
   textureInfos.reserve(data.size());
   for (const auto &ddsVec : data) {
     if (ddsVec.empty()) {
-      printf("[ERR]: Found empty texture!\n");
+      PLOG(plog::fatal) << "Found empty texture!"
+                        << std::endl;
       exit(-1);
       continue;
     }
@@ -809,9 +811,7 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
     if (file.empty()) {
       localtextureIDs[i] = defaultTextureID;
       textureMap[names[i]] = defaultTextureID;
-#ifdef DEBUG
-      printf("Error couldn't find asset: %s!\n", name.c_str());
-#endif  // DEBUG
+      PLOG(plog::error) << "Couldn't find asset: " << name << "!" << std::endl;
       continue;
     }
     data.push_back(file);

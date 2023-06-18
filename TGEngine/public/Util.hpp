@@ -1,5 +1,9 @@
 #pragma once
 
+#include <plog/Log.h>
+#include <plog/Initializers/RollingFileInitializer.h>
+#include <plog/Initializers/ConsoleInitializer.h>
+
 #include <filesystem>
 #include <stdint.h>
 #include <type_traits>

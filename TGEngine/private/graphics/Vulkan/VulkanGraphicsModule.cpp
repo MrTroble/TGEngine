@@ -727,8 +727,8 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
   std::string severity = to_string(messageSeverity);
   std::string type = to_string(messageTypes);
 
-  printf("[%s][%s]: %s\n", severity.c_str(), type.c_str(),
-         pCallbackData->pMessage);
+  PLOG(plog::info) << "[Vulkan]" << severity << "," << type << ": "
+                   << pCallbackData->pMessage;
   if (messageSeverity == DebugUtilsMessageSeverityFlagBitsEXT::eError)
     return VK_TRUE;
   return VK_FALSE;
@@ -1289,7 +1289,7 @@ void VulkanGraphicsModule::tick(double time) {
   if (exitFailed) return;
 
   if (this->nextImage > cmdbuffer.size()) {
-    printf("Size greater command buffer size!");
+    PLOG(plog::fatal) << "Size greater command buffer size!";
   }
 
   const auto currentBuffer = cmdbuffer[this->nextImage];
@@ -1362,15 +1362,11 @@ void VulkanGraphicsModule::tick(double time) {
   const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
                                    nullptr);
   const Result result = primarySync->queue.presentKHR(&presentInfo);
-  if (result == Result::eErrorInitializationFailed) {
-    printf("For some reasone NV drivers seem to be hitting this error!");
-  }
   if (checkAndRecreate(this, result)) {
     currentBuffer.reset();
     auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
                                                 waitSemaphore, {});
     this->nextImage = nextimage.value;
-    if (this->nextImage > 2) printf("WTF!");
     return;
   }
 
@@ -1431,7 +1427,9 @@ void VulkanGraphicsModule::removeRender(const size_t renderInfoCount,
                                         const TRenderHolder* renderIDs) {
   std::lock_guard lg(commandBufferRecording);
   for (size_t i = 0; i < renderInfoCount; i++) {
-    const auto id = renderIDs[i].internalHandle;
+    TRenderHolder holder = renderIDs[i];
+    if (!holder) continue;
+    const auto id = holder.internalHandle;
     renderInfosForRetry[id].clear();
     secondaryCommandBuffer[id] = nullptr;
   }

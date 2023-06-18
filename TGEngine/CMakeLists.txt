@@ -60,6 +60,9 @@ target_link_libraries(TGEngine PUBLIC glslang::OSDependent glslang::glslang glsl
 find_package(imgui CONFIG REQUIRED)
 target_link_libraries(TGEngine PUBLIC imgui::imgui)
 
+find_package(plog CONFIG REQUIRED)
+target_link_libraries(TGEngine PRIVATE plog::plog)
+
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>)
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>/..)
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>/../..)

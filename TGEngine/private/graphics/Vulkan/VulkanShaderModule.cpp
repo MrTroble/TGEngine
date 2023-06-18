@@ -11,6 +11,7 @@
 #include <iostream>
 #include <vulkan/vulkan.hpp>
 #undef ERROR
+#define SPR_NO_DEBUG_OUTPUT 1
 #define SPR_NO_GLSL_INCLUDE 1
 #include "../../../public/headerlibs/ShaderPermute.hpp"
 
@@ -253,8 +254,8 @@ std::unique_ptr<glslang::TShader> __implGenerateIntermediate(
   const nlohmann::json json = nlohmann::json::parse(code);
   auto permute = permute::fromJson<permute::PermuteGLSL>(json);
   if (!permute.generate(additional)) {
-    for (auto& str : permute.getContent()) printf("%s\n", str.c_str());
-    printf("Error while generating glsl!");
+    for (auto& str : permute.getContent()) PLOG(plog::info) << str << std::endl;
+    PLOG(plog::error) << "Error while generating glsl!" << std::endl;
     return std::unique_ptr<glslang::TShader>();
   }
   return std::unique_ptr<glslang::TShader>(
@@ -264,7 +265,7 @@ std::unique_ptr<glslang::TShader> __implGenerateIntermediate(
 VulkanShaderPipe* __implLoadShaderPipeAndCompile(
     const std::vector<ShaderInfo>& vector) {
   if (vector.size() == 0) {
-    printf("Wrong shader count!");
+    PLOG(plog::error) << "Wrong shader count!";
     return nullptr;
   }
   VulkanShaderPipe* shaderPipe = new VulkanShaderPipe();
@@ -304,7 +305,7 @@ ShaderPipe VulkanShaderModule::loadShaderPipeAndCompile(
     const std::string abrivation = name.substr(name.size() - 4);
     const auto& content = util::wholeFile(name);
     if (content.empty()) {
-      printf("[WARN]: File [%s] not found!\n", name.c_str());
+      PLOG(plog::warning) << "File [" << name << "] not found" << std::endl;
       continue;
     }
     vector.push_back({getLang(abrivation), content});

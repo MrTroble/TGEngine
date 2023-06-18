@@ -3,6 +3,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include "../Util.hpp"
 
 #include "../Error.hpp"
 #include "Material.hpp"
@@ -59,7 +60,7 @@ struct ShaderInfo {
 #define DEBUG_EXPECT(input) debugExpect(input)
 inline void debugExpect(const bool assertion, const std::string& string) {
   if (!assertion) {
-    std::cout << "[DEBUG]: " << string << std::endl;
+    PLOG(plog::debug) << string << std::endl;
     throw std::runtime_error(string);
   }
 }

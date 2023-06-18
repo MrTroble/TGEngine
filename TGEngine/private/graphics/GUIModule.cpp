@@ -3,9 +3,10 @@
 #include "../../public/TGEngine.hpp"
 #include "../../public/graphics/WindowModule.hpp"
 #include "../../public/graphics/vulkan/VulkanModuleDef.hpp"
-
+//
+#include <imgui.h>
 #include "../../public/imgui/imgui_impl_vulkan.h"
-
+//
 #ifdef WIN32
 #include <Windows.h>
 #include "../../public/imgui/imgui_impl_win32.h"
@@ -18,7 +19,6 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd,
 #include "../../public/imgui/imgui_impl_x11.h"
 extern IMGUI_IMPL_API int ImGui_ImplX11_EventHandler(XEvent &event);
 #endif
-#include <imgui.h>
 
 namespace tge::gui {
 

@@ -8,6 +8,6 @@
     "glslang",
     "glm",
     "imgui",
-    "vulkan-headers"
+    "plog"
   ]
 }
