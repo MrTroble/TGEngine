@@ -25,7 +25,8 @@ void fireRecreate() {
 Error init(const graphics::FeatureSet &featureSet) {
   if (isInitialized) return error = Error::ALREADY_INITIALIZED;
   static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
-  plog::init(plog::debug, "Log.txt").addAppender(&consoleAppender);
+  plog::init<1>(plog::debug, "TGELog.txt").addAppender(&consoleAppender);
+  plog::init(plog::verbose, "TGEVerboseLog.txt").addAppender(plog::get<1>());
   winModule = new graphics::WindowModule();
   modules.push_back(winModule);
   usedApiLayer = new graphics::PerformanceMessuringAPILayer(

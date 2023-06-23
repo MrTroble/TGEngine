@@ -995,7 +995,7 @@ main::Error VulkanGraphicsModule::init() {
   if (std::find_if(begin(extensionEnabled), end(extensionEnabled), [](auto x) {
         return strcmp(x, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0;
       }) != end(extensionEnabled)) {
-    std::cout << "Create debug utils!" << std::endl;
+    PLOG_DEBUG << "Create debug utils!";
 
     DispatchLoaderDynamic stat;
     stat.vkCreateDebugUtilsMessengerEXT =

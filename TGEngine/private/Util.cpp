@@ -21,11 +21,7 @@ std::vector<char> wholeFile(const fs::path& path) {
     inputstream =
         std::ifstream(search, std::ios::ate | std::ios::in | std::ios::binary);
     if (!inputstream) {
-#ifdef DEBUG
-      PLOG(plog::debug) << "Error couldn't find file: " << path << "!"
-                        << std::endl;
-#endif  // DEBUG
-
+      PLOG_VERBOSE << "Error couldn't find file: " << path << "!";
       return std::vector<char>();
     }
   }

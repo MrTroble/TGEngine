@@ -175,7 +175,6 @@ struct GeneralShaderAnalizer : public glslang::TIntermTraverser {
 
   void visitSymbol(glslang::TIntermSymbol* symbol) {
     const auto& type = symbol->getType();
-    std::cout << type.getCompleteString() << std::endl;
     const auto& quali = type.getQualifier();
     if (quali.layoutBinding < NO_BINDING_GIVEN) {
       if (uset.contains(quali.layoutBinding)) return;
@@ -254,8 +253,8 @@ std::unique_ptr<glslang::TShader> __implGenerateIntermediate(
   const nlohmann::json json = nlohmann::json::parse(code);
   auto permute = permute::fromJson<permute::PermuteGLSL>(json);
   if (!permute.generate(additional)) {
-    for (auto& str : permute.getContent()) PLOG(plog::info) << str << std::endl;
-    PLOG(plog::error) << "Error while generating glsl!" << std::endl;
+    for (auto& str : permute.getContent()) PLOG_INFO << str;
+    PLOG_ERROR << "Error while generating glsl!";
     return std::unique_ptr<glslang::TShader>();
   }
   return std::unique_ptr<glslang::TShader>(
@@ -265,7 +264,7 @@ std::unique_ptr<glslang::TShader> __implGenerateIntermediate(
 VulkanShaderPipe* __implLoadShaderPipeAndCompile(
     const std::vector<ShaderInfo>& vector) {
   if (vector.size() == 0) {
-    PLOG(plog::error) << "Wrong shader count!";
+    PLOG_ERROR << "Wrong shader count!";
     return nullptr;
   }
   VulkanShaderPipe* shaderPipe = new VulkanShaderPipe();
@@ -305,7 +304,7 @@ ShaderPipe VulkanShaderModule::loadShaderPipeAndCompile(
     const std::string abrivation = name.substr(name.size() - 4);
     const auto& content = util::wholeFile(name);
     if (content.empty()) {
-      PLOG(plog::warning) << "File [" << name << "] not found" << std::endl;
+      PLOG_WARNING << "File [" << name << "] not found";
       continue;
     }
     vector.push_back({getLang(abrivation), content});

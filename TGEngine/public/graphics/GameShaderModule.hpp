@@ -60,7 +60,7 @@ struct ShaderInfo {
 #define DEBUG_EXPECT(input) debugExpect(input)
 inline void debugExpect(const bool assertion, const std::string& string) {
   if (!assertion) {
-    PLOG(plog::debug) << string << std::endl;
+    PLOG_DEBUG << string;
     throw std::runtime_error(string);
   }
 }
