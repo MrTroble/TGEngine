@@ -4,6 +4,7 @@
 #include "../public/graphics/GUIModule.hpp"
 #include "../public/graphics/PerformanceTestAPI.hpp"
 #include "../public/graphics/vulkan/VulkanGraphicsModule.hpp"
+#include <fstream>
 
 namespace tge::main {
 
@@ -25,8 +26,13 @@ void fireRecreate() {
 Error init(const graphics::FeatureSet &featureSet) {
   if (isInitialized) return error = Error::ALREADY_INITIALIZED;
   static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
+  { 
+     const std::ofstream stream1("TGELog.txt");
+     const std::ofstream stream2("TGEVerboseLog.txt");
+  }
   plog::init<1>(plog::debug, "TGELog.txt").addAppender(&consoleAppender);
-  plog::init(plog::verbose, "TGEVerboseLog.txt").addAppender(plog::get<1>());
+  plog::init(plog::verbose, "TGEVerboseLog.txt")
+      .addAppender(plog::get<1>());
   winModule = new graphics::WindowModule();
   modules.push_back(winModule);
   usedApiLayer = new graphics::PerformanceMessuringAPILayer(

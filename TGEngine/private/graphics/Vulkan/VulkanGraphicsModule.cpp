@@ -727,7 +727,7 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
   std::string severity = to_string(messageSeverity);
   std::string type = to_string(messageTypes);
 
-  PLOG(plog::info) << "[Vulkan]" << severity << "," << type << ": "
+  PLOG_INFO << severity << "," << type << ": "
                    << pCallbackData->pMessage;
   if (messageSeverity == DebugUtilsMessageSeverityFlagBitsEXT::eError)
     return VK_TRUE;
@@ -947,6 +947,7 @@ inline bool checkAndRecreate(VulkanGraphicsModule* vgm, const Result result) {
     vgm->pushMaterials(materialCopy.size() - 1, materialCopy.data() + 1, 1);
     for (size_t i = 0; i < renderCopy.size(); i++) {
       const auto& currentVector = renderCopy[i];
+      if (currentVector.empty()) continue;
       vgm->pushRender(currentVector.size(), currentVector.data(),
                       renderCopy.size() - i);
     }
