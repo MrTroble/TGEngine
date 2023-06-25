@@ -13,7 +13,7 @@ endif()
 include(FetchContent)
 FETCHCONTENT_DECLARE(
   googletest
-  URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
+  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
 )
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -62,6 +62,14 @@ target_link_libraries(TGEngine PUBLIC imgui::imgui)
 
 find_package(plog CONFIG REQUIRED)
 target_link_libraries(TGEngine PRIVATE plog::plog)
+
+enable_testing()
+
+add_executable(TGEngineTests "test/TGTests.cpp")
+target_link_libraries(TGEngineTests PRIVATE TGEngine GTest::gtest_main)
+
+include(GoogleTest)
+gtest_discover_tests(TGEngineTests)
 
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>)
 install(DIRECTORY "assets" DESTINATION $<TARGET_FILE_DIR:TGEngine>/..)

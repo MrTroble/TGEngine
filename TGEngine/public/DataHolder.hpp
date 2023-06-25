@@ -1,7 +1,10 @@
 #pragma once
 
+#include <plog/Log.h>
+
 #include <algorithm>
 #include <mutex>
+#include <span>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -13,6 +16,94 @@ inline void addInternal(std::vector<internaltype> &allocation,
   allocation.resize(allocation.size() + count);
   std::copy(values, values + count, allocation.begin() + internalID);
 }
+
+template <class... ExternalTypes>
+struct DataHolderOutput : public std::unique_lock<std::mutex> {
+  std::tuple<typename std::vector<ExternalTypes>::iterator...> iterator;
+  size_t beginIndex;
+
+  explicit DataHolderOutput(std::mutex &mutex)
+      : std::unique_lock<std::mutex>(mutex) {}
+};
+
+template <typename Tuple, typename Tuple2, std::size_t... I>
+void process(Tuple &lists, Tuple2 &values, std::index_sequence<I...> _i) {
+  (std::get<I>(lists).push_back(std::get<I>(values)), ...);
+}
+
+template <typename Tuple, typename Tuple2>
+void process(Tuple &tuple, Tuple2 &values) {
+  process(tuple, values,
+          std::make_index_sequence<std::tuple_size<Tuple>::value>());
+}
+
+template <class... ExternalTypes>
+struct DataHolder {
+  using Outputname = DataHolderOutput<ExternalTypes...>;
+  using ValueType = std::tuple<std::vector<ExternalTypes>...>;
+
+  std::mutex mutex;
+  ValueType internalValues;
+  std::unordered_map<size_t, size_t> translationTable;
+  size_t currentIndex = 0;
+
+  template <size_t index = 0>
+  std::tuple_element_t<index, std::tuple<ExternalTypes...>> get(
+      const size_t pIndex) {
+    std::lock_guard guard(this->mutex);
+    auto &vector = std::get<index>(internalValues);
+#ifdef DEBUG
+    if (pIndex >= vector.size()) {
+      PLOG_DEBUG << "Index " << pIndex << " not in DataHolder!";
+      return {};
+    }
+#endif  // DEBUG
+    return vector[pIndex];
+  }
+
+  Outputname allocate(const size_t amount) {
+    Outputname holder(this->mutex);
+    const auto index = std::get<0>(internalValues).size();
+    holder.beginIndex = currentIndex;
+    const auto newSize = index + amount;
+    holder.iterator = std::apply(
+        [&](auto &...input) {
+          (input.resize(newSize), ...);
+          return std::make_tuple((std::begin(input) + index)...);
+        },
+        internalValues);
+    for (size_t i = 0; i < amount; i++) {
+      translationTable[currentIndex++] = index + i;
+    }
+    return holder;
+  }
+
+  bool erase(std::span<size_t> toErase) {
+    std::lock_guard guard(mutex);
+    for (const size_t key : toErase) {
+      if (translationTable.erase(key) == 0) return false;
+    }
+    return true;
+  }
+
+  void compact() {
+    std::lock_guard guard(mutex);
+    auto index = translationTable.size();
+    ValueType newValue;
+    std::apply([&](auto &...vectors) { (vectors.reserve(index), ...); },
+               newValue);
+    size_t currentIndex = 0;
+    for (auto &[key, value] : translationTable) {
+      const auto values = std::apply(
+          [&](auto &...old) { return std::make_tuple(old[value]...); },
+          internalValues);
+      process(newValue, values);
+      value = currentIndex;
+      currentIndex++;
+    }
+    internalValues = newValue;
+  }
+};
 
 template <class type>
 struct DataHolderBase {
