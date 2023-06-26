@@ -52,13 +52,12 @@ struct DataHolder {
       const size_t pIndex) {
     std::lock_guard guard(this->mutex);
     auto &vector = std::get<index>(internalValues);
-#ifdef DEBUG
-    if (pIndex >= vector.size()) {
-      PLOG_DEBUG << "Index " << pIndex << " not in DataHolder!";
+    auto newIndex = translationTable.find(pIndex);
+    if (newIndex == std::end(translationTable)) {
+      PLOG_ERROR << "Index " << pIndex << " not in DataHolder!";
       return {};
     }
-#endif  // DEBUG
-    return vector[pIndex];
+    return vector[newIndex->second];
   }
 
   Outputname allocate(const size_t amount) {

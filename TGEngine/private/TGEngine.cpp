@@ -25,7 +25,7 @@ void fireRecreate() {
 
 Error init(const graphics::FeatureSet &featureSet) {
   if (isInitialized) return error = Error::ALREADY_INITIALIZED;
-  static plog::ConsoleAppender<plog::TxtFormatter> consoleAppender;
+  static plog::ColorConsoleAppender<plog::TxtFormatter> consoleAppender;
   { 
      const std::ofstream stream1("TGELog.txt");
      const std::ofstream stream2("TGEVerboseLog.txt");
