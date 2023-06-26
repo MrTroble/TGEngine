@@ -83,10 +83,9 @@ class PerformanceMessuringAPILayer : public APILayer {
   }
 
   [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
-      const size_t materialcount, const Material* materials,
-      const size_t offset = INVALID_SIZE_T) override {
+      const size_t materialcount, const Material* materials) override {
     TimingAdder adder(materialCounter);
-    const auto rtc = api->pushMaterials(materialcount, materials, offset);
+    const auto rtc = api->pushMaterials(materialcount, materials);
     return rtc;
   };
 

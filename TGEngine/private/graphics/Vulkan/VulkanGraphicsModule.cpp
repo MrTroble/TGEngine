@@ -195,7 +195,6 @@ std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
 
   std::vector<PipelineHolder> holder(materialcount);
   {
-    
     auto output = this->materialHolder.allocate(materialcount);
     std::apply(
         [&](auto pipeline, auto layout, auto material) {
@@ -204,6 +203,9 @@ std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
             *pipeline = piperesult.value[i];
             *layout = pipelineCreateInfos[i].layout;
             *material = materials[i];
+            pipeline++;
+            layout++;
+            material++;
           }
         },
         output.iterator);
@@ -269,7 +271,8 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
       shaderAPI->addToRender(&binding, 1, (void*)&cmdBuf);
     }
 
-    cmdBuf.bindPipeline(PipelineBindPoint::eGraphics,
+    cmdBuf.bindPipeline(
+        PipelineBindPoint::eGraphics,
         this->materialHolder.get<0>(info.materialId.internalHandle));
 
     for (const auto& range : info.constRanges) {
@@ -712,15 +715,25 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                       DebugUtilsMessageTypeFlagsEXT messageTypes,
                       const DebugUtilsMessengerCallbackDataEXT* pCallbackData,
                       void* pUserData) {
-  if (messageSeverity == DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
-    return VK_FALSE;
+  plog::Severity severity = plog::info;
+  switch (messageSeverity) {
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose:
+      severity = plog::verbose;
+      break;
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo:
+      severity = plog::info;
+      break;
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning:
+      severity = plog::warning;
+      break;
+    case vk::DebugUtilsMessageSeverityFlagBitsEXT::eError:
+      severity = plog::error;
+      break;
+    default:
+      break;
   }
-  std::string severity = to_string(messageSeverity);
-  std::string type = to_string(messageTypes);
 
-  PLOG_INFO << severity << "," << type << ": " << pCallbackData->pMessage;
-  if (messageSeverity == DebugUtilsMessageSeverityFlagBitsEXT::eError)
-    return VK_TRUE;
+  PLOG(severity) << pCallbackData->pMessage;
   return VK_FALSE;
 }
 #endif
@@ -749,11 +762,6 @@ inline void updateDescriptors(VulkanGraphicsModule* vgm,
 inline void createLightPass(VulkanGraphicsModule* vgm) {
   const auto sapi = vgm->getShaderAPI();
 
-  const auto pipe = (VulkanShaderPipe*)sapi->loadShaderPipeAndCompile(
-      {"assets/lightPass.vert", "assets/lightPass.frag"});
-  vgm->shaderPipes.push_back(pipe);
-  vgm->lightBindings = sapi->createBindings(pipe, 1);
-
   BufferInfo bufferInfo;
   bufferInfo.data = &vgm->lights;
   bufferInfo.size = sizeof(vgm->lights);
@@ -761,9 +769,6 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   vgm->lightData = vgm->pushData(1, &bufferInfo)[0];
 
   updateDescriptors(vgm, sapi);
-
-  std::vector<PipelineShaderStageCreateInfo> createInfos;
-  getOrCreate(vgm, pipe, createInfos);
 
   const Rect2D sic = {
       {0, 0}, {(uint32_t)vgm->viewport.width, (uint32_t)vgm->viewport.height}};
@@ -791,19 +796,18 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   const PipelineDynamicStateCreateInfo dynamicStateInfo({}, states);
 
   GraphicsPipelineCreateInfo graphicsPipeline(
-      {}, createInfos, &visci, &inputAssemblyCreateInfo, {}, &vsci, &rsci,
+      {}, vgm->lightCreateInfos, &visci, &inputAssemblyCreateInfo, {}, &vsci, &rsci,
       &msci, {}, &colorBlendState, &dynamicStateInfo, nullptr, vgm->renderpass,
       1);
-  vgm->lightMat = Material(pipe);
   sapi->addToMaterial(&vgm->lightMat, &graphicsPipeline);
 
   const auto gp = vgm->device.createGraphicsPipeline({}, graphicsPipeline);
   VERROR(gp.result)
-
+  
   auto output = vgm->materialHolder.allocate(1);
   vgm->lightPipe = PipelineHolder(vgm, output.beginIndex);
-  std::get<0>(output.iterator)[output.beginIndex] = gp.value;
-  std::get<1>(output.iterator)[output.beginIndex] = graphicsPipeline.layout;
+  std::get<0>(output.iterator)[0] = gp.value;
+  std::get<1>(output.iterator)[0] = graphicsPipeline.layout;
 }
 
 inline void oneTimeWait(VulkanGraphicsModule* vgm, const size_t count,
@@ -920,7 +924,7 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
     vgm->framebuffer.push_back(
         vgm->device.createFramebuffer(framebufferCreateInfo));
   }
-  if (!vgm->lightPipe) {
+  if (!(!vgm->lightPipe)) {
     const auto sapi = vgm->getShaderAPI();
     updateDescriptors(vgm, sapi);
   }
@@ -930,11 +934,15 @@ inline bool checkAndRecreate(VulkanGraphicsModule* vgm, const Result result) {
   if (result == Result::eErrorOutOfDateKHR ||
       result == Result::eSuboptimalKHR) {
     createSwapchain(vgm);
-    vgm->materialHolder.
+    const auto oldValues = vgm->materialHolder.clear();
+    for (auto pipeline : std::get<0>(oldValues)) {
+      vgm->device.destroy(pipeline);
+    }
+    vgm->materialHolder.currentIndex = 0;
     createLightPass(vgm);
-    const auto materialCopy = std::get<2>(vgm->materialHolder.internalValues);
+    const auto& materialCopy = std::get<2>(oldValues);
     const auto renderCopy = vgm->renderInfosForRetry;
-    vgm->pushMaterials(materialCopy.size() - 1, materialCopy.data() + 1, 1);
+    vgm->pushMaterials(materialCopy.size() - 1, materialCopy.data() + 1);
     for (size_t i = 0; i < renderCopy.size(); i++) {
       const auto& currentVector = renderCopy[i];
       if (currentVector.empty()) continue;
@@ -1267,6 +1275,13 @@ main::Error VulkanGraphicsModule::init() {
   this->shaderAPI->init();
   device.waitIdle();
 
+  const auto pipe = (VulkanShaderPipe*)shaderAPI->loadShaderPipeAndCompile(
+      {"assets/lightPass.vert", "assets/lightPass.frag"});
+  shaderPipes.push_back(pipe);
+  lightBindings = shaderAPI->createBindings(pipe, 1);
+  getOrCreate(this, pipe, lightCreateInfos);
+  lightMat = Material(pipe);
+
   createLightPass(this);
 
   auto nextimage =
@@ -1325,7 +1340,7 @@ void VulkanGraphicsModule::tick(double time) {
     currentBuffer.setScissor(0, scissor);
 
     currentBuffer.bindPipeline(PipelineBindPoint::eGraphics,
-                               pipelines[lightPipe]);
+                               materialHolder.get<0>(lightPipe.internalHandle));
 
     const std::array lights = {lightBindings};
     getShaderAPI()->addToRender(lights.data(), lights.size(),
@@ -1391,7 +1406,8 @@ void VulkanGraphicsModule::destroy() {
       std::unique(memItr, std::end(bufferDataHolder.allocation2));
   for (; memItr != memEnd; memItr++) device.freeMemory(*memItr);
   for (const auto buf : bufferDataHolder.allocation1) device.destroyBuffer(buf);
-  for (const auto pipe : pipelines) device.destroyPipeline(pipe);
+  for (const auto pipe : std::get<0>(materialHolder.clear()))
+    device.destroyPipeline(pipe);
   for (const auto shader : shaderModules) device.destroyShaderModule(shader);
   device.destroyCommandPool(pool);
   device.destroyCommandPool(secondaryPool);

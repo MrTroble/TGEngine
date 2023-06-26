@@ -206,8 +206,9 @@ class VulkanGraphicsModule : public APILayer {
 
   TDataHolder lightData;
   PipelineHolder lightPipe;
-  size_t lightBindings;
+  size_t lightBindings = INVALID_SIZE_T;
   Material lightMat;
+  std::vector<PipelineShaderStageCreateInfo> lightCreateInfos;
 
   uint32_t nextImage = 0;
 

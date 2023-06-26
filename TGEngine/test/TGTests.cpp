@@ -170,4 +170,24 @@ TEST(DataHolderTest, BasicDataHolderTests) {
   EXPECT_EQ(std::get<0>(holder.internalValues).size(), DELETE2);
   EXPECT_EQ(std::get<1>(holder.internalValues).size(), DELETE2);
   EXPECT_EQ(std::get<2>(holder.internalValues).size(), DELETE2);
+
+  const auto removed = holder.clear();
+  for (size_t i = 0; i < DELETE; i++) {
+    size_t index = 2 * i + 1;
+    EXPECT_EQ(std::get<0>(removed)[i], index);
+    EXPECT_EQ(std::get<1>(removed)[i], -index);
+    EXPECT_EQ(std::get<2>(removed)[i], index * index);
+  }
+
+  for (size_t i = 0; i < DELETE; i++) {
+    size_t index = 2 * i + 1;
+    EXPECT_EQ(std::get<0>(removed)[i + DELETE], index);
+    EXPECT_EQ(std::get<1>(removed)[i + DELETE], -index);
+    EXPECT_EQ(std::get<2>(removed)[i + DELETE], index * index);
+  }
+
+  EXPECT_EQ(holder.translationTable.size(), 0);
+  EXPECT_EQ(std::get<0>(holder.internalValues).size(), 0);
+  EXPECT_EQ(std::get<1>(holder.internalValues).size(), 0);
+  EXPECT_EQ(std::get<2>(holder.internalValues).size(), 0);
 }
