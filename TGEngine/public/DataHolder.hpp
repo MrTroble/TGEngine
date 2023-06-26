@@ -8,6 +8,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <vector>
+#include <unordered_set>
 
 template <class internaltype>
 inline void addInternal(std::vector<internaltype> &allocation,
@@ -85,14 +86,18 @@ struct DataHolder {
     return true;
   }
 
-  void compact() {
+  ValueType compact() {
     std::lock_guard guard(mutex);
     auto index = translationTable.size();
     ValueType newValue;
     std::apply([&](auto &...vectors) { (vectors.reserve(index), ...); },
                newValue);
     size_t currentIndex = 0;
+    std::unordered_set<size_t> oldValues;
+    const auto oldSize = std::get<0>(internalValues).size(); 
+    oldValues.reserve(oldSize - index);
     for (auto &[key, value] : translationTable) {
+      oldValues.insert(value);
       const auto values = std::apply(
           [&](auto &...old) { return std::make_tuple(old[value]...); },
           internalValues);
@@ -100,7 +105,22 @@ struct DataHolder {
       value = currentIndex;
       currentIndex++;
     }
+    ValueType oldValueType;
+    std::apply([&](auto &...vectors) { (vectors.reserve(oldSize), ...); },
+               oldValueType);
+    for (size_t i = 0; i < oldSize; i++) {
+      if (oldValues.contains(i)) continue;
+      const auto values = std::apply(
+          [&](auto &...old) { return std::make_tuple(old[i]...); },
+          internalValues);
+      process(oldValueType, values);
+    }
     internalValues = newValue;
+    return oldValueType;
+  }
+
+  void clear() {
+
   }
 };
 

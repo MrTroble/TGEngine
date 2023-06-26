@@ -115,8 +115,7 @@ inline void getOrCreate(
 }
 
 std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
-    const size_t materialcount, const Material* materials,
-    const size_t offset) {
+    const size_t materialcount, const Material* materials) {
   EXPECT(materialcount != 0 && materials != nullptr);
 
   const Rect2D scissor({0, 0},
@@ -151,9 +150,6 @@ std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
 
   std::vector<PipelineInputAssemblyStateCreateInfo> input;
   input.resize(materialcount);
-
-  const auto indexOffset = offset == INVALID_SIZE_T ? pipelines.size() : offset;
-  this->materialToLayout.resize(indexOffset + materialcount);
 
   std::vector<PipelineRasterizationStateCreateInfo> rasterizationInfos(
       materialcount);
@@ -191,32 +187,28 @@ std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
     shaderAPI->addToMaterial(&material, &gpipeCreateInfo);
     pipelineCreateInfos.push_back(gpipeCreateInfo);
     shaderPipes.push_back(shaderPipe);
-    this->materialToLayout[i + indexOffset] = gpipeCreateInfo.layout;
   }
 
   const auto piperesult =
       device.createGraphicsPipelines({}, pipelineCreateInfos);
   VERROR(piperesult.result);
 
-  const auto newSize = indexOffset + piperesult.value.size();
-  pipelines.resize(newSize);
-  materialsForRetry.resize(newSize);
-  for (size_t i = indexOffset; i < newSize; i++) {
-    const auto currentPipe = pipelines[i];
-    if (currentPipe) device.destroy(currentPipe);
-  }
-
-  const auto copyToOffset = pipelines.begin() + indexOffset;
-  std::copy(piperesult.value.cbegin(), piperesult.value.cend(), copyToOffset);
-
-  for (size_t i = 0; i < materialcount; i++) {
-    materialsForRetry[i + indexOffset] = materials[i];
-  }
-
   std::vector<PipelineHolder> holder(materialcount);
-  for (size_t i = 0; i < materialcount; i++) {
-    holder[i] = PipelineHolder(this, i + indexOffset);
+  {
+    
+    auto output = this->materialHolder.allocate(materialcount);
+    std::apply(
+        [&](auto pipeline, auto layout, auto material) {
+          for (size_t i = 0; i < materialcount; i++) {
+            holder[i] = PipelineHolder(this, i + output.beginIndex);
+            *pipeline = piperesult.value[i];
+            *layout = pipelineCreateInfos[i].layout;
+            *material = materials[i];
+          }
+        },
+        output.iterator);
   }
+
   return holder;
 }
 
@@ -278,11 +270,11 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     }
 
     cmdBuf.bindPipeline(PipelineBindPoint::eGraphics,
-                        pipelines[info.materialId.internalHandle]);
+        this->materialHolder.get<0>(info.materialId.internalHandle));
 
     for (const auto& range : info.constRanges) {
       cmdBuf.pushConstants(
-          this->materialToLayout[info.materialId.internalHandle],
+          this->materialHolder.get<1>(info.materialId.internalHandle),
           shaderToVulkan(range.type), 0, range.pushConstData.size(),
           range.pushConstData.data());
     }
@@ -436,8 +428,7 @@ std::vector<TDataHolder> VulkanGraphicsModule::pushData(
     const auto old = actualMemory;
     actualMemory = aligned(actualMemory, memRequLocal.alignment);
     const auto difference = actualMemory - old;
-    if (difference > 0 && i > 0) 
-        bufferAlignedSize[i - 1] += difference;
+    if (difference > 0 && i > 0) bufferAlignedSize[i - 1] += difference;
     actualMemory += offsetedSize;
 
     bufferOffset[i] = actualMemory;
@@ -727,8 +718,7 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
   std::string severity = to_string(messageSeverity);
   std::string type = to_string(messageTypes);
 
-  PLOG_INFO << severity << "," << type << ": "
-                   << pCallbackData->pMessage;
+  PLOG_INFO << severity << "," << type << ": " << pCallbackData->pMessage;
   if (messageSeverity == DebugUtilsMessageSeverityFlagBitsEXT::eError)
     return VK_TRUE;
   return VK_FALSE;
@@ -809,12 +799,11 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
 
   const auto gp = vgm->device.createGraphicsPipeline({}, graphicsPipeline);
   VERROR(gp.result)
-  vgm->lightPipe = 0;
-  if (vgm->pipelines.size() < 1) vgm->pipelines.resize(1);
-  if (vgm->pipelines[0]) vgm->device.destroy(vgm->pipelines[0]);
-  vgm->pipelines[0] = gp.value;
-  if (vgm->materialToLayout.size() < 1) vgm->materialToLayout.resize(1);
-  vgm->materialToLayout[0] = graphicsPipeline.layout;
+
+  auto output = vgm->materialHolder.allocate(1);
+  vgm->lightPipe = PipelineHolder(vgm, output.beginIndex);
+  std::get<0>(output.iterator)[output.beginIndex] = gp.value;
+  std::get<1>(output.iterator)[output.beginIndex] = graphicsPipeline.layout;
 }
 
 inline void oneTimeWait(VulkanGraphicsModule* vgm, const size_t count,
@@ -931,7 +920,7 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
     vgm->framebuffer.push_back(
         vgm->device.createFramebuffer(framebufferCreateInfo));
   }
-  if (vgm->lightPipe != INVALID_UINT32) {
+  if (!vgm->lightPipe) {
     const auto sapi = vgm->getShaderAPI();
     updateDescriptors(vgm, sapi);
   }
@@ -941,8 +930,9 @@ inline bool checkAndRecreate(VulkanGraphicsModule* vgm, const Result result) {
   if (result == Result::eErrorOutOfDateKHR ||
       result == Result::eSuboptimalKHR) {
     createSwapchain(vgm);
+    vgm->materialHolder.
     createLightPass(vgm);
-    const auto materialCopy = vgm->materialsForRetry;
+    const auto materialCopy = std::get<2>(vgm->materialHolder.internalValues);
     const auto renderCopy = vgm->renderInfosForRetry;
     vgm->pushMaterials(materialCopy.size() - 1, materialCopy.data() + 1, 1);
     for (size_t i = 0; i < renderCopy.size(); i++) {
@@ -981,9 +971,10 @@ main::Error VulkanGraphicsModule::init() {
   for (const auto& extension : extensionInfos) {
     const auto lname = extension.extensionName.data();
     const auto enditr = extensionToEnable.end();
-    if (std::find_if(extensionToEnable.begin(), enditr,
-        [&](auto in) { return strcmp(lname, in) == 0; }) != enditr) {
-        extensionEnabled.push_back(lname);
+    if (std::find_if(extensionToEnable.begin(), enditr, [&](auto in) {
+          return strcmp(lname, in) == 0;
+        }) != enditr) {
+      extensionEnabled.push_back(lname);
     }
   }
 
@@ -1453,7 +1444,8 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
     const BufferCreateInfo bufferCreateInfo({}, requireMents.size,
                                             BufferUsageFlagBits::eTransferDst);
     if (index != nullptr) {
-      const auto& [output, memory, returnID] = internalBuffer<true>(this, 1, &bufferCreateInfo, true);
+      const auto& [output, memory, returnID] =
+          internalBuffer<true>(this, 1, &bufferCreateInfo, true);
       dataBuffer = output.back().buffer;
       memoryBuffer = memory;
       index->buffer = TDataHolder(this, returnID);

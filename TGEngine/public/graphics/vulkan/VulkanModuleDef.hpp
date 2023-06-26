@@ -167,7 +167,9 @@ class VulkanGraphicsModule : public APILayer {
   CommandPool guiPool;
   std::vector<CommandBuffer> cmdbuffer;
   std::vector<CommandBuffer> noneRenderCmdbuffer;
-  std::vector<Pipeline> pipelines;
+
+  DataHolder<vk::Pipeline, vk::PipelineLayout, Material> materialHolder;
+
   uint32_t queueFamilyIndex;
   uint32_t queueIndex;
   uint32_t secondaryqueueIndex;
@@ -191,9 +193,7 @@ class VulkanGraphicsModule : public APILayer {
   std::vector<ImageView> textureImageViews;
   std::vector<shader::ShaderPipe> shaderPipes;
   std::vector<CommandBuffer> primary = {CommandBuffer()};
-  std::vector<vk::PipelineLayout> materialToLayout;
   std::vector<std::vector<RenderInfo>> renderInfosForRetry;
-  std::vector<Material> materialsForRetry;
   std::vector<InternalImageInfo> internalimageInfos;
 
   size_t firstImage;
@@ -205,7 +205,7 @@ class VulkanGraphicsModule : public APILayer {
   size_t attachmentCount;
 
   TDataHolder lightData;
-  size_t lightPipe = INVALID_UINT32;
+  PipelineHolder lightPipe;
   size_t lightBindings;
   Material lightMat;
 
@@ -235,8 +235,7 @@ class VulkanGraphicsModule : public APILayer {
                     const TRenderHolder*renderIDs) override;
 
   std::vector<PipelineHolder> pushMaterials(
-      const size_t materialcount, const Material *materials,
-      const size_t offset = INVALID_SIZE_T) override;
+      const size_t materialcount, const Material *materials) override;
 
   std::vector<TDataHolder> pushData(const size_t dataCount,
                                     const BufferInfo *bufferInfo) override;

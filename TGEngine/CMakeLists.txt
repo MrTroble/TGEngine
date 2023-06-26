@@ -66,7 +66,7 @@ target_link_libraries(TGEngine PRIVATE plog::plog)
 enable_testing()
 
 add_executable(TGEngineTests "test/TGTests.cpp")
-target_link_libraries(TGEngineTests PRIVATE TGEngine GTest::gtest_main)
+target_link_libraries(TGEngineTests PRIVATE plog::plog GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(TGEngineTests)

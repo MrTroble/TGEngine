@@ -123,8 +123,7 @@ class APILayer : public main::Module {  // Interface
   virtual ~APILayer() {}
 
   [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
-      const size_t materialcount, const Material* materials,
-      const size_t offset = INVALID_SIZE_T) = 0;
+      const size_t materialcount, const Material* materials) = 0;
 
   [[nodiscard]] virtual std::vector<TDataHolder> pushData(
       const size_t dataCount, const BufferInfo* bufferInfo) = 0;
