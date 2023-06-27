@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+
 #include <cstddef>
 #include <limits>
 
@@ -12,16 +13,16 @@ static constexpr uint32_t INVALID_UINT32 =
 #ifdef DEBUG
 #define TGE_EXPECT(statement, message, rv) \
   if (!(statement)) {                      \
-    printf("[UNEXPECTED]: %s\n", message); \
+    PLOG_ERROR << message;                 \
     return rv;                             \
   }                                        \
   forceSemicolon
 
-#define TGE_EXPECT_N(statement, message)   \
-  if (!(statement)) {                      \
-    printf("[UNEXPECTED]: %s\n", message); \
-    return;                                \
-  }                                        \
+#define TGE_EXPECT_N(statement, message) \
+  if (!(statement)) {                    \
+    PLOG_ERROR << message;               \
+    return;                              \
+  }                                      \
   forceSemicolon
 #else
 #define TGE_EXPECT(statement, message, rv) forceSemicolon

@@ -14,11 +14,6 @@ struct PrintableCounter {
     return std::format("[{}: overallTime={}, hitCount={}, averageTime={}]",
                        name, time, hitCount, time / (double)hitCount);
   }
-
-  void print() {
-    const auto string = fullDebug();
-    printf("%s\n", string.c_str());
-  }
 };
 
 class TimingAdder {
@@ -65,21 +60,12 @@ class PerformanceMessuringAPILayer : public APILayer {
            renderCounter.fullDebug() + "\n" + textureCounter.fullDebug() + "\n";
   }
 
-  void print() {
-    materialCounter.print();
-    dataCounter.print();
-    renderCounter.print();
-    textureCounter.print();
-  }
-
   void destroy() override {
     api->destroy();
-    print();
   }
 
   void recreate() override {
     api->recreate();
-    print();
   }
 
   [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(

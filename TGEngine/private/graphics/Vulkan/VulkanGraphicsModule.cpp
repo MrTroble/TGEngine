@@ -762,14 +762,6 @@ inline void updateDescriptors(VulkanGraphicsModule* vgm,
 inline void createLightPass(VulkanGraphicsModule* vgm) {
   const auto sapi = vgm->getShaderAPI();
 
-  BufferInfo bufferInfo;
-  bufferInfo.data = &vgm->lights;
-  bufferInfo.size = sizeof(vgm->lights);
-  bufferInfo.type = DataType::Uniform;
-  vgm->lightData = vgm->pushData(1, &bufferInfo)[0];
-
-  updateDescriptors(vgm, sapi);
-
   const Rect2D sic = {
       {0, 0}, {(uint32_t)vgm->viewport.width, (uint32_t)vgm->viewport.height}};
 
@@ -1281,6 +1273,14 @@ main::Error VulkanGraphicsModule::init() {
   lightBindings = shaderAPI->createBindings(pipe, 1);
   getOrCreate(this, pipe, lightCreateInfos);
   lightMat = Material(pipe);
+
+  BufferInfo bufferInfo;
+  bufferInfo.data = &this->lights;
+  bufferInfo.size = sizeof(this->lights);
+  bufferInfo.type = DataType::Uniform;
+  this->lightData = this->pushData(1, &bufferInfo)[0];
+
+  updateDescriptors(this, this->shaderAPI);
 
   createLightPass(this);
 
