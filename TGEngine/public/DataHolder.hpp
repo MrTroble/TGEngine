@@ -49,14 +49,14 @@ struct DataHolder {
   size_t currentIndex = 0;
 
   template <size_t index = 0>
-  std::tuple_element_t<index, std::tuple<ExternalTypes...>> get(
+  std::tuple_element_t<index, std::tuple<ExternalTypes...>> &get(
       const size_t pIndex) {
     std::lock_guard guard(this->mutex);
     auto &vector = std::get<index>(internalValues);
     auto newIndex = translationTable.find(pIndex);
     if (newIndex == std::end(translationTable)) {
       PLOG_ERROR << "Index " << pIndex << " not in DataHolder!";
-      return {};
+      throw std::runtime_error("Index not in DataHolder!");
     }
     return vector[newIndex->second];
   }
@@ -99,7 +99,9 @@ struct DataHolder {
     for (auto &[key, value] : translationTable) {
       oldValues.insert(value);
       const auto values = std::apply(
-          [&](auto &...old) { return std::make_tuple(old[value]...); },
+          [&](const auto &...old) {
+            return std::make_tuple(old[value]...);
+          },
           internalValues);
       process(newValue, values);
       value = currentIndex;

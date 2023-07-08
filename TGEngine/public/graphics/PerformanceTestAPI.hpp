@@ -93,9 +93,9 @@ class PerformanceMessuringAPILayer : public APILayer {
 
   [[nodiscard]] virtual TRenderHolder pushRender(
       const size_t renderInfoCount, const RenderInfo* renderInfos,
-      const size_t offset = 0) override {
+      const TRenderHolder holder) override {
     TimingAdder adder(renderCounter);
-    return api->pushRender(renderInfoCount, renderInfos);
+    return api->pushRender(renderInfoCount, renderInfos, holder);
   }
 
   [[nodiscard]] virtual TSamplerHolder pushSampler(

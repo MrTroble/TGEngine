@@ -84,7 +84,14 @@ struct Light {
       : pos(pos), color(color), intensity(intensity) {}
 };
 
-enum class DataType { IndexData, VertexData, VertexIndexData, Uniform, All, Invalid };
+enum class DataType {
+  IndexData,
+  VertexData,
+  VertexIndexData,
+  Uniform,
+  All,
+  Invalid
+};
 
 struct BufferInfo {
   void* data = nullptr;
@@ -128,14 +135,15 @@ class APILayer : public main::Module {  // Interface
   [[nodiscard]] virtual std::vector<TDataHolder> pushData(
       const size_t dataCount, const BufferInfo* bufferInfo) = 0;
 
-  virtual void changeData(const size_t sizes, const BufferChange* changeInfos) = 0;
+  virtual void changeData(const size_t sizes,
+                          const BufferChange* changeInfos) = 0;
 
   virtual void removeRender(const size_t renderInfoCount,
                             const TRenderHolder* renderIDs) = 0;
 
-  [[nodiscard]] virtual TRenderHolder pushRender(const size_t renderInfoCount,
-                                                 const RenderInfo* renderInfos,
-                                                 const size_t offset = 0) = 0;
+  [[nodiscard]] virtual TRenderHolder pushRender(
+      const size_t renderInfoCount, const RenderInfo* renderInfos,
+      const TRenderHolder toOverride = TRenderHolder()) = 0;
 
   [[nodiscard]] virtual TSamplerHolder pushSampler(
       const SamplerInfo& sampler) = 0;

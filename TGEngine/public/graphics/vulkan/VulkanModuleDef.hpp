@@ -71,7 +71,7 @@ struct QueueSync {
         armed = false;
       }
     } else {
-      printf("Synchronization called within the same thread twice!");
+      PLOG_WARNING << "Synchronization called within the same thread twice!";
     }
   }
 
@@ -184,17 +184,20 @@ class VulkanGraphicsModule : public APILayer {
   BufferHolderType bufferDataHolder;
 
   Viewport viewport;
-  std::vector<CommandBuffer> secondaryCommandBuffer;
-  std::mutex commandBufferRecording;  // protects secondaryCommandBuffer from
-                                      // memory invalidation
+  DataHolder<vk::CommandBuffer, std::vector<RenderInfo>,
+             std::shared_ptr<std::mutex>>
+      secondaryCommandBuffer;
+
   std::vector<vk::Sampler> sampler;
   std::vector<Image> textureImages;
   std::vector<std::tuple<DeviceMemory, size_t>> textureMemorys;
   std::vector<ImageView> textureImageViews;
   std::vector<shader::ShaderPipe> shaderPipes;
   std::vector<CommandBuffer> primary = {CommandBuffer()};
-  std::vector<std::vector<RenderInfo>> renderInfosForRetry;
   std::vector<InternalImageInfo> internalimageInfos;
+
+  std::vector<TRenderHolder> renderInfosForRetry;
+  std::mutex renderInfosForRetryHolder;
 
   size_t firstImage;
   size_t depthImage;
@@ -233,24 +236,24 @@ class VulkanGraphicsModule : public APILayer {
   void destroy() override;
 
   void removeRender(const size_t renderInfoCount,
-                    const TRenderHolder*renderIDs) override;
+                    const TRenderHolder *renderIDs) override;
 
-  std::vector<PipelineHolder> pushMaterials(
-      const size_t materialcount, const Material *materials) override;
+  std::vector<PipelineHolder> pushMaterials(const size_t materialcount,
+                                            const Material *materials) override;
 
   std::vector<TDataHolder> pushData(const size_t dataCount,
                                     const BufferInfo *bufferInfo) override;
 
   void changeData(const size_t sizes, const BufferChange *changeInfos) override;
 
-  TRenderHolder pushRender(const size_t renderInfoCount,
-                           const RenderInfo *renderInfos,
-                    const size_t offset = 0) override;
+  TRenderHolder pushRender(
+      const size_t renderInfoCount, const RenderInfo *renderInfos,
+      const TRenderHolder toOverride = TRenderHolder()) override;
 
   TSamplerHolder pushSampler(const SamplerInfo &sampler) override;
 
   std::vector<TTextureHolder> pushTexture(const size_t textureCount,
-                     const TextureInfo *textures) override;
+                                          const TextureInfo *textures) override;
 
   size_t pushLights(const size_t lightCount, const Light *lights,
                     const size_t offset = 0) override;

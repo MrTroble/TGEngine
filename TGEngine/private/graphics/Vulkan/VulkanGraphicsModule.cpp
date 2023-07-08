@@ -228,21 +228,33 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
 
 TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                                const RenderInfo* renderInfos,
-                                               const size_t offset) {
+                                               const TRenderHolder toOverride) {
   EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
-  const std::lock_guard onExitUnlock(commandBufferRecording);
 
-  const CommandBufferAllocateInfo commandBufferAllocate(
-      secondaryBufferPool, CommandBufferLevel::eSecondary, 1);
-  const auto indexIn = this->secondaryCommandBuffer.size() - offset;
-  const CommandBuffer cmdBuf =
-      offset == 0 ? device.allocateCommandBuffers(commandBufferAllocate).back()
-                  : this->secondaryCommandBuffer[indexIn];
+  std::unique_lock<std::mutex> lockGuard;
+  vk::CommandBuffer commandBuffer;
+  TRenderHolder nextHolder = toOverride;
+  std::unique_lock<std::mutex> generalLock;
+  if (!toOverride) {
+    const CommandBufferAllocateInfo commandBufferAllocate(
+        secondaryBufferPool, CommandBufferLevel::eSecondary, 1);
+    commandBuffer = device.allocateCommandBuffers(commandBufferAllocate)[0];
+  } else {
+    primarySync->waitAndDisarm();
+    generalLock = std::unique_lock(primarySync->handle);
+    lockGuard = std::unique_lock(
+        *secondaryCommandBuffer.get<2>(toOverride.internalHandle).get());
+    commandBuffer = secondaryCommandBuffer.get<0>(toOverride.internalHandle);
+
+    auto& retry = secondaryCommandBuffer.get<1>(toOverride.internalHandle);
+    retry.resize(renderInfoCount);
+    std::copy(renderInfos, renderInfos + renderInfoCount, retry.begin());
+  }
 
   const CommandBufferInheritanceInfo inheritance(renderpass, 0);
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eRenderPassContinue, &inheritance);
-  cmdBuf.begin(beginInfo);
+  commandBuffer.begin(beginInfo);
   for (size_t i = 0; i < renderInfoCount; i++) {
     auto& info = renderInfos[i];
 
@@ -254,55 +266,61 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
       if (info.vertexOffsets.size() == 0) {
         std::vector<DeviceSize> offsets(vertexBuffer.size());
         std::fill(offsets.begin(), offsets.end(), 0);
-        cmdBuf.bindVertexBuffers(0, vertexBuffer, offsets);
+        commandBuffer.bindVertexBuffers(0, vertexBuffer, offsets);
       } else {
         TGE_EXPECT(vertexBuffer.size() == info.vertexOffsets.size(),
                    "Size is not equal!", {});
-        cmdBuf.bindVertexBuffers(0, vertexBuffer.size(), vertexBuffer.data(),
-                                 (DeviceSize*)info.vertexOffsets.data());
+        commandBuffer.bindVertexBuffers(0, vertexBuffer.size(),
+                                        vertexBuffer.data(),
+                                        (DeviceSize*)info.vertexOffsets.data());
       }
     }
 
     if (info.bindingID != INVALID_SIZE_T) {
-      shaderAPI->addToRender(&info.bindingID, 1, (void*)&cmdBuf);
+      shaderAPI->addToRender(&info.bindingID, 1, (void*)&commandBuffer);
     } else {
       const auto binding = shaderAPI->createBindings(
           shaderPipes[info.materialId.internalHandle]);
-      shaderAPI->addToRender(&binding, 1, (void*)&cmdBuf);
+      shaderAPI->addToRender(&binding, 1, (void*)&commandBuffer);
     }
 
-    cmdBuf.bindPipeline(
+    commandBuffer.bindPipeline(
         PipelineBindPoint::eGraphics,
         this->materialHolder.get<0>(info.materialId.internalHandle));
 
     for (const auto& range : info.constRanges) {
-      cmdBuf.pushConstants(
+      commandBuffer.pushConstants(
           this->materialHolder.get<1>(info.materialId.internalHandle),
           shaderToVulkan(range.type), 0, range.pushConstData.size(),
           range.pushConstData.data());
     }
 
     if (info.indexSize != IndexSize::NONE) [[likely]] {
-      cmdBuf.bindIndexBuffer(
+      commandBuffer.bindIndexBuffer(
           bufferDataHolder.get(bufferDataHolder.allocation1, info.indexBuffer),
           info.indexOffset, (IndexType)info.indexSize);
 
-      cmdBuf.drawIndexed(info.indexCount, info.instanceCount, 0, 0,
-                         info.firstInstance);
+      commandBuffer.drawIndexed(info.indexCount, info.instanceCount, 0, 0,
+                                info.firstInstance);
     } else {
-      cmdBuf.draw(info.indexCount, info.instanceCount, 0, 0);
+      commandBuffer.draw(info.indexCount, info.instanceCount, 0, 0);
     }
   }
-  cmdBuf.end();
-  if (offset == 0) {
-    secondaryCommandBuffer.push_back(cmdBuf);
-  }
+  commandBuffer.end();
 
-  if (renderInfosForRetry.size() <= indexIn)
-    renderInfosForRetry.resize(indexIn + 1);
-  renderInfosForRetry[indexIn] =
-      std::vector(renderInfos, renderInfos + renderInfoCount);
-  return TRenderHolder(this, indexIn);
+  if (!toOverride) {
+    auto allocation = secondaryCommandBuffer.allocate(1);
+    auto [buffer, retry, mutex] = allocation.iterator;
+    *mutex = std::make_unique<std::mutex>();
+    lockGuard = std::unique_lock(*mutex->get());
+    *buffer = commandBuffer;
+    retry->resize(renderInfoCount);
+    std::copy(renderInfos, renderInfos + renderInfoCount, retry->begin());
+    nextHolder = TRenderHolder(this, allocation.beginIndex);
+    std::lock_guard guard(renderInfosForRetryHolder);
+    renderInfosForRetry.push_back(nextHolder);
+  }
+  return nextHolder;
 }
 
 inline BufferUsageFlags getUsageFlagsFromDataType(const DataType type) {
@@ -788,14 +806,14 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   const PipelineDynamicStateCreateInfo dynamicStateInfo({}, states);
 
   GraphicsPipelineCreateInfo graphicsPipeline(
-      {}, vgm->lightCreateInfos, &visci, &inputAssemblyCreateInfo, {}, &vsci, &rsci,
-      &msci, {}, &colorBlendState, &dynamicStateInfo, nullptr, vgm->renderpass,
-      1);
+      {}, vgm->lightCreateInfos, &visci, &inputAssemblyCreateInfo, {}, &vsci,
+      &rsci, &msci, {}, &colorBlendState, &dynamicStateInfo, nullptr,
+      vgm->renderpass, 1);
   sapi->addToMaterial(&vgm->lightMat, &graphicsPipeline);
 
   const auto gp = vgm->device.createGraphicsPipeline({}, graphicsPipeline);
   VERROR(gp.result)
-  
+
   auto output = vgm->materialHolder.allocate(1);
   vgm->lightPipe = PipelineHolder(vgm, output.beginIndex);
   std::get<0>(output.iterator)[0] = gp.value;
@@ -933,13 +951,17 @@ inline bool checkAndRecreate(VulkanGraphicsModule* vgm, const Result result) {
     vgm->materialHolder.currentIndex = 0;
     createLightPass(vgm);
     const auto& materialCopy = std::get<2>(oldValues);
-    const auto renderCopy = vgm->renderInfosForRetry;
     vgm->pushMaterials(materialCopy.size() - 1, materialCopy.data() + 1);
-    for (size_t i = 0; i < renderCopy.size(); i++) {
-      const auto& currentVector = renderCopy[i];
-      if (currentVector.empty()) continue;
-      vgm->pushRender(currentVector.size(), currentVector.data(),
-                      renderCopy.size() - i);
+
+    {
+      std::unique_lock lock(vgm->renderInfosForRetryHolder);
+      for (const TRenderHolder renderHolder : vgm->renderInfosForRetry) {
+        const auto& currentVector =
+            vgm->secondaryCommandBuffer.get<1>(renderHolder.internalHandle);
+        if (currentVector.empty()) continue;
+        vgm->pushRender(currentVector.size(), currentVector.data(),
+                        renderHolder);
+      }
     }
     tge::main::fireRecreate();
     return true;
@@ -1320,12 +1342,9 @@ void VulkanGraphicsModule::tick(double time) {
     currentBuffer.beginRenderPass(renderPassBeginInfo,
                                   SubpassContents::eSecondaryCommandBuffers);
     {
-      std::lock_guard lg(commandBufferRecording);
-      std::vector<CommandBuffer> bufferToExecute;
-      bufferToExecute.reserve(secondaryCommandBuffer.size());
-      for (const auto currentBuffer : secondaryCommandBuffer) {
-        if (currentBuffer) bufferToExecute.push_back(currentBuffer);
-      }
+      std::lock_guard lg(secondaryCommandBuffer.mutex);
+      const auto& bufferToExecute =
+          std::get<0>(secondaryCommandBuffer.internalValues);
       if (!bufferToExecute.empty()) {
         currentBuffer.executeCommands(bufferToExecute);
       }
@@ -1433,13 +1452,23 @@ void VulkanGraphicsModule::destroy() {
 
 void VulkanGraphicsModule::removeRender(const size_t renderInfoCount,
                                         const TRenderHolder* renderIDs) {
-  std::lock_guard lg(commandBufferRecording);
+  std::vector<size_t> toErase;
+  toErase.reserve(renderInfoCount);
   for (size_t i = 0; i < renderInfoCount; i++) {
     TRenderHolder holder = renderIDs[i];
     if (!holder) continue;
-    const auto id = holder.internalHandle;
-    renderInfosForRetry[id].clear();
-    secondaryCommandBuffer[id] = nullptr;
+    toErase.push_back(holder.internalHandle);
+    std::lock_guard guard(renderInfosForRetryHolder);
+    const auto iterator = std::find(renderInfosForRetry.begin(),
+                                    renderInfosForRetry.end(), holder);
+    if (iterator != renderInfosForRetry.end())
+      renderInfosForRetry.erase(iterator);
+  }
+  if (!toErase.empty()) {
+    secondaryCommandBuffer.erase(toErase);
+    const auto& lostBuffer = std::get<0>(secondaryCommandBuffer.compact());
+    if (!lostBuffer.empty())
+        device.freeCommandBuffers(secondaryBufferPool, lostBuffer);
   }
 }
 
