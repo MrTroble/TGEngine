@@ -1433,7 +1433,8 @@ void VulkanGraphicsModule::destroy() {
       std::unique(memItr, std::end(bufferDataHolder.allocation2));
   for (; memItr != memEnd; memItr++) device.freeMemory(*memItr);
   for (const auto buf : bufferDataHolder.allocation1) device.destroyBuffer(buf);
-  for (const auto pipe : std::get<0>(materialHolder.clear()))
+  const auto pipeList = std::get<0>(materialHolder.clear());
+  for (const auto pipe : pipeList)
     device.destroyPipeline(pipe);
   for (const auto shader : shaderModules) device.destroyShaderModule(shader);
   device.destroyCommandPool(pool);
