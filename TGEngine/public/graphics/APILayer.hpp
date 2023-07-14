@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <mutex>
 #include <vector>
+#include <tuple>
 
 #include "../Module.hpp"
 #include "ElementHolder.hpp"
@@ -170,8 +171,8 @@ class APILayer : public main::Module {  // Interface
 
   [[nodiscard]] virtual glm::vec2 getRenderExtent() const = 0;
 
-  [[nodiscard]] virtual std::vector<char> getImageData(
-      const size_t imageId, CacheIndex* = nullptr) = 0;
+  [[nodiscard]] virtual std::pair<std::vector<char>, TDataHolder> getImageData(
+      const TTextureHolder imageId, const TDataHolder cache = TDataHolder()) = 0;
 
   [[nodiscard]] virtual APILayer* backend() { return this; }
 };

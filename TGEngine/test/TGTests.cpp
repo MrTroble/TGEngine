@@ -5,6 +5,12 @@
 
 #include "../public/DataHolder.hpp"
 
+using namespace tge;
+
+struct TestHolder {
+  size_t internalHandle;
+};
+
 TEST(DataHolderTest, BasicDataHolderTests) {
   static plog::ColorConsoleAppender<plog::TxtFormatter> color;
   plog::init(plog::verbose, &color);
@@ -86,10 +92,9 @@ TEST(DataHolderTest, BasicDataHolderTests) {
     std::apply(
         [&](auto& first, auto& second, auto& third) {
           for (size_t i = 0; i < AMOUNT; i++) {
-            *first = i;
+            *(first++) = i;
             *second = -i;
             *third = i * i;
-            first++;
             second++;
             third++;
           }
@@ -190,4 +195,45 @@ TEST(DataHolderTest, BasicDataHolderTests) {
   EXPECT_EQ(std::get<0>(holder.internalValues).size(), 0);
   EXPECT_EQ(std::get<1>(holder.internalValues).size(), 0);
   EXPECT_EQ(std::get<2>(holder.internalValues).size(), 0);
+
+  size_t index;
+  { index = holder.allocate(3).beginIndex; }
+  for (size_t i = 0; i < 3; i++) {
+    holder.change<0>(index + i) = 2 + i;
+  }
+
+  std::vector<size_t> sizes;
+  for (size_t i = 0; i < 3; i++) {
+    sizes.push_back(index + i);
+    EXPECT_EQ(holder.get<0>(index + i), 2 + i);
+    EXPECT_EQ(holder.get<1>(index + i), 0);
+    EXPECT_EQ(holder.get<2>(index + i), 0);
+  }
+
+  const auto allGet = holder.get<0>(sizes);
+  EXPECT_EQ(allGet.size(), 3);
+  for (size_t i = 0; i < 3; i++) {
+    EXPECT_EQ(allGet[i], 2 + i);
+  }
+
+  TestHolder testholder{index};
+  EXPECT_EQ(holder.get<0>(testholder), 2);
+
+  static_assert(HolderConcept<TestHolder>);
+
+  std::vector<TestHolder> testholderList = {{index}};
+  std::vector<int> valueFound = holder.get<0, TestHolder>(testholderList);
+  EXPECT_EQ(valueFound.size(), 1);
+  EXPECT_EQ(valueFound[0], 2);
+
+  std::vector<int> valueFound2 = holder.get<1, TestHolder>(testholderList);
+  EXPECT_EQ(valueFound2.size(), 1);
+  EXPECT_EQ(valueFound2[0], 0);
+
+  TestHolder testholder2{index + 1};
+  EXPECT_EQ(holder.get<1>(testholder2), 0);
+
+  holder.change<1>(testholder2) = 2000;
+
+  EXPECT_EQ(holder.get<1>(testholder2), 2000);
 }

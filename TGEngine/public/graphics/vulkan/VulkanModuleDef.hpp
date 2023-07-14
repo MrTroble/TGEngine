@@ -139,7 +139,7 @@ constexpr size_t DATA_CHANGE_ONLY_BUFFER = 2;
 
 struct InternalImageInfo {
   Format format;
-  Extent2D ex;
+  Extent2D extent;
   ImageUsageFlags usage = ImageUsageFlagBits::eColorAttachment;
   SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
 };
@@ -183,28 +183,25 @@ class VulkanGraphicsModule : public APILayer {
   vk::PhysicalDeviceLimits deviceLimits;
   BufferHolderType bufferDataHolder;
 
-  Viewport viewport;
   DataHolder<vk::CommandBuffer, std::vector<RenderInfo>,
-             std::shared_ptr<std::mutex>>
+             std::shared_ptr<std::mutex>, std::vector<TDataHolder>,
+             std::vector<PipelineHolder>>
       secondaryCommandBuffer;
 
+  DataHolder<vk::Image, vk::ImageView, vk::DeviceMemory, size_t,
+             InternalImageInfo>
+      textureImageHolder;
+
   std::vector<vk::Sampler> sampler;
-  std::vector<Image> textureImages;
-  std::vector<std::tuple<DeviceMemory, size_t>> textureMemorys;
-  std::vector<ImageView> textureImageViews;
+  Viewport viewport;
   std::vector<shader::ShaderPipe> shaderPipes;
   std::vector<CommandBuffer> primary = {CommandBuffer()};
-  std::vector<InternalImageInfo> internalimageInfos;
 
   std::vector<TRenderHolder> renderInfosForRetry;
   std::mutex renderInfosForRetryHolder;
 
-  size_t firstImage;
-  size_t depthImage;
-  size_t albedoImage;
-  size_t normalImage;
-  size_t roughnessMetallicImage;
-  size_t position;
+  std::array<TTextureHolder, 6> internalImageData;
+
   size_t attachmentCount;
 
   TDataHolder lightData;
@@ -265,8 +262,9 @@ class VulkanGraphicsModule : public APILayer {
 
   glm::vec2 getRenderExtent() const override;
 
-  std::vector<char> getImageData(const size_t imageId,
-                                 CacheIndex *cacheIndex = nullptr) override;
+  virtual std::pair<std::vector<char>, TDataHolder> getImageData(
+      const TTextureHolder imageId,
+      const TDataHolder cache = TDataHolder()) override;
 };
 
 }  // namespace tge::graphics

@@ -242,11 +242,12 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
   } else {
     primarySync->waitAndDisarm();
     generalLock = std::unique_lock(primarySync->handle);
-    lockGuard = std::unique_lock(
-        *secondaryCommandBuffer.get<2>(toOverride.internalHandle).get());
-    commandBuffer = secondaryCommandBuffer.get<0>(toOverride.internalHandle);
+    lockGuard =
+        std::unique_lock(*secondaryCommandBuffer.get<2>(toOverride).get());
+    commandBuffer = secondaryCommandBuffer.get<0>(toOverride);
 
-    auto& retry = secondaryCommandBuffer.get<1>(toOverride.internalHandle);
+    auto retryChanges = secondaryCommandBuffer.change<1>(toOverride);
+    auto& retry = retryChanges.data;
     retry.resize(renderInfoCount);
     std::copy(renderInfos, renderInfos + renderInfoCount, retry.begin());
   }
@@ -310,7 +311,7 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
 
   if (!toOverride) {
     auto allocation = secondaryCommandBuffer.allocate(1);
-    auto [buffer, retry, mutex] = allocation.iterator;
+    auto& [buffer, retry, mutex, dataHolder, pipeline] = allocation.iterator;
     *mutex = std::make_unique<std::mutex>();
     lockGuard = std::unique_lock(*mutex->get());
     *buffer = commandBuffer;
@@ -319,6 +320,18 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     nextHolder = TRenderHolder(this, allocation.beginIndex);
     std::lock_guard guard(renderInfosForRetryHolder);
     renderInfosForRetry.push_back(nextHolder);
+    std::vector<TDataHolder>& dataHolderToAdd = *dataHolder;
+    dataHolderToAdd.reserve(renderInfoCount * 100);
+    std::vector<PipelineHolder>& pipelineHolder = *pipeline;
+    pipelineHolder.reserve(renderInfoCount);
+    for (size_t i = 0; i < renderInfoCount; i++) {
+      const auto& render = renderInfos[i];
+      pipelineHolder.push_back(render.materialId);
+      dataHolderToAdd.push_back(render.indexBuffer);
+      for (const auto moreHolder : render.vertexBuffer) {
+        dataHolderToAdd.push_back(moreHolder);
+      }
+    }
   }
   return nextHolder;
 }
@@ -564,87 +577,91 @@ TSamplerHolder VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
   return TSamplerHolder(this, position);
 }
 
-inline size_t createInternalImages(
-    VulkanGraphicsModule* vgm, const std::vector<InternalImageInfo>& imagesIn) {
-  std::vector<std::tuple<ImageViewCreateInfo, size_t>> memorys;
+inline std::vector<TTextureHolder> createInternalImages(
+    VulkanGraphicsModule* vgm,
+    const std::vector<InternalImageInfo>& internalImageInfos) {
+  std::vector<std::tuple<ImageViewCreateInfo, size_t>> memoryAndOffsets;
+  memoryAndOffsets.reserve(internalImageInfos.size());
   size_t wholeSize = 0;
 
-  const auto firstIndex = vgm->textureImages.size();
-
-  for (const auto& img : imagesIn) {
+  for (const auto& imageInfo : internalImageInfos) {
     const ImageCreateInfo depthImageCreateInfo(
-        {}, ImageType::e2D, img.format, {img.ex.width, img.ex.height, 1}, 1, 1,
-        img.sampleCount, ImageTiling::eOptimal, img.usage);
+        {}, ImageType::e2D, imageInfo.format,
+        {imageInfo.extent.width, imageInfo.extent.height, 1}, 1, 1,
+        imageInfo.sampleCount, ImageTiling::eOptimal, imageInfo.usage);
     const auto depthImage = vgm->device.createImage(depthImageCreateInfo);
 
-    const MemoryRequirements imageMemReq =
+    const MemoryRequirements memoryRequirements =
         vgm->device.getImageMemoryRequirements(depthImage);
 
     const ImageAspectFlags aspect =
-        ((img.usage & ImageUsageFlagBits::eColorAttachment ||
-          img.usage & ImageUsageFlagBits::eSampled)
+        ((imageInfo.usage & ImageUsageFlagBits::eColorAttachment ||
+          imageInfo.usage & ImageUsageFlagBits::eSampled)
              ? ImageAspectFlagBits::eColor
              : (ImageAspectFlagBits)0) |
-        (img.usage & ImageUsageFlagBits::eDepthStencilAttachment
+        (imageInfo.usage & ImageUsageFlagBits::eDepthStencilAttachment
              ? ImageAspectFlagBits::eDepth
              : (ImageAspectFlagBits)0);
     const ImageSubresourceRange subresourceRange(aspect, 0, 1, 0, 1);
 
     const ImageViewCreateInfo depthImageViewCreateInfo(
-        {}, depthImage, ImageViewType::e2D, img.format, {}, subresourceRange);
-    vgm->textureImages.push_back(depthImage);
+        {}, depthImage, ImageViewType::e2D, imageInfo.format, {},
+        subresourceRange);
 
-    const auto rest = wholeSize % imageMemReq.alignment;
+    const auto rest = wholeSize % memoryRequirements.alignment;
     if (rest != 0) {
-      wholeSize += imageMemReq.alignment - rest;
+      wholeSize += memoryRequirements.alignment - rest;
     }
 
-    memorys.push_back(std::make_tuple(depthImageViewCreateInfo, wholeSize));
-    wholeSize += imageMemReq.size;
-
-    vgm->internalimageInfos.push_back(img);
+    memoryAndOffsets.push_back(
+        std::make_tuple(depthImageViewCreateInfo, wholeSize));
+    wholeSize += memoryRequirements.size;
   }
 
-  const MemoryAllocateInfo memAllocInfo(wholeSize, vgm->memoryTypeDeviceLocal);
-  const auto depthImageMemory = vgm->device.allocateMemory(memAllocInfo);
+  const MemoryAllocateInfo allocationInfo(wholeSize,
+                                          vgm->memoryTypeDeviceLocal);
+  const auto imageMemory = vgm->device.allocateMemory(allocationInfo);
 
-  for (const auto& [image, offset] : memorys) {
-    vgm->device.bindImageMemory(image.image, depthImageMemory, offset);
-    vgm->textureMemorys.push_back(std::make_tuple(depthImageMemory, offset));
+  std::vector<TTextureHolder> internalTexture;
+  internalTexture.reserve(internalImageInfos.size());
 
-    const auto depthImageView = vgm->device.createImageView(image);
-    vgm->textureImageViews.push_back(depthImageView);
+  const auto output =
+      vgm->textureImageHolder.allocate(internalImageInfos.size());
+  auto [imageItr, viewItr, memoryItr, offsetItr, internalItr] = output.iterator;
+  for (const auto& [image, offset] : memoryAndOffsets) {
+    vgm->device.bindImageMemory(image.image, imageMemory, offset);
+
+    const auto imageView = vgm->device.createImageView(image);
+    *(imageItr++) = image.image;
+    *(viewItr++) = imageView;
+    *(memoryItr++) = imageMemory;
+    *(offsetItr++) = offset;
+    internalTexture.emplace_back(vgm,
+                                 internalTexture.size() + output.beginIndex);
   }
-  return firstIndex;
+  std::copy(internalImageInfos.begin(), internalImageInfos.end(), internalItr);
+  return internalTexture;
 }
 
 std::vector<TTextureHolder> VulkanGraphicsModule::pushTexture(
     const size_t textureCount, const TextureInfo* textures) {
   EXPECT(textureCount != 0 && textures != nullptr);
 
-  const size_t firstIndex = textureImages.size();
-
-  std::vector<Buffer> intermBuffers;
-  std::vector<DeviceMemory> intermMemorys;
-  std::vector<BufferImageCopy> intermCopys;
-  intermBuffers.reserve(textureCount);
-  intermMemorys.reserve(textureCount);
-  intermCopys.reserve(textureCount);
+  std::vector<Buffer> bufferList;
+  std::vector<DeviceMemory> memoryList;
+  bufferList.reserve(textureCount);
+  memoryList.reserve(textureCount);
 
   util::OnExit exitHandle([&] {
-    for (auto mem : intermMemorys) device.freeMemory(mem);
-    for (auto img : intermBuffers) device.destroyBuffer(img);
+    for (auto memory : memoryList) device.freeMemory(memory);
+    for (auto buffer : bufferList) device.destroyBuffer(buffer);
   });
 
-  textureImages.reserve(firstIndex + textureCount);
-  textureMemorys.reserve(firstIndex + textureCount);
-  textureImageViews.reserve(firstIndex + textureCount);
-
-  const auto& cmd = noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER];
+  const auto& commandBuffer = noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit, {});
-  secondarySync->begin(cmd, beginInfo);
+  secondarySync->begin(commandBuffer, beginInfo);
 
   constexpr ImageSubresourceRange range = {ImageAspectFlagBits::eColor, 0, 1, 0,
                                            1};
@@ -658,60 +675,56 @@ std::vector<TTextureHolder> VulkanGraphicsModule::pushTexture(
         ImageUsageFlagBits::eTransferDst | ImageUsageFlagBits::eSampled};
   }
 
-  const auto internalImageIndex = createInternalImages(this, imagesIn);
+  const auto internalImageHolder = createInternalImages(this, imagesIn);
 
   for (size_t i = 0; i < textureCount; i++) {
-    const TextureInfo& tex = textures[i];
-    const Extent3D ext = {tex.width, tex.height, 1};
+    const TextureInfo& textureInfo = textures[i];
+    const Extent3D extent = {textureInfo.width, textureInfo.height, 1};
 
-    const BufferCreateInfo intermBufferCreate({}, tex.size,
-                                              BufferUsageFlagBits::eTransferSrc,
-                                              SharingMode::eExclusive, {});
-    const auto intermBuffer = device.createBuffer(intermBufferCreate);
-    intermBuffers.push_back(intermBuffer);
-    const auto memRequIntern = device.getBufferMemoryRequirements(intermBuffer);
-    const MemoryAllocateInfo intermMemAllocInfo(memRequIntern.size,
-                                                memoryTypeHostVisibleCoherent);
-    const auto intermMemory = device.allocateMemory(intermMemAllocInfo);
-    intermMemorys.push_back(intermMemory);
-    device.bindBufferMemory(intermBuffer, intermMemory, 0);
-    const auto handle = device.mapMemory(intermMemory, 0, VK_WHOLE_SIZE, {});
-    std::memcpy(handle, tex.data, tex.size);
-    device.unmapMemory(intermMemory);
+    const BufferCreateInfo bufferCreateInfo({}, textureInfo.size,
+                                            BufferUsageFlagBits::eTransferSrc,
+                                            SharingMode::eExclusive, {});
+    const auto buffer = device.createBuffer(bufferCreateInfo);
+    bufferList.push_back(buffer);
+    const auto memoryRequirements = device.getBufferMemoryRequirements(buffer);
+    const MemoryAllocateInfo allocationInfo(memoryRequirements.size,
+                                            memoryTypeHostVisibleCoherent);
+    const auto memory = device.allocateMemory(allocationInfo);
+    memoryList.push_back(memory);
+    device.bindBufferMemory(buffer, memory, 0);
+    const auto handle = device.mapMemory(memory, 0, VK_WHOLE_SIZE, {});
+    std::memcpy(handle, textureInfo.data, textureInfo.size);
+    device.unmapMemory(memory);
 
-    intermCopys.push_back({0,
-                           tex.width,
-                           tex.height,
-                           {ImageAspectFlagBits::eColor, 0, 0, 1},
-                           {},
-                           ext});
-
-    const auto curentImg = textureImages[i + internalImageIndex];
+    const auto holderInformation = internalImageHolder[i];
+    const auto currentImage =
+        textureImageHolder.get<0>(holderInformation.internalHandle);
 
     waitForImageTransition(
-        cmd, ImageLayout::eUndefined, ImageLayout::eTransferDstOptimal,
-        curentImg, range, PipelineStageFlagBits::eTopOfPipe,
-        AccessFlagBits::eNoneKHR, PipelineStageFlagBits::eTransfer,
-        AccessFlagBits::eTransferWrite);
+        commandBuffer, ImageLayout::eUndefined,
+        ImageLayout::eTransferDstOptimal, currentImage, range,
+        PipelineStageFlagBits::eTopOfPipe, AccessFlagBits::eNoneKHR,
+        PipelineStageFlagBits::eTransfer, AccessFlagBits::eTransferWrite);
 
-    cmd.copyBufferToImage(intermBuffer, curentImg,
-                          ImageLayout::eTransferDstOptimal, intermCopys.back());
+    commandBuffer.copyBufferToImage(buffer, currentImage,
+                                    ImageLayout::eTransferDstOptimal,
+                                    {{0,
+                                      textureInfo.width,
+                                      textureInfo.height,
+                                      {ImageAspectFlagBits::eColor, 0, 0, 1},
+                                      {},
+                                      extent}});
 
     waitForImageTransition(
-        cmd, ImageLayout::eTransferDstOptimal,
-        ImageLayout::eShaderReadOnlyOptimal, curentImg, range,
+        commandBuffer, ImageLayout::eTransferDstOptimal,
+        ImageLayout::eShaderReadOnlyOptimal, currentImage, range,
         PipelineStageFlagBits::eTransfer, AccessFlagBits::eTransferWrite,
         PipelineStageFlagBits::eFragmentShader, AccessFlagBits::eShaderRead);
   }
 
-  const SubmitInfo info({}, {}, cmd);
+  const SubmitInfo info({}, {}, commandBuffer);
   secondarySync->endSubmitAndWait(info);
-  std::vector<TTextureHolder> textureHolder;
-  textureHolder.resize(textureCount);
-  for (size_t i = 0; i < textureCount; i++) {
-    textureHolder[i] = TTextureHolder(this, i + firstIndex);
-  }
-  return textureHolder;
+  return internalImageHolder;
 }
 
 size_t VulkanGraphicsModule::pushLights(const size_t lightCount,
@@ -759,13 +772,11 @@ VkBool32 debugMessage(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
 inline void updateDescriptors(VulkanGraphicsModule* vgm,
                               shader::ShaderAPI* sapi) {
   std::array<BindingInfo, 5> bindingInfos;
-  TTextureHolder holder;
   for (size_t i = 0; i < 4; i++) {
     bindingInfos[i].type = BindingType::InputAttachment;
     bindingInfos[i].bindingSet = vgm->lightBindings;
     bindingInfos[i].binding = i;
-    holder.internalHandle = vgm->firstImage + i + 1;
-    bindingInfos[i].data.texture.texture = holder;
+    bindingInfos[i].data.texture.texture = vgm->internalImageData[i + 1];
     bindingInfos[i].data.texture.sampler = TSamplerHolder();
   }
   bindingInfos[4].type = BindingType::UniformBuffer;
@@ -820,31 +831,34 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   std::get<1>(output.iterator)[0] = graphicsPipeline.layout;
 }
 
-inline void oneTimeWait(VulkanGraphicsModule* vgm, const size_t count,
-                        const CommandBuffer cmd, QueueSync* sync) {
+inline void oneTimeWait(VulkanGraphicsModule* vgm,
+                        const CommandBuffer commandBuffer,
+                        QueueSync* synchronizer) {
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit, {});
-  sync->begin(cmd, beginInfo);
+  synchronizer->begin(commandBuffer, beginInfo);
 
-  waitForImageTransition(cmd, ImageLayout::eUndefined, ImageLayout::eGeneral,
-                         vgm->textureImages[vgm->depthImage],
-                         {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
+  waitForImageTransition(
+      commandBuffer, ImageLayout::eUndefined, ImageLayout::eGeneral,
+      vgm->textureImageHolder.get<0>(vgm->internalImageData[0]),
+      {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
 
   constexpr ImageSubresourceRange range = {ImageAspectFlagBits::eColor, 0, 1, 0,
                                            1};
-  for (size_t i = vgm->firstImage + 1; i < vgm->firstImage + count; i++) {
-    waitForImageTransition(cmd, ImageLayout::eUndefined,
-                           ImageLayout::eShaderReadOnlyOptimal,
-                           vgm->textureImages[i], range);
+  for (size_t i = 1; i < vgm->internalImageData.size(); i++) {
+    waitForImageTransition(
+        commandBuffer, ImageLayout::eUndefined,
+        ImageLayout::eShaderReadOnlyOptimal,
+        vgm->textureImageHolder.get<0>(vgm->internalImageData[i]), range);
   }
 
   for (const auto& image : vgm->swapchainImages) {
-    waitForImageTransition(cmd, ImageLayout::eUndefined, ImageLayout::eGeneral,
-                           image, range);
+    waitForImageTransition(commandBuffer, ImageLayout::eUndefined,
+                           ImageLayout::eGeneral, image, range);
   }
 
-  const SubmitInfo info({}, {}, cmd);
-  sync->endSubmitAndWait(info);
+  const SubmitInfo info({}, {}, commandBuffer);
+  synchronizer->endSubmitAndWait(info);
 }
 
 inline void createSwapchain(VulkanGraphicsModule* vgm) {
@@ -871,40 +885,35 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
   vgm->swapchain = vgm->device.createSwapchainKHR(swapchainCreateInfo);
   vgm->swapchainImages = vgm->device.getSwapchainImagesKHR(vgm->swapchain);
 
-  const Extent2D ext = {(uint32_t)vgm->viewport.width,
+  const Extent2D extent = {(uint32_t)vgm->viewport.width,
                         (uint32_t)vgm->viewport.height};
-  const std::vector<InternalImageInfo> intImageInfo = {
-      {vgm->depthFormat, ext, ImageUsageFlagBits::eDepthStencilAttachment},
-      {vgm->format.format, ext,
+  const std::vector<InternalImageInfo> internalImageInfos = {
+      {vgm->depthFormat, extent, ImageUsageFlagBits::eDepthStencilAttachment},
+      {vgm->format.format, extent,
        ImageUsageFlagBits::eColorAttachment |
            ImageUsageFlagBits::eInputAttachment |
            ImageUsageFlagBits::eTransferSrc},
-      {Format::eR8G8B8A8Snorm, ext,
+      {Format::eR8G8B8A8Snorm, extent,
        ImageUsageFlagBits::eColorAttachment |
            ImageUsageFlagBits::eInputAttachment |
            ImageUsageFlagBits::eTransferSrc},
-      {Format::eR32Sfloat, ext,
+      {Format::eR32Sfloat, extent,
        ImageUsageFlagBits::eColorAttachment |
            ImageUsageFlagBits::eInputAttachment |
            ImageUsageFlagBits::eTransferSrc},
-      {Format::eR32Sfloat, ext,
+      {Format::eR32Sfloat, extent,
        ImageUsageFlagBits::eColorAttachment |
            ImageUsageFlagBits::eInputAttachment |
            ImageUsageFlagBits::eTransferSrc},
-      {vgm->format.format, ext,
+      {vgm->format.format, extent,
        ImageUsageFlagBits::eColorAttachment |
            ImageUsageFlagBits::eInputAttachment |
            ImageUsageFlagBits::eTransferSrc}};
 
-  vgm->firstImage = createInternalImages(vgm, intImageInfo);
-  vgm->depthImage = vgm->firstImage;
-  vgm->albedoImage = vgm->firstImage + 1;
-  vgm->normalImage = vgm->firstImage + 2;
-  vgm->roughnessMetallicImage = vgm->firstImage + 3;
-  vgm->position = vgm->firstImage + 4;
+  const auto data = createInternalImages(vgm, internalImageInfos);
+  std::copy(data.begin(), data.end(), vgm->internalImageData.begin());
 
-  oneTimeWait(vgm, intImageInfo.size(),
-              vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER],
+  oneTimeWait(vgm, vgm->noneRenderCmdbuffer[TEXTURE_ONLY_BUFFER],
               vgm->secondarySync);
 
   for (const auto view : vgm->swapchainImageviews) {
@@ -921,11 +930,9 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
     const auto imview = vgm->device.createImageView(imageviewCreateInfo);
     vgm->swapchainImageviews.push_back(imview);
 
-    std::vector<ImageView> images;
+    std::vector<ImageView> images =
+        vgm->textureImageHolder.get<1, TTextureHolder>(vgm->internalImageData);
     images.resize(vgm->attachmentCount);
-    std::copy(vgm->textureImageViews.begin() + vgm->firstImage,
-              vgm->textureImageViews.begin() + vgm->firstImage + images.size(),
-              images.begin());
     images.back() = imview;
 
     const FramebufferCreateInfo framebufferCreateInfo(
@@ -1370,7 +1377,8 @@ void VulkanGraphicsModule::tick(double time) {
     currentBuffer.endRenderPass();
 
     waitForImageTransition(currentBuffer, ImageLayout::eUndefined,
-                           ImageLayout::eGeneral, textureImages[depthImage],
+                           ImageLayout::eGeneral,
+                           textureImageHolder.get<0>(internalImageData[0]),
                            {ImageAspectFlagBits::eDepth, 0, 1, 0, 1});
 
     currentBuffer.end();
@@ -1412,13 +1420,13 @@ void VulkanGraphicsModule::destroy() {
   if (primarySync != secondarySync) delete secondarySync;
   device.destroySemaphore(waitSemaphore);
   device.destroySemaphore(signalSemaphore);
-  for (const auto imag : textureImages) device.destroyImage(imag);
-  const auto eItr = std::unique(
-      textureMemorys.begin(), textureMemorys.end(),
-      [](auto t1, auto t2) { return std::get<0>(t1) == std::get<0>(t2); });
-  for (auto itr = textureMemorys.begin(); itr != eItr; itr++)
-    device.freeMemory(std::get<0>(*itr));
-  for (const auto imView : textureImageViews) device.destroyImageView(imView);
+  auto [imageList, viewList, memoryList, _u1, _u2] = textureImageHolder.clear();
+  for (auto image : imageList) device.destroy(image);
+  for (auto view : viewList) device.destroy(view);
+  const auto imageMemoryEnd = std::unique(memoryList.begin(), memoryList.end());
+  for (auto iterator = memoryList.begin(); iterator != imageMemoryEnd;
+       iterator++)
+    device.freeMemory(*iterator);
   for (const auto samp : sampler) device.destroySampler(samp);
   auto memItr = std::begin(bufferDataHolder.allocation2);
   const auto memEnd =
@@ -1466,9 +1474,10 @@ void VulkanGraphicsModule::removeRender(const size_t renderInfoCount,
   }
   if (!toErase.empty()) {
     secondaryCommandBuffer.erase(toErase);
-    const auto& lostBuffer = std::get<0>(secondaryCommandBuffer.compact());
+    const auto tuple = secondaryCommandBuffer.compact();
+    const auto& lostBuffer = std::get<0>(tuple);
     if (!lostBuffer.empty())
-        device.freeCommandBuffers(secondaryBufferPool, lostBuffer);
+      device.freeCommandBuffers(secondaryBufferPool, lostBuffer);
   }
 }
 
@@ -1478,33 +1487,26 @@ glm::vec2 VulkanGraphicsModule::getRenderExtent() const {
 
 APILayer* getNewVulkanModule() { return new VulkanGraphicsModule(); }
 
-std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
-                                                     CacheIndex* index) {
-  const auto currentImage = textureImages[imageId];
+std::pair<std::vector<char>, TDataHolder> VulkanGraphicsModule::getImageData(
+    const TTextureHolder imageId, const TDataHolder cache) {
+  const auto currentImage = textureImageHolder.get<0>(imageId);
   const auto requireMents = device.getImageMemoryRequirements(currentImage);
 
   Buffer dataBuffer(nullptr);
   DeviceMemory memoryBuffer(nullptr);
-  if (index == nullptr || !index->buffer) {
+  TDataHolder dataHolder = cache;
+  if (!dataHolder) {
     const BufferCreateInfo bufferCreateInfo({}, requireMents.size,
                                             BufferUsageFlagBits::eTransferDst);
-    if (index != nullptr) {
-      const auto& [output, memory, returnID] =
-          internalBuffer<true>(this, 1, &bufferCreateInfo, true);
-      dataBuffer = output.back().buffer;
-      memoryBuffer = memory;
-      index->buffer = TDataHolder(this, returnID);
-    } else {
-      const auto& [output, memory, _u] =
-          internalBuffer<false>(this, 1, &bufferCreateInfo, true);
-      dataBuffer = output.back().buffer;
-      memoryBuffer = memory;
-    }
-  } else if (index != nullptr) {
-    dataBuffer =
-        bufferDataHolder.get(bufferDataHolder.allocation1, index->buffer);
+    const auto& [output, memory, returnID] =
+        internalBuffer<true>(this, 1, &bufferCreateInfo, true);
+    dataBuffer = output.back().buffer;
+    memoryBuffer = memory;
+    dataHolder = TDataHolder(this, returnID);
+  } else {
+    dataBuffer = bufferDataHolder.get(bufferDataHolder.allocation1, dataHolder);
     memoryBuffer =
-        bufferDataHolder.get(bufferDataHolder.allocation2, index->buffer);
+        bufferDataHolder.get(bufferDataHolder.allocation2, dataHolder);
   }
 
   const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
@@ -1520,10 +1522,10 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
   waitForImageTransition(buffer, ImageLayout::eShaderReadOnlyOptimal,
                          ImageLayout::eTransferSrcOptimal, currentImage, range);
 
-  const auto oldInfo = internalimageInfos[imageId];
+  const auto oldInfo = this->textureImageHolder.get<4>(imageId);
   constexpr ImageSubresourceLayers layers(ImageAspectFlagBits::eColor, 0, 0, 1);
-  const BufferImageCopy imageInfo(0, 0, 0, layers, {},
-                                  {oldInfo.ex.width, oldInfo.ex.height, 1});
+  const BufferImageCopy imageInfo(
+      0, 0, 0, layers, {}, {oldInfo.extent.width, oldInfo.extent.height, 1});
   buffer.copyImageToBuffer(currentImage, ImageLayout::eTransferSrcOptimal,
                            dataBuffer, imageInfo);
 
@@ -1540,14 +1542,10 @@ std::vector<char> VulkanGraphicsModule::getImageData(const size_t imageId,
   std::copy(readMemory, (readMemory + requireMents.size), vector.begin());
   device.unmapMemory(memoryBuffer);
 
-  if (index == nullptr) {
-    device.freeMemory(memoryBuffer);
-    device.destroyBuffer(dataBuffer);
-  }
   if (secondarySync != primarySync) {
     secondarySync->handle.unlock();
   }
-  return vector;
+  return std::make_pair(vector, dataHolder);
 }
 
 }  // namespace tge::graphics

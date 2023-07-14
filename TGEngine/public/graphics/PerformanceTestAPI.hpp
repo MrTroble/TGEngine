@@ -1,5 +1,6 @@
 #include <chrono>
 #include <format>
+
 #include "APILayer.hpp"
 
 struct PrintableCounter {
@@ -60,13 +61,9 @@ class PerformanceMessuringAPILayer : public APILayer {
            renderCounter.fullDebug() + "\n" + textureCounter.fullDebug() + "\n";
   }
 
-  void destroy() override {
-    api->destroy();
-  }
+  void destroy() override { api->destroy(); }
 
-  void recreate() override {
-    api->recreate();
-  }
+  void recreate() override { api->recreate(); }
 
   [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
       const size_t materialcount, const Material* materials) override {
@@ -82,7 +79,8 @@ class PerformanceMessuringAPILayer : public APILayer {
     return rtc;
   }
 
-  virtual void changeData(const size_t dataCount, const BufferChange* change) override {
+  virtual void changeData(const size_t dataCount,
+                          const BufferChange* change) override {
     return api->changeData(dataCount, change);
   }
 
@@ -110,8 +108,8 @@ class PerformanceMessuringAPILayer : public APILayer {
   }
 
   [[nodiscard]] virtual size_t pushLights(const size_t lightCount,
-                                       const Light* lights,
-                                       const size_t offset = 0) override {
+                                          const Light* lights,
+                                          const size_t offset = 0) override {
     return api->pushLights(lightCount, lights, offset);
   }
 
@@ -128,8 +126,9 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->getRenderExtent();
   }
 
-  [[nodiscard]] virtual std::vector<char> getImageData(
-      const size_t imageId, CacheIndex* cache = nullptr) override {
+  [[nodiscard]] virtual std::pair<std::vector<char>, TDataHolder> getImageData(
+      const TTextureHolder imageId,
+      const TDataHolder cache = TDataHolder()) override {
     return api->getImageData(imageId, cache);
   }
 

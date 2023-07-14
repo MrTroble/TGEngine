@@ -10,6 +10,11 @@
 #include <unordered_set>
 #include <vector>
 
+namespace tge {
+
+template <class Type>
+concept HolderConcept = requires(Type t) { t.internalHandle; };
+
 template <class internaltype>
 inline void addInternal(std::vector<internaltype> &allocation,
                         const size_t internalID, const size_t count,
@@ -24,7 +29,7 @@ struct DataHolderOutput : public std::unique_lock<std::mutex> {
   size_t beginIndex;
 
   explicit DataHolderOutput(std::mutex &mutex)
-      : std::unique_lock<std::mutex>(mutex) {}
+      : std::unique_lock<std::mutex>(mutex), beginIndex(0) {}
 };
 
 template <typename Tuple, typename Tuple2, std::size_t... I>
@@ -38,19 +43,77 @@ void process(Tuple &tuple, Tuple2 &values) {
           std::make_index_sequence<std::tuple_size<Tuple>::value>());
 }
 
+template <class Type>
+struct DataHolderSingleOutput : public std::unique_lock<std::mutex> {
+  Type &data;
+
+  explicit DataHolderSingleOutput(std::mutex &mutex, Type &data)
+      : std::unique_lock<std::mutex>(mutex), data(data) {}
+
+  explicit DataHolderSingleOutput(std::unique_lock<std::mutex> &&mutex,
+                                  Type &data)
+      : std::unique_lock<std::mutex>(std::move(mutex)), data(data) {}
+
+  DataHolderSingleOutput<Type> &operator=(const Type &other) {
+    data = other;
+    return *this;
+  }
+};
+
 template <class... ExternalTypes>
 struct DataHolder {
   using Outputname = DataHolderOutput<ExternalTypes...>;
   using ValueType = std::tuple<std::vector<ExternalTypes>...>;
+
+  template <size_t index>
+  using TypeAt = std::tuple_element_t<index, std::tuple<ExternalTypes...>>;
 
   std::mutex mutex;
   ValueType internalValues;
   std::unordered_map<size_t, size_t> translationTable;
   size_t currentIndex = 0;
 
+  template <size_t index = 0, HolderConcept HolderType>
+  std::vector<TypeAt<index>> get(const std::span<HolderType> &pIndex) {
+    std::vector<size_t> indicies(pIndex.size());
+    auto start = indicies.begin();
+    for (auto holder : pIndex) {
+      *(start++) = holder.internalHandle;
+    }
+    return get<index>(indicies);
+  }
+
+  template <size_t index = 0, HolderConcept HolderType>
+  TypeAt<index> const &get(HolderType pIndex) {
+    return get<index>(pIndex.internalHandle);
+  }
+
   template <size_t index = 0>
-  std::tuple_element_t<index, std::tuple<ExternalTypes...>> &get(
-      const size_t pIndex) {
+  std::vector<TypeAt<index>> get(const std::span<size_t> &pIndex) {
+    std::lock_guard guard(this->mutex);
+    std::vector<TypeAt<index>> types;
+    types.reserve(pIndex.size());
+    auto &vector = std::get<index>(internalValues);
+    for (const auto index : pIndex) {
+      auto newIndex = translationTable.find(index);
+      if (newIndex == std::end(translationTable)) {
+        PLOG_ERROR << "Index " << index << " not in DataHolder!";
+        throw std::runtime_error("Index not in DataHolder!");
+      }
+      types.push_back(vector[newIndex->second]);
+    }
+    return types;
+  }
+
+  template <size_t index = 0>
+  size_t size() {
+    std::lock_guard guard(mutex);
+    auto &vector = std::get<index>(internalValues);
+    return vector.size();
+  }
+
+  template <size_t index = 0>
+  TypeAt<index> const &get(const size_t pIndex) {
     std::lock_guard guard(this->mutex);
     auto &vector = std::get<index>(internalValues);
     auto newIndex = translationTable.find(pIndex);
@@ -59,6 +122,24 @@ struct DataHolder {
       throw std::runtime_error("Index not in DataHolder!");
     }
     return vector[newIndex->second];
+  }
+
+  template <size_t index = 0>
+  DataHolderSingleOutput<TypeAt<index>> change(const size_t pIndex) {
+    std::unique_lock guard(this->mutex);
+    auto &vector = std::get<index>(internalValues);
+    auto newIndex = translationTable.find(pIndex);
+    if (newIndex == std::end(translationTable)) {
+      PLOG_ERROR << "Index " << pIndex << " not in DataHolder!";
+      throw std::runtime_error("Index not in DataHolder!");
+    }
+    return DataHolderSingleOutput<TypeAt<index>>(std::move(guard),
+                                                 vector[newIndex->second]);
+  }
+
+  template <size_t index = 0, HolderConcept HolderType>
+  DataHolderSingleOutput<TypeAt<index>> change(const HolderType pIndex) {
+    return change<index>(pIndex.internalHandle);
   }
 
   Outputname allocate(const size_t amount) {
@@ -99,9 +180,7 @@ struct DataHolder {
     for (auto &[key, value] : translationTable) {
       oldValues.insert(value);
       const auto values = std::apply(
-          [&](const auto &...old) {
-            return std::make_tuple(old[value]...);
-          },
+          [&](const auto &...old) { return std::make_tuple(old[value]...); },
           internalValues);
       process(newValue, values);
       value = currentIndex;
@@ -334,3 +413,5 @@ struct DataHolder5 : public DataHolder4<type1, type2, type3, type4> {
     return std::tuple(returnID, first, second, third, fourth, fith);
   }
 };
+
+}  // namespace tge

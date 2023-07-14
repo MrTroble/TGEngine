@@ -1,15 +1,16 @@
 #include "../../../public/graphics/vulkan/VulkanShaderModule.hpp"
 
-#include "../../../public/Error.hpp"
-#include "../../../public/Util.hpp"
-#include "../../../public/graphics/vulkan/VulkanModuleDef.hpp"
-#include "../../../public/graphics/vulkan/VulkanShaderPipe.hpp"
 #include <glslang/MachineIndependent/localintermediate.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
 #include <iostream>
 #include <vulkan/vulkan.hpp>
+
+#include "../../../public/Error.hpp"
+#include "../../../public/Util.hpp"
+#include "../../../public/graphics/vulkan/VulkanModuleDef.hpp"
+#include "../../../public/graphics/vulkan/VulkanShaderPipe.hpp"
 #undef ERROR
 #define SPR_NO_DEBUG_OUTPUT 1
 #define SPR_NO_GLSL_INCLUDE 1
@@ -330,42 +331,6 @@ size_t VulkanShaderModule::createBindings(ShaderPipe pipe, const size_t count) {
   for (size_t i = 0; i < count; i++) {
     pipeInfos.push_back({nextID + i, layout});
   }
-
-  std::vector<BindingInfo> bInfo;
-  if (defaultbindings.size() > layout && shaderPipe->needsDefaultBindings) {
-    auto& bindings = defaultbindings[layout];
-    if (!bindings.empty()) {
-      for (size_t i = 0; i < count; i++) {
-        const auto nID = nextID + i;
-        for (auto& b : bindings) {
-          b.bindingSet = nID;
-          bInfo.push_back(b);
-        }
-      }
-      BindingInfo binding;
-      binding.type = BindingType::Texture;
-      binding.binding = 1;
-      for (size_t i = 0; i < count; i++) {
-        binding.bindingSet = nextID + i;
-        for (size_t i = 5; i < vgm->textureImages.size(); i++) {
-          binding.arrayID = i;
-          bInfo.push_back(binding);
-        }
-        binding.data.texture.texture =
-            vgm->getGraphicsModule()->defaultTextureID;
-        for (size_t i = 0; i < 5; i++) {
-          binding.arrayID = i;
-          bInfo.push_back(binding);
-        }
-        for (size_t i = vgm->textureImages.size(); i < 255; i++) {
-          binding.arrayID = i;
-          bInfo.push_back(binding);
-        }
-      }
-
-      this->bindData(bInfo.data(), bInfo.size());
-    }
-  }
   return nextID;
 }
 
@@ -409,7 +374,7 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
             !tex.sampler ? vk::Sampler()
                          : vgm->sampler[tex.sampler.internalHandle],
             !tex.texture ? vk::ImageView()
-                         : vgm->textureImageViews[tex.texture.internalHandle],
+                         : vgm->textureImageHolder.get<1>(tex.texture),
             ImageLayout::eShaderReadOnlyOptimal);
         set.push_back(WriteDescriptorSet(
             descSets[cinfo.bindingSet], cinfo.binding, cinfo.arrayID, 1,
