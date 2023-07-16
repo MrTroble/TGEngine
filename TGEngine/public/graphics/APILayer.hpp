@@ -5,8 +5,9 @@
 #include <functional>
 #include <glm/glm.hpp>
 #include <mutex>
-#include <vector>
+#include <span>
 #include <tuple>
+#include <vector>
 
 #include "../Module.hpp"
 #include "ElementHolder.hpp"
@@ -142,6 +143,16 @@ class APILayer : public main::Module {  // Interface
   virtual void removeRender(const size_t renderInfoCount,
                             const TRenderHolder* renderIDs) = 0;
 
+  virtual void removeData(const std::span<TDataHolder> dataHolder) = 0;
+
+  virtual void removeTextures(
+      const std::span<TTextureHolder> textureHolder) = 0;
+
+  virtual void removeSampler(const std::span<TSamplerHolder> samplerHolder) = 0;
+
+  virtual void removeMaterials(
+      const std::span<PipelineHolder> pipelineHolder) = 0;
+
   [[nodiscard]] virtual TRenderHolder pushRender(
       const size_t renderInfoCount, const RenderInfo* renderInfos,
       const TRenderHolder toOverride = TRenderHolder()) = 0;
@@ -172,7 +183,8 @@ class APILayer : public main::Module {  // Interface
   [[nodiscard]] virtual glm::vec2 getRenderExtent() const = 0;
 
   [[nodiscard]] virtual std::pair<std::vector<char>, TDataHolder> getImageData(
-      const TTextureHolder imageId, const TDataHolder cache = TDataHolder()) = 0;
+      const TTextureHolder imageId,
+      const TDataHolder cache = TDataHolder()) = 0;
 
   [[nodiscard]] virtual APILayer* backend() { return this; }
 };

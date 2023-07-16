@@ -89,6 +89,25 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->removeRender(renderInfoCount, renderIDs);
   }
 
+  virtual void removeData(const std::span<TDataHolder> dataHolder) override {
+    return api->removeData(dataHolder);
+  }
+
+  virtual void removeTextures(
+      const std::span<TTextureHolder> textureHolder) override {
+    return api->removeTextures(textureHolder);
+  }
+
+  virtual void removeSampler(
+      const std::span<TSamplerHolder> samplerHolder) override {
+    return api->removeSampler(samplerHolder);
+  }
+
+  virtual void removeMaterials(
+      const std::span<PipelineHolder> pipelineHolder) override {
+    return api->removeMaterials(pipelineHolder);
+  }
+
   [[nodiscard]] virtual TRenderHolder pushRender(
       const size_t renderInfoCount, const RenderInfo* renderInfos,
       const TRenderHolder holder) override {

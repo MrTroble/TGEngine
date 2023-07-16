@@ -235,6 +235,14 @@ class VulkanGraphicsModule : public APILayer {
   void removeRender(const size_t renderInfoCount,
                     const TRenderHolder *renderIDs) override;
 
+  void removeData(const std::span<TDataHolder> dataHolder) override;
+
+  void removeTextures(const std::span<TTextureHolder> textureHolder) override;
+
+  void removeSampler(const std::span<TSamplerHolder> samplerHolder) override;
+
+  void removeMaterials(const std::span<PipelineHolder> pipelineHolder) override;
+
   std::vector<PipelineHolder> pushMaterials(const size_t materialcount,
                                             const Material *materials) override;
 

@@ -226,6 +226,19 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
   throw std::runtime_error("Error shader translation not implemented!");
 }
 
+void VulkanGraphicsModule::removeData(const std::span<TDataHolder> dataHolder) {
+
+}
+
+void VulkanGraphicsModule::removeTextures(
+    const std::span<TTextureHolder> textureHolder) {}
+
+void VulkanGraphicsModule::removeSampler(
+    const std::span<TSamplerHolder> samplerHolder) {}
+
+void VulkanGraphicsModule::removeMaterials(
+    const std::span<PipelineHolder> pipelineHolder) {}
+
 TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                                const RenderInfo* renderInfos,
                                                const TRenderHolder toOverride) {
@@ -886,7 +899,7 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
   vgm->swapchainImages = vgm->device.getSwapchainImagesKHR(vgm->swapchain);
 
   const Extent2D extent = {(uint32_t)vgm->viewport.width,
-                        (uint32_t)vgm->viewport.height};
+                           (uint32_t)vgm->viewport.height};
   const std::vector<InternalImageInfo> internalImageInfos = {
       {vgm->depthFormat, extent, ImageUsageFlagBits::eDepthStencilAttachment},
       {vgm->format.format, extent,
@@ -1434,8 +1447,7 @@ void VulkanGraphicsModule::destroy() {
   for (; memItr != memEnd; memItr++) device.freeMemory(*memItr);
   for (const auto buf : bufferDataHolder.allocation1) device.destroyBuffer(buf);
   const auto pipeList = std::get<0>(materialHolder.clear());
-  for (const auto pipe : pipeList)
-    device.destroyPipeline(pipe);
+  for (const auto pipe : pipeList) device.destroyPipeline(pipe);
   for (const auto shader : shaderModules) device.destroyShaderModule(shader);
   device.destroyCommandPool(pool);
   device.destroyCommandPool(secondaryPool);
