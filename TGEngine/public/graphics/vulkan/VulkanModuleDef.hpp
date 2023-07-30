@@ -178,7 +178,8 @@ class VulkanGraphicsModule : public APILayer {
   uint32_t memoryTypeHostVisibleCoherent;
   uint32_t memoryTypeDeviceLocal;
   vk::PhysicalDeviceLimits deviceLimits;
-  DataHolder<vk::Buffer, vk::DeviceMemory, size_t, size_t, size_t> bufferDataHolder;
+  DataHolder<vk::Buffer, vk::DeviceMemory, size_t, size_t, size_t>
+      bufferDataHolder;
 
   DataHolder<vk::CommandBuffer, std::vector<RenderInfo>,
              std::shared_ptr<std::mutex>, std::vector<TDataHolder>,
@@ -232,13 +233,17 @@ class VulkanGraphicsModule : public APILayer {
   void removeRender(const size_t renderInfoCount,
                     const TRenderHolder *renderIDs) override;
 
-  void removeData(const std::span<TDataHolder> dataHolder) override;
+  void removeData(const std::span<TDataHolder> dataHolder,
+                  bool instant = false) override;
 
-  void removeTextures(const std::span<TTextureHolder> textureHolder) override;
+  void removeTextures(const std::span<TTextureHolder> textureHolder,
+                      bool instant = false) override;
 
-  void removeSampler(const std::span<TSamplerHolder> samplerHolder) override;
+  void removeSampler(const std::span<TSamplerHolder> samplerHolder,
+                     bool instant = false) override;
 
-  void removeMaterials(const std::span<PipelineHolder> pipelineHolder) override;
+  void removeMaterials(const std::span<PipelineHolder> pipelineHolder,
+                       bool instant = false) override;
 
   std::vector<PipelineHolder> pushMaterials(const size_t materialcount,
                                             const Material *materials) override;

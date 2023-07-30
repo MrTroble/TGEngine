@@ -89,23 +89,24 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->removeRender(renderInfoCount, renderIDs);
   }
 
-  virtual void removeData(const std::span<TDataHolder> dataHolder) override {
-    return api->removeData(dataHolder);
+  virtual void removeData(const std::span<TDataHolder> dataHolder,
+                          bool instant = false) override {
+    return api->removeData(dataHolder, instant);
   }
 
-  virtual void removeTextures(
-      const std::span<TTextureHolder> textureHolder) override {
-    return api->removeTextures(textureHolder);
+  virtual void removeTextures(const std::span<TTextureHolder> textureHolder,
+                              bool instant = false) override {
+    return api->removeTextures(textureHolder, instant);
   }
 
-  virtual void removeSampler(
-      const std::span<TSamplerHolder> samplerHolder) override {
-    return api->removeSampler(samplerHolder);
+  virtual void removeSampler(const std::span<TSamplerHolder> samplerHolder,
+                             bool instant = false) override {
+    return api->removeSampler(samplerHolder, instant);
   }
 
-  virtual void removeMaterials(
-      const std::span<PipelineHolder> pipelineHolder) override {
-    return api->removeMaterials(pipelineHolder);
+  virtual void removeMaterials(const std::span<PipelineHolder> pipelineHolder,
+                               bool instant = false) override {
+    return api->removeMaterials(pipelineHolder, instant);
   }
 
   [[nodiscard]] virtual TRenderHolder pushRender(

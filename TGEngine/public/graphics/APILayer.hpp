@@ -143,15 +143,17 @@ class APILayer : public main::Module {  // Interface
   virtual void removeRender(const size_t renderInfoCount,
                             const TRenderHolder* renderIDs) = 0;
 
-  virtual void removeData(const std::span<TDataHolder> dataHolder) = 0;
+  virtual void removeData(const std::span<TDataHolder> dataHolder,
+                          bool instant = false) = 0;
 
-  virtual void removeTextures(
-      const std::span<TTextureHolder> textureHolder) = 0;
+  virtual void removeTextures(const std::span<TTextureHolder> textureHolder,
+                              bool instant = false) = 0;
 
-  virtual void removeSampler(const std::span<TSamplerHolder> samplerHolder) = 0;
+  virtual void removeSampler(const std::span<TSamplerHolder> samplerHolder,
+                             bool instant = false) = 0;
 
-  virtual void removeMaterials(
-      const std::span<PipelineHolder> pipelineHolder) = 0;
+  virtual void removeMaterials(const std::span<PipelineHolder> pipelineHolder,
+                               bool instant = false) = 0;
 
   [[nodiscard]] virtual TRenderHolder pushRender(
       const size_t renderInfoCount, const RenderInfo* renderInfos,

@@ -159,10 +159,19 @@ struct DataHolder {
     return holder;
   }
 
-  bool erase(std::span<size_t> toErase) {
-    std::lock_guard guard(mutex);
+  bool erase(const std::span<size_t> toErase) {
+    const std::lock_guard guard(mutex);
     for (const size_t key : toErase) {
       if (translationTable.erase(key) == 0) return false;
+    }
+    return true;
+  }
+
+  template <HolderConcept Holder>
+  bool erase(const std::span<Holder> toErase) {
+    const std::lock_guard guard(mutex);
+    for (const auto key : toErase) {
+      if (translationTable.erase(key.internalHandle) == 0) return false;
     }
     return true;
   }
@@ -175,7 +184,7 @@ struct DataHolder {
                newValue);
     size_t currentIndex = 0;
     std::unordered_set<size_t> oldValues;
-    const auto oldSize = std::get<0>(internalValues).size();
+    const auto oldSize = size();
     oldValues.reserve(oldSize - index);
     for (auto &[key, value] : translationTable) {
       oldValues.insert(value);

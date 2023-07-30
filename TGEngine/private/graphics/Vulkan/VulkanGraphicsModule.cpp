@@ -225,17 +225,38 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
   throw std::runtime_error("Error shader translation not implemented!");
 }
 
-void VulkanGraphicsModule::removeData(const std::span<TDataHolder> dataHolder) {
+void VulkanGraphicsModule::removeData(const std::span<TDataHolder> dataHolder,
+                                      bool instant) {
+  if (this->bufferDataHolder.erase(dataHolder)) {
+    if (instant || this->bufferDataHolder.size() / 2 >=
+                       this->bufferDataHolder.translationTable.size()) {
+      const auto compactation = this->bufferDataHolder.compact();
+      const auto& buffers = std::get<0>(compactation);
+      for (const auto buffer : buffers) {
+        device.destroy(buffer);
+      }
+      const std::lock_guard guard(this->bufferDataHolder.mutex);
+      auto memorys = std::get<1>(compactation);
+      auto allMemorys = std::get<1>(this->bufferDataHolder.internalValues);
+      for (const auto memory : std::ranges::unique(memorys)) {
+        if (std::ranges::none_of(allMemorys, [&](auto memoryIn) {
+              return memory == memoryIn;
+            })) {
+          device.freeMemory(memory);
+        }
+      }
+    }
+  }
 }
 
 void VulkanGraphicsModule::removeTextures(
-    const std::span<TTextureHolder> textureHolder) {}
+    const std::span<TTextureHolder> textureHolder, bool instant) {}
 
 void VulkanGraphicsModule::removeSampler(
-    const std::span<TSamplerHolder> samplerHolder) {}
+    const std::span<TSamplerHolder> samplerHolder, bool instant) {}
 
 void VulkanGraphicsModule::removeMaterials(
-    const std::span<PipelineHolder> pipelineHolder) {}
+    const std::span<PipelineHolder> pipelineHolder, bool instant) {}
 
 TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                                const RenderInfo* renderInfos,
