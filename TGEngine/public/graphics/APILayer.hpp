@@ -167,8 +167,8 @@ class APILayer : public main::Module {  // Interface
                                           const Light* lights,
                                           const size_t offset = 0) = 0;
 
-  [[nodiscard]] virtual size_t getAligned(const size_t buffer,
-                                          const size_t toBeAligned) const = 0;
+  [[nodiscard]] virtual size_t getAligned(const TDataHolder buffer,
+                                          const size_t toBeAligned) = 0;
 
   [[nodiscard]] virtual size_t getAligned(const DataType type) const = 0;
 

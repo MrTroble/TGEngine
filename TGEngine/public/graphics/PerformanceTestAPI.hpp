@@ -133,7 +133,7 @@ class PerformanceMessuringAPILayer : public APILayer {
   }
 
   [[nodiscard]] virtual size_t getAligned(
-      const size_t buffer, const size_t toBeAligned) const override {
+      const TDataHolder buffer, const size_t toBeAligned) override {
     return api->getAligned(buffer, toBeAligned);
   }
 

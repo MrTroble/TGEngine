@@ -354,11 +354,11 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
     switch (cinfo.type) {
       case BindingType::Storage:
       case BindingType::UniformBuffer: {
-        const auto& buffI = cinfo.data.buffer;
-        const auto buffer = vgm->bufferDataHolder.get(
-            vgm->bufferDataHolder.allocation1, buffI.dataID);
-        bufferInfo[i] =
-            (DescriptorBufferInfo(buffer, buffI.offset, buffI.size));
+        const auto& bufferBindingInfo = cinfo.data.buffer;
+        const auto buffer =
+            vgm->bufferDataHolder.get<0>(bufferBindingInfo.dataID);
+        bufferInfo[i] = (DescriptorBufferInfo(buffer, bufferBindingInfo.offset,
+                                              bufferBindingInfo.size));
         set.push_back(
             WriteDescriptorSet(descSets[cinfo.bindingSet], cinfo.binding, 0, 1,
                                cinfo.type == BindingType::UniformBuffer

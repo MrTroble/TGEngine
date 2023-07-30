@@ -3,6 +3,8 @@
 #include <array>
 #include <iostream>
 #include <mutex>
+#include <ranges>
+#include <unordered_set>
 
 #define DEBUG 1
 
@@ -10,7 +12,6 @@
 #include "../../../public/Util.hpp"
 #include "../../../public/graphics/WindowModule.hpp"
 #define VULKAN_HPP_HAS_SPACESHIP_OPERATOR
-#include <unordered_set>
 
 #include "../../../public/Error.hpp"
 #include "../../../public/TGEngine.hpp"
@@ -80,11 +81,9 @@ size_t VulkanGraphicsModule::getAligned(const DataType type) const {
   throw std::runtime_error("Not implemented!");
 }
 
-size_t VulkanGraphicsModule::getAligned(const size_t buffer,
-                                        const size_t toBeAligned) const {
-  const auto& alignment = bufferDataHolder.allocation5;
-  EXPECT(buffer < alignment.size());
-  const auto align = alignment[buffer];
+size_t VulkanGraphicsModule::getAligned(const TDataHolder buffer,
+                                        const size_t toBeAligned) {
+  const auto align = bufferDataHolder.get<4>(buffer);
   const auto rest = toBeAligned % align;
   return toBeAligned + (align - rest);
 }
@@ -227,7 +226,6 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
 }
 
 void VulkanGraphicsModule::removeData(const std::span<TDataHolder> dataHolder) {
-
 }
 
 void VulkanGraphicsModule::removeTextures(
@@ -272,9 +270,8 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
   for (size_t i = 0; i < renderInfoCount; i++) {
     auto& info = renderInfos[i];
 
-    const std::vector<Buffer> vertexBuffer = bufferDataHolder.get(
-        bufferDataHolder.allocation1, info.vertexBuffer.size(),
-        info.vertexBuffer.data());
+    const std::vector<Buffer> vertexBuffer =
+        bufferDataHolder.get<0>(std::span(info.vertexBuffer));
 
     if (!vertexBuffer.empty()) {
       if (info.vertexOffsets.size() == 0) {
@@ -310,9 +307,9 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     }
 
     if (info.indexSize != IndexSize::NONE) [[likely]] {
-      commandBuffer.bindIndexBuffer(
-          bufferDataHolder.get(bufferDataHolder.allocation1, info.indexBuffer),
-          info.indexOffset, (IndexType)info.indexSize);
+      commandBuffer.bindIndexBuffer(bufferDataHolder.get<0>(info.indexBuffer),
+                                    info.indexOffset,
+                                    (IndexType)info.indexSize);
 
       commandBuffer.drawIndexed(info.indexCount, info.instanceCount, 0, 0,
                                 info.firstInstance);
@@ -388,8 +385,9 @@ internalBuffer(VulkanGraphicsModule* vgm, const size_t dataCount,
   std::vector<OutputBuffer> tempBuffer;
   tempBuffer.reserve(dataCount);
 
-  auto [returnID, bufferList, bufferMemoryList, bufferSizeList, bufferOffset,
-        alignment] = vgm->bufferDataHolder.start(perma ? dataCount : 0);
+  auto lockguard = vgm->bufferDataHolder.allocate(perma ? dataCount : 0);
+  auto [bufferList, bufferMemoryList, bufferSizeList, bufferOffset, alignment] =
+      lockguard.iterator;
 
   size_t tempMemory = 0;
 
@@ -400,10 +398,10 @@ internalBuffer(VulkanGraphicsModule* vgm, const size_t dataCount,
     const auto tempOffsetedSize = aligned(memRequ.size, memRequ.alignment);
     tempBuffer.push_back({intermBuffer, tempOffsetedSize, tempMemory});
     if constexpr (perma) {
-      bufferOffset[i] = tempMemory;
-      bufferList[i] = intermBuffer;
-      bufferSizeList[i] = tempOffsetedSize;
-      alignment[i] = memRequ.alignment;
+      *bufferOffset++ = tempMemory;
+      *bufferList++ = intermBuffer;
+      *bufferSizeList++ = tempOffsetedSize;
+      *alignment++ = memRequ.alignment;
     }
     tempMemory += tempOffsetedSize;
   }
@@ -421,7 +419,7 @@ internalBuffer(VulkanGraphicsModule* vgm, const size_t dataCount,
     const auto& buffer = tempBuffer[i];
     vgm->device.bindBufferMemory(buffer.buffer, memory, buffer.alignedOffset);
   }
-  return std::make_tuple(tempBuffer, memory, returnID);
+  return std::make_tuple(tempBuffer, memory, lockguard.beginIndex);
 }
 
 std::vector<TDataHolder> VulkanGraphicsModule::pushData(
@@ -434,61 +432,66 @@ std::vector<TDataHolder> VulkanGraphicsModule::pushData(
   tempBufferAlignedSize.resize(dataCount);
   std::vector<size_t> bufferAlignedSize;
   bufferAlignedSize.resize(dataCount);
+  size_t tempMemory = 0;
+  size_t actualMemory = 0;
 
-  auto [returnID, bufferList, bufferMemoryList, bufferSizeList, bufferOffset,
-        alignment] = bufferDataHolder.start(dataCount);
+  size_t returnIndex = 0;
+  {
+    auto bufferAllocate = bufferDataHolder.allocate(dataCount);
+    auto [bufferList, bufferMemoryList, bufferSizeList, bufferOffset,
+          alignment] = bufferAllocate.iterator;
+    returnIndex = bufferAllocate.beginIndex;
+
+    for (size_t i = 0; i < dataCount; i++) {
+      const auto& info = bufferInfo[i];
+      const BufferUsageFlags bufferUsage = getUsageFlagsFromDataType(info.type);
+
+      const BufferCreateInfo bufferCreateInfo({}, info.size,
+                                              BufferUsageFlagBits::eTransferSrc,
+                                              SharingMode::eExclusive);
+      const auto intermBuffer = device.createBuffer(bufferCreateInfo);
+      tempBuffer.push_back(intermBuffer);
+      const auto memRequ = device.getBufferMemoryRequirements(intermBuffer);
+      const auto tempOffsetedSize = aligned(memRequ.size, memRequ.alignment);
+      tempMemory += tempOffsetedSize;
+      tempBufferAlignedSize[i] = tempOffsetedSize;
+
+      const BufferCreateInfo bufferLocalCreateInfo(
+          {}, info.size,
+          BufferUsageFlagBits::eTransferDst |
+              BufferUsageFlagBits::eTransferSrc | bufferUsage,
+          SharingMode::eExclusive);
+      const auto localBuffer = device.createBuffer(bufferLocalCreateInfo);
+      const auto memRequLocal = device.getBufferMemoryRequirements(localBuffer);
+
+      const auto offsetedSize =
+          aligned(memRequLocal.size, memRequLocal.alignment);
+      bufferAlignedSize[i] = offsetedSize;
+      const auto old = actualMemory;
+      actualMemory = aligned(actualMemory, memRequLocal.alignment);
+      const auto difference = actualMemory - old;
+      if (difference > 0 && i > 0) bufferAlignedSize[i - 1] += difference;
+      actualMemory += offsetedSize;
+
+      *(bufferOffset++) = actualMemory;
+      *(bufferList + i) = localBuffer;
+      *(bufferSizeList++) = offsetedSize;
+      *(alignment++) = memRequLocal.alignment;
+    }
+  }
+
+  const MemoryAllocateInfo allocLocalInfo(actualMemory, memoryTypeDeviceLocal);
+  const auto localMem = device.allocateMemory(allocLocalInfo);
+  this->bufferDataHolder.fill_adjacent<1>(returnIndex, localMem, dataCount);
+
+  const MemoryAllocateInfo allocInfo(tempMemory, memoryTypeHostVisibleCoherent);
+  const auto hostVisibleMemory = device.allocateMemory(allocInfo);
 
   const auto& cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit);
   secondarySync->begin(cmdBuf, beginInfo);
-
-  size_t tempMemory = 0;
-  size_t actualMemory = 0;
-
-  for (size_t i = 0; i < dataCount; i++) {
-    const auto& info = bufferInfo[i];
-    const BufferUsageFlags bufferUsage = getUsageFlagsFromDataType(info.type);
-
-    const BufferCreateInfo bufferCreateInfo({}, info.size,
-                                            BufferUsageFlagBits::eTransferSrc,
-                                            SharingMode::eExclusive);
-    const auto intermBuffer = device.createBuffer(bufferCreateInfo);
-    tempBuffer.push_back(intermBuffer);
-    const auto memRequ = device.getBufferMemoryRequirements(intermBuffer);
-    const auto tempOffsetedSize = aligned(memRequ.size, memRequ.alignment);
-    tempMemory += tempOffsetedSize;
-    tempBufferAlignedSize[i] = tempOffsetedSize;
-
-    const BufferCreateInfo bufferLocalCreateInfo(
-        {}, info.size,
-        BufferUsageFlagBits::eTransferDst | BufferUsageFlagBits::eTransferSrc |
-            bufferUsage,
-        SharingMode::eExclusive);
-    const auto localBuffer = device.createBuffer(bufferLocalCreateInfo);
-    const auto memRequLocal = device.getBufferMemoryRequirements(localBuffer);
-
-    const auto offsetedSize =
-        aligned(memRequLocal.size, memRequLocal.alignment);
-    bufferAlignedSize[i] = offsetedSize;
-    const auto old = actualMemory;
-    actualMemory = aligned(actualMemory, memRequLocal.alignment);
-    const auto difference = actualMemory - old;
-    if (difference > 0 && i > 0) bufferAlignedSize[i - 1] += difference;
-    actualMemory += offsetedSize;
-
-    bufferOffset[i] = actualMemory;
-    bufferList[i] = localBuffer;
-    bufferSizeList[i] = offsetedSize;
-    alignment[i] = memRequLocal.alignment;
-  }
-
-  const MemoryAllocateInfo allocLocalInfo(actualMemory, memoryTypeDeviceLocal);
-  const auto localMem = device.allocateMemory(allocLocalInfo);
-
-  const MemoryAllocateInfo allocInfo(tempMemory, memoryTypeHostVisibleCoherent);
-  const auto hostVisibleMemory = device.allocateMemory(allocInfo);
 
   size_t currentOffset = 0;
   size_t tempCurrentOffset = 0;
@@ -506,13 +509,12 @@ std::vector<TDataHolder> VulkanGraphicsModule::pushData(
     device.unmapMemory(hostVisibleMemory);
     tempCurrentOffset += tempCurrentSize;
 
-    bufferMemoryList[i] = localMem;
-    const auto cBuffer = bufferList[i];
-    device.bindBufferMemory(cBuffer, localMem, currentOffset);
+    const auto currentBuffer = this->bufferDataHolder.get<0>(i + returnIndex);
+    device.bindBufferMemory(currentBuffer, localMem, currentOffset);
     currentOffset += bufferAlignedSize[i];
 
     const BufferCopy copyInfo(0, 0, info.size);
-    cmdBuf.copyBuffer(tempBuf, cBuffer, copyInfo);
+    cmdBuf.copyBuffer(tempBuf, currentBuffer, copyInfo);
   }
 
   const SubmitInfo info({}, {}, cmdBuf);
@@ -523,7 +525,7 @@ std::vector<TDataHolder> VulkanGraphicsModule::pushData(
 
   std::vector<TDataHolder> dataHolders(dataCount);
   for (size_t i = 0; i < dataCount; i++) {
-    dataHolders[i] = TDataHolder(this, returnID + i);
+    dataHolders[i] = TDataHolder(this, returnIndex + i);
   }
   return dataHolders;
 }
@@ -562,8 +564,7 @@ void VulkanGraphicsModule::changeData(const size_t sizes,
 
     const BufferCopy copyRegion(0, change.offset, change.size);
 
-    const auto currentBuffer =
-        this->bufferDataHolder.get(bufferDataHolder.allocation1, change.holder);
+    const auto currentBuffer = this->bufferDataHolder.get<0>(change.holder);
     cmdBuf.copyBuffer(bufferList[i].buffer, currentBuffer, copyRegion);
   }
 
@@ -1441,11 +1442,11 @@ void VulkanGraphicsModule::destroy() {
        iterator++)
     device.freeMemory(*iterator);
   for (const auto samp : sampler) device.destroySampler(samp);
-  auto memItr = std::begin(bufferDataHolder.allocation2);
-  const auto memEnd =
-      std::unique(memItr, std::end(bufferDataHolder.allocation2));
-  for (; memItr != memEnd; memItr++) device.freeMemory(*memItr);
-  for (const auto buf : bufferDataHolder.allocation1) device.destroyBuffer(buf);
+  for (const auto memory :
+       std::ranges::unique(std::get<1>(bufferDataHolder.internalValues)))
+    device.freeMemory(memory);
+  for (const auto buf : std::get<0>(bufferDataHolder.internalValues))
+    device.destroyBuffer(buf);
   const auto pipeList = std::get<0>(materialHolder.clear());
   for (const auto pipe : pipeList) device.destroyPipeline(pipe);
   for (const auto shader : shaderModules) device.destroyShaderModule(shader);
@@ -1517,9 +1518,8 @@ std::pair<std::vector<char>, TDataHolder> VulkanGraphicsModule::getImageData(
     memoryBuffer = memory;
     dataHolder = TDataHolder(this, returnID);
   } else {
-    dataBuffer = bufferDataHolder.get(bufferDataHolder.allocation1, dataHolder);
-    memoryBuffer =
-        bufferDataHolder.get(bufferDataHolder.allocation2, dataHolder);
+    dataBuffer = bufferDataHolder.get<0>(dataHolder);
+    memoryBuffer = bufferDataHolder.get<1>(dataHolder);
   }
 
   const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];

@@ -144,9 +144,6 @@ struct InternalImageInfo {
   SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
 };
 
-using BufferHolderType =
-    DataHolder5<Buffer, DeviceMemory, size_t, size_t, size_t>;
-
 class VulkanGraphicsModule : public APILayer {
  public:
   Instance instance;
@@ -181,7 +178,7 @@ class VulkanGraphicsModule : public APILayer {
   uint32_t memoryTypeHostVisibleCoherent;
   uint32_t memoryTypeDeviceLocal;
   vk::PhysicalDeviceLimits deviceLimits;
-  BufferHolderType bufferDataHolder;
+  DataHolder<vk::Buffer, vk::DeviceMemory, size_t, size_t, size_t> bufferDataHolder;
 
   DataHolder<vk::CommandBuffer, std::vector<RenderInfo>,
              std::shared_ptr<std::mutex>, std::vector<TDataHolder>,
@@ -263,8 +260,8 @@ class VulkanGraphicsModule : public APILayer {
   size_t pushLights(const size_t lightCount, const Light *lights,
                     const size_t offset = 0) override;
 
-  size_t getAligned(const size_t buffer,
-                    const size_t toBeAligned = 0) const override;
+  size_t getAligned(const TDataHolder buffer,
+                    const size_t toBeAligned = 0) override;
 
   size_t getAligned(const DataType type) const override;
 
