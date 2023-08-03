@@ -89,23 +89,26 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->removeRender(renderInfoCount, renderIDs);
   }
 
-  virtual void removeData(const std::span<TDataHolder> dataHolder,
+  virtual void removeData(const std::span<const TDataHolder> dataHolder,
                           bool instant = false) override {
     return api->removeData(dataHolder, instant);
   }
 
-  virtual void removeTextures(const std::span<TTextureHolder> textureHolder,
-                              bool instant = false) override {
+  virtual void removeTextures(
+      const std::span<const TTextureHolder> textureHolder,
+      bool instant = false) override {
     return api->removeTextures(textureHolder, instant);
   }
 
-  virtual void removeSampler(const std::span<TSamplerHolder> samplerHolder,
-                             bool instant = false) override {
+  virtual void removeSampler(
+      const std::span<const TSamplerHolder> samplerHolder,
+      bool instant = false) override {
     return api->removeSampler(samplerHolder, instant);
   }
 
-  virtual void removeMaterials(const std::span<PipelineHolder> pipelineHolder,
-                               bool instant = false) override {
+  virtual void removeMaterials(
+      const std::span<const PipelineHolder> pipelineHolder,
+      bool instant = false) override {
     return api->removeMaterials(pipelineHolder, instant);
   }
 
@@ -133,8 +136,8 @@ class PerformanceMessuringAPILayer : public APILayer {
     return api->pushLights(lightCount, lights, offset);
   }
 
-  [[nodiscard]] virtual size_t getAligned(
-      const TDataHolder buffer, const size_t toBeAligned) override {
+  [[nodiscard]] virtual size_t getAligned(const TDataHolder buffer,
+                                          const size_t toBeAligned) override {
     return api->getAligned(buffer, toBeAligned);
   }
 

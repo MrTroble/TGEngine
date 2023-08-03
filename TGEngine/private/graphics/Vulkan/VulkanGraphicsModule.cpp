@@ -225,8 +225,8 @@ inline vk::ShaderStageFlagBits shaderToVulkan(shader::ShaderType type) {
   throw std::runtime_error("Error shader translation not implemented!");
 }
 
-void VulkanGraphicsModule::removeData(const std::span<TDataHolder> dataHolder,
-                                      bool instant) {
+void VulkanGraphicsModule::removeData(
+    const std::span<const TDataHolder> dataHolder, bool instant) {
   if (this->bufferDataHolder.erase(dataHolder)) {
     if (instant || this->bufferDataHolder.size() / 2 >=
                        this->bufferDataHolder.translationTable.size()) {
@@ -236,9 +236,13 @@ void VulkanGraphicsModule::removeData(const std::span<TDataHolder> dataHolder,
         device.destroy(buffer);
       }
       const std::lock_guard guard(this->bufferDataHolder.mutex);
-      auto memorys = std::get<1>(compactation);
-      auto allMemorys = std::get<1>(this->bufferDataHolder.internalValues);
-      for (const auto memory : std::ranges::unique(memorys)) {
+      const auto& memorys = std::get<1>(compactation);
+      const auto& allMemorys =
+          std::get<1>(this->bufferDataHolder.internalValues);
+      std::vector<vk::DeviceMemory> uniqueMemory;
+      uniqueMemory.reserve(memorys.size());
+      std::ranges::unique_copy(memorys, std::back_inserter(uniqueMemory));
+      for (const auto memory : uniqueMemory) {
         if (std::ranges::none_of(allMemorys, [&](auto memoryIn) {
               return memory == memoryIn;
             })) {
@@ -250,13 +254,42 @@ void VulkanGraphicsModule::removeData(const std::span<TDataHolder> dataHolder,
 }
 
 void VulkanGraphicsModule::removeTextures(
-    const std::span<TTextureHolder> textureHolder, bool instant) {}
+    const std::span<const TTextureHolder> textureHolder, bool instant) {
+  if (this->textureImageHolder.erase(textureHolder)) {
+    if (instant || this->textureImageHolder.size() / 2 >=
+                       this->textureImageHolder.translationTable.size()) {
+      const auto compactation = this->textureImageHolder.compact();
+      const auto& images = std::get<0>(compactation);
+      for (const auto image : images) {
+        device.destroy(image);
+      }
+      const auto& views = std::get<1>(compactation);
+      for (const auto view : views) {
+        device.destroy(view);
+      }
+      const std::lock_guard guard(this->textureImageHolder.mutex);
+      const auto& memorys = std::get<2>(compactation);
+      const auto& allMemorys =
+          std::get<2>(this->textureImageHolder.internalValues);
+      std::vector<vk::DeviceMemory> uniqueMemory;
+      uniqueMemory.reserve(memorys.size());
+      std::ranges::unique_copy(memorys, std::back_inserter(uniqueMemory));
+      for (const auto memory : uniqueMemory) {
+        if (std::ranges::none_of(allMemorys, [&](auto memoryIn) {
+              return memory == memoryIn;
+            })) {
+          device.freeMemory(memory);
+        }
+      }
+    }
+  }
+}
 
 void VulkanGraphicsModule::removeSampler(
-    const std::span<TSamplerHolder> samplerHolder, bool instant) {}
+    const std::span<const TSamplerHolder> samplerHolder, bool instant) {}
 
 void VulkanGraphicsModule::removeMaterials(
-    const std::span<PipelineHolder> pipelineHolder, bool instant) {}
+    const std::span<const PipelineHolder> pipelineHolder, bool instant) {}
 
 TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                                const RenderInfo* renderInfos,
@@ -917,6 +950,7 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
       CompositeAlphaFlagBitsKHR::eOpaque, vgm->presentMode, true,
       vgm->swapchain);
 
+  auto oldChain = vgm->swapchain;
   vgm->swapchain = vgm->device.createSwapchainKHR(swapchainCreateInfo);
   vgm->swapchainImages = vgm->device.getSwapchainImagesKHR(vgm->swapchain);
 
@@ -945,6 +979,7 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
            ImageUsageFlagBits::eInputAttachment |
            ImageUsageFlagBits::eTransferSrc}};
 
+  const auto oldImages = vgm->internalImageData;
   const auto data = createInternalImages(vgm, internalImageInfos);
   std::copy(data.begin(), data.end(), vgm->internalImageData.begin());
 
@@ -980,6 +1015,12 @@ inline void createSwapchain(VulkanGraphicsModule* vgm) {
     const auto sapi = vgm->getShaderAPI();
     updateDescriptors(vgm, sapi);
   }
+
+  vgm->device.waitIdle();
+  if (oldChain) {
+    vgm->device.destroy(oldChain);
+  }
+  vgm->removeTextures(oldImages, true);
 }
 
 inline bool checkAndRecreate(VulkanGraphicsModule* vgm, const Result result) {

@@ -73,6 +73,14 @@ struct DataHolder {
   std::unordered_map<size_t, size_t> translationTable;
   size_t currentIndex = 0;
 
+ protected:
+  template <size_t index = 0>
+  size_t __size() {
+    auto &vector = std::get<index>(internalValues);
+    return vector.size();
+  }
+
+ public:
   template <size_t index = 0, HolderConcept HolderType>
   std::vector<TypeAt<index>> get(const std::span<HolderType> &pIndex) {
     std::vector<size_t> indicies(pIndex.size());
@@ -108,8 +116,7 @@ struct DataHolder {
   template <size_t index = 0>
   size_t size() {
     std::lock_guard guard(mutex);
-    auto &vector = std::get<index>(internalValues);
-    return vector.size();
+    return __size<index>();
   }
 
   template <size_t index = 0>
@@ -184,7 +191,7 @@ struct DataHolder {
                newValue);
     size_t currentIndex = 0;
     std::unordered_set<size_t> oldValues;
-    const auto oldSize = size();
+    const auto oldSize = __size();
     oldValues.reserve(oldSize - index);
     for (auto &[key, value] : translationTable) {
       oldValues.insert(value);
