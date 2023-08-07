@@ -183,7 +183,7 @@ class VulkanGraphicsModule : public APILayer {
 
   DataHolder<vk::CommandBuffer, std::vector<RenderInfo>,
              std::shared_ptr<std::mutex>, std::vector<TDataHolder>,
-             std::vector<PipelineHolder>>
+             std::vector<TPipelineHolder>>
       secondaryCommandBuffer;
 
   DataHolder<vk::Image, vk::ImageView, vk::DeviceMemory, size_t,
@@ -203,7 +203,7 @@ class VulkanGraphicsModule : public APILayer {
   size_t attachmentCount;
 
   TDataHolder lightData;
-  PipelineHolder lightPipe;
+  TPipelineHolder lightPipe;
   size_t lightBindings = INVALID_SIZE_T;
   Material lightMat;
   std::vector<PipelineShaderStageCreateInfo> lightCreateInfos;
@@ -242,11 +242,11 @@ class VulkanGraphicsModule : public APILayer {
   void removeSampler(const std::span<const TSamplerHolder> samplerHolder,
                      bool instant = false) override;
 
-  void removeMaterials(const std::span<const PipelineHolder> pipelineHolder,
+  void removeMaterials(const std::span<const TPipelineHolder> pipelineHolder,
                        bool instant = false) override;
 
-  std::vector<PipelineHolder> pushMaterials(const size_t materialcount,
-                                            const Material *materials) override;
+  std::vector<TPipelineHolder> pushMaterials(
+      const size_t materialcount, const Material *materials) override;
 
   std::vector<TDataHolder> pushData(const size_t dataCount,
                                     const BufferInfo *bufferInfo) override;

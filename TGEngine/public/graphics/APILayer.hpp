@@ -36,7 +36,7 @@ struct PushConstRanges {
 struct RenderInfo {
   std::vector<TDataHolder> vertexBuffer;
   TDataHolder indexBuffer;
-  PipelineHolder materialId;
+  TPipelineHolder materialId;
   size_t indexCount;
   size_t instanceCount = 1;
   size_t indexOffset = 0;
@@ -112,17 +112,9 @@ class APILayer : public main::Module {  // Interface
  protected:
   GameGraphicsModule* graphicsModule = nullptr;
   shader::ShaderAPI* shaderAPI;
-  std::vector<size_t> referenceCounter;
   std::mutex referenceCounterMutex;
 
  public:
-  [[nodiscard]] size_t nextCounter() {
-    std::lock_guard lg(referenceCounterMutex);
-    const auto currentCount = referenceCounter.size();
-    referenceCounter.push_back(1);
-    return currentCount;
-  }
-
   inline void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
     this->graphicsModule = graphicsModule;
   }
@@ -131,7 +123,7 @@ class APILayer : public main::Module {  // Interface
 
   virtual ~APILayer() {}
 
-  [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
+  [[nodiscard]] virtual std::vector<TPipelineHolder> pushMaterials(
       const size_t materialcount, const Material* materials) = 0;
 
   [[nodiscard]] virtual std::vector<TDataHolder> pushData(
@@ -155,7 +147,7 @@ class APILayer : public main::Module {  // Interface
       bool instant = false) = 0;
 
   virtual void removeMaterials(
-      const std::span<const PipelineHolder> pipelineHolder,
+      const std::span<const TPipelineHolder> pipelineHolder,
       bool instant = false) = 0;
 
   [[nodiscard]] virtual TRenderHolder pushRender(

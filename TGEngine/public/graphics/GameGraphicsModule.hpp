@@ -61,7 +61,7 @@ class GameGraphicsModule : public main::Module {
   TTextureHolder defaultTextureID;
   std::mutex protectTexture;
   std::unordered_map<std::string, TTextureHolder> textureMap;
-  PipelineHolder defaultMaterial;
+  TPipelineHolder defaultMaterial;
   tge::shader::ShaderPipe defaultPipe;
   FeatureSet features;
 

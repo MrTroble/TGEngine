@@ -1,21 +1,20 @@
 #pragma once
 
-#include "../Error.hpp"
 #include <functional>
 
+#include "../Error.hpp"
+
 namespace tge::graphics {
-class APILayer;
 
 struct EntryHolder {
-  uint32_t internalHandle = INVALID_UINT32;
-  uint32_t referenceID = INVALID_UINT32;
+  size_t internalHandle = INVALID_SIZE_T;
 
   EntryHolder() = default;
 
-  EntryHolder(APILayer* api, const size_t internalHandle);
+  EntryHolder(const size_t internalHandle) : internalHandle(internalHandle) {}
 
   [[nodiscard]] inline bool operator!() const noexcept {
-    return internalHandle == INVALID_UINT32;
+    return internalHandle == INVALID_SIZE_T;
   }
 
   [[nodiscard]] inline bool operator==(
@@ -24,16 +23,13 @@ struct EntryHolder {
   }
 };
 
-struct PipelineHolder : public EntryHolder {
-  using EntryHolder::EntryHolder;
-};
-
-#define DEFINE_HOLDER(name)                     \
-  struct T##name##Holder : public EntryHolder { \
-    T##name##Holder() = default;                \
-    using EntryHolder::EntryHolder;             \
+#define DEFINE_HOLDER(name)                                    \
+  struct T##name##Holder : public tge::graphics::EntryHolder { \
+    T##name##Holder() = default;                               \
+    using tge::graphics::EntryHolder::EntryHolder;             \
   }
 
+DEFINE_HOLDER(Pipeline);
 DEFINE_HOLDER(Render);
 DEFINE_HOLDER(Sampler);
 DEFINE_HOLDER(Texture);

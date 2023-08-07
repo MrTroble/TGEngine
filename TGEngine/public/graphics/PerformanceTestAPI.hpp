@@ -65,7 +65,7 @@ class PerformanceMessuringAPILayer : public APILayer {
 
   void recreate() override { api->recreate(); }
 
-  [[nodiscard]] virtual std::vector<PipelineHolder> pushMaterials(
+  [[nodiscard]] virtual std::vector<TPipelineHolder> pushMaterials(
       const size_t materialcount, const Material* materials) override {
     TimingAdder adder(materialCounter);
     const auto rtc = api->pushMaterials(materialcount, materials);
@@ -107,7 +107,7 @@ class PerformanceMessuringAPILayer : public APILayer {
   }
 
   virtual void removeMaterials(
-      const std::span<const PipelineHolder> pipelineHolder,
+      const std::span<const TPipelineHolder> pipelineHolder,
       bool instant = false) override {
     return api->removeMaterials(pipelineHolder, instant);
   }

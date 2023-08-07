@@ -113,7 +113,7 @@ inline void getOrCreate(
   }
 }
 
-std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
+std::vector<TPipelineHolder> VulkanGraphicsModule::pushMaterials(
     const size_t materialcount, const Material* materials) {
   EXPECT(materialcount != 0 && materials != nullptr);
 
@@ -192,13 +192,13 @@ std::vector<PipelineHolder> VulkanGraphicsModule::pushMaterials(
       device.createGraphicsPipelines({}, pipelineCreateInfos);
   VERROR(piperesult.result);
 
-  std::vector<PipelineHolder> holder(materialcount);
+  std::vector<TPipelineHolder> holder(materialcount);
   {
     auto output = this->materialHolder.allocate(materialcount);
     std::apply(
         [&](auto pipeline, auto layout, auto material) {
           for (size_t i = 0; i < materialcount; i++) {
-            holder[i] = PipelineHolder(this, i + output.beginIndex);
+            holder[i] = TPipelineHolder(i + output.beginIndex);
             *pipeline = piperesult.value[i];
             *layout = pipelineCreateInfos[i].layout;
             *material = materials[i];
@@ -289,7 +289,7 @@ void VulkanGraphicsModule::removeSampler(
     const std::span<const TSamplerHolder> samplerHolder, bool instant) {}
 
 void VulkanGraphicsModule::removeMaterials(
-    const std::span<const PipelineHolder> pipelineHolder, bool instant) {}
+    const std::span<const TPipelineHolder> pipelineHolder, bool instant) {}
 
 TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                                const RenderInfo* renderInfos,
@@ -381,12 +381,12 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
     *buffer = commandBuffer;
     retry->resize(renderInfoCount);
     std::copy(renderInfos, renderInfos + renderInfoCount, retry->begin());
-    nextHolder = TRenderHolder(this, allocation.beginIndex);
+    nextHolder = TRenderHolder(allocation.beginIndex);
     std::lock_guard guard(renderInfosForRetryHolder);
     renderInfosForRetry.push_back(nextHolder);
     std::vector<TDataHolder>& dataHolderToAdd = *dataHolder;
     dataHolderToAdd.reserve(renderInfoCount * 100);
-    std::vector<PipelineHolder>& pipelineHolder = *pipeline;
+    std::vector<TPipelineHolder>& pipelineHolder = *pipeline;
     pipelineHolder.reserve(renderInfoCount);
     for (size_t i = 0; i < renderInfoCount; i++) {
       const auto& render = renderInfos[i];
@@ -579,7 +579,7 @@ std::vector<TDataHolder> VulkanGraphicsModule::pushData(
 
   std::vector<TDataHolder> dataHolders(dataCount);
   for (size_t i = 0; i < dataCount; i++) {
-    dataHolders[i] = TDataHolder(this, returnIndex + i);
+    dataHolders[i] = TDataHolder(returnIndex + i);
   }
   return dataHolders;
 }
@@ -642,7 +642,7 @@ TSamplerHolder VulkanGraphicsModule::pushSampler(const SamplerInfo& sampler) {
       anisotropy != 0, anisotropy);
   const auto smplr = device.createSampler(samplerCreateInfo);
   this->sampler.push_back(smplr);
-  return TSamplerHolder(this, position);
+  return TSamplerHolder(position);
 }
 
 inline std::vector<TTextureHolder> createInternalImages(
@@ -704,8 +704,7 @@ inline std::vector<TTextureHolder> createInternalImages(
     *(viewItr++) = imageView;
     *(memoryItr++) = imageMemory;
     *(offsetItr++) = offset;
-    internalTexture.emplace_back(vgm,
-                                 internalTexture.size() + output.beginIndex);
+    internalTexture.emplace_back(internalTexture.size() + output.beginIndex);
   }
   std::copy(internalImageInfos.begin(), internalImageInfos.end(), internalItr);
   return internalTexture;
@@ -894,7 +893,7 @@ inline void createLightPass(VulkanGraphicsModule* vgm) {
   VERROR(gp.result)
 
   auto output = vgm->materialHolder.allocate(1);
-  vgm->lightPipe = PipelineHolder(vgm, output.beginIndex);
+  vgm->lightPipe = TPipelineHolder(output.beginIndex);
   std::get<0>(output.iterator)[0] = gp.value;
   std::get<1>(output.iterator)[0] = graphicsPipeline.layout;
 }
@@ -1578,7 +1577,7 @@ std::pair<std::vector<char>, TDataHolder> VulkanGraphicsModule::getImageData(
         internalBuffer<true>(this, 1, &bufferCreateInfo, true);
     dataBuffer = output.back().buffer;
     memoryBuffer = memory;
-    dataHolder = TDataHolder(this, returnID);
+    dataHolder = TDataHolder(returnID);
   } else {
     dataBuffer = bufferDataHolder.get<0>(dataHolder);
     memoryBuffer = bufferDataHolder.get<1>(dataHolder);

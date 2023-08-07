@@ -111,7 +111,7 @@ inline std::vector<TDataHolder> loadDataBuffers(const Model &model,
 
 inline void pushRender(const Model &model, APILayer *apiLayer,
                        const std::vector<TDataHolder>& dataId,
-                       const std::vector<PipelineHolder> &materialId,
+                       const std::vector<TPipelineHolder> &materialId,
                        const size_t nodeID,
                        const std::vector<size_t> bindings) {
   std::vector<RenderInfo> renderInfos;
@@ -286,7 +286,7 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
   const auto dataId = loadDataBuffers(model, apiLayer);
 
   std::vector<shader::ShaderPipe> createdShader;
-  std::vector<PipelineHolder> materials(
+  std::vector<TPipelineHolder> materials(
       model.materials.size());  // TODO fix this
   std::fill(begin(materials), end(materials), defaultMaterial);
 
