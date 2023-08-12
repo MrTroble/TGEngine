@@ -135,6 +135,24 @@ class APILayer : public main::Module {  // Interface
   virtual void removeRender(const size_t renderInfoCount,
                             const TRenderHolder* renderIDs) = 0;
 
+  [[nodiscard]] virtual std::vector<TPipelineHolder> pushMaterials(
+      const std::span<const Material> materials) {
+    return pushMaterials(materials.size(), materials.data());
+  }
+
+  [[nodiscard]] virtual std::vector<TDataHolder> pushData(
+      const std::span<const BufferInfo> bufferInfo) {
+    return pushData(bufferInfo.size(), bufferInfo.data());
+  }
+
+  void changeData(const std::span<const BufferChange> changeInfos) {
+    changeData(changeInfos.size(), changeInfos.data());
+  }
+
+  void removeRender(const std::span<const TRenderHolder> renderIDs) {
+    removeRender(renderIDs.size(), renderIDs.data());
+  }
+
   virtual void removeData(const std::span<const TDataHolder> dataHolder,
                           bool instant = false) = 0;
 
@@ -159,6 +177,17 @@ class APILayer : public main::Module {  // Interface
 
   [[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
       const size_t textureCount, const TextureInfo* textures) = 0;
+
+  [[nodiscard]] virtual TRenderHolder pushRender(
+      const std::span<const RenderInfo> renderInfos,
+      const TRenderHolder toOverride = TRenderHolder()) {
+    return pushRender(renderInfos.size(), renderInfos.data());
+  }
+
+  [[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
+      const std::span<const TextureInfo> textures) {
+    return pushTexture(textures.size(), textures.data());
+  }
 
   [[nodiscard]] virtual size_t pushLights(const size_t lightCount,
                                           const Light* lights,

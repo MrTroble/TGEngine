@@ -88,6 +88,10 @@ class GameGraphicsModule : public main::Module {
 
   [[nodiscard]] size_t addNode(const NodeInfo *nodeInfos, const size_t count);
 
+  [[nodiscard]] size_t addNode(const std::span<const NodeInfo> nodeInfos) {
+    return addNode(nodeInfos.data(), nodeInfos.size());
+  }
+
   [[nodiscard]] size_t nextNodeID() { return node.size(); }
 
   void updateTransform(const size_t nodeID, const NodeTransform &transform);
