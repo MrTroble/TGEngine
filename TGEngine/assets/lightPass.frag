@@ -24,7 +24,7 @@
         "    vec3 normal = normalize(subpassLoad(NORMAL).rgb);",
         "    vec3 pos = subpassLoad(POSITION).rgb;",
         "    vec2 roughnessMetallic = subpassLoad(ROUGHNESS_METALLIC).rg;",
-        "    vec3 multiplier = vec3(0.05f, 0.05f, 0.05f);",
+        "    vec3 multiplier = vec3(0.2f, 0.2f, 0.2f);",
         "    for(int x = 0; x < lights.lightCount; x++) {",
         "        Light lightInfo = lights.light[x];",
         "        vec3 l = normalize(lightInfo.pos);",

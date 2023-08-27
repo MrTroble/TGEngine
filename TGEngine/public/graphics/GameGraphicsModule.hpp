@@ -116,6 +116,9 @@ class GameGraphicsModule : public main::Module {
   [[nodiscard]] APILayer *getAPILayer() { return apiLayer; }
 
   [[nodiscard]] WindowModule *getWindowModule() { return windowModule; }
+
+  friend void calculateMatrix(GameGraphicsModule *ggm, const size_t index,
+                              const size_t parentID);
 };
 
 }  // namespace tge::graphics

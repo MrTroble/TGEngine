@@ -110,7 +110,7 @@ inline std::vector<TDataHolder> loadDataBuffers(const Model &model,
 }
 
 inline void pushRender(const Model &model, APILayer *apiLayer,
-                       const std::vector<TDataHolder>& dataId,
+                       const std::vector<TDataHolder> &dataId,
                        const std::vector<TPipelineHolder> &materialId,
                        const size_t nodeID,
                        const std::vector<size_t> bindings) {
@@ -269,9 +269,7 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
              : loader.LoadASCIIFromString(&model, &error, &warning, data.data(),
                                           data.size(), baseDir);
   if (!rst) {
-    PLOG_ERROR << "Loading failed\n"
-                      << error << std::endl
-                      << warning;
+    PLOG_ERROR << "Loading failed\n" << error << std::endl << warning;
     return INVALID_SIZE_T;
   }
 
@@ -297,6 +295,45 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
   return nId;
 }
 
+constexpr uint8_t MIN_ALIGNMENT = sizeof(glm::mat4) * 2;
+
+inline glm::mat4 adjoint(const glm::mat4 &matrix) {
+  glm::mat4 output;
+  for (size_t x = 0; x < 4; x++) {
+    for (size_t y = 0; y < 4; y++) {
+      glm::mat3 mat3;
+      size_t nextX = 0;
+      for (size_t x2 = 0; x2 < 4; x2++) {
+        if (x == x2) continue;
+        size_t nextY = 0;
+        for (size_t y2 = 0; y2 < 4; y2++) {
+          if (y == y2) continue;
+          mat3[nextX][nextY++] = matrix[x2][y2];
+        }
+        nextX++;
+      }
+      output[x][y] = std::pow(-1, x + y) * glm::determinant(mat3);
+    }
+  }
+  return glm::transpose(output);
+}
+
+inline void calculateMatrix(GameGraphicsModule *ggm, const size_t index,
+                            const size_t parentID) {
+  const auto i = index * ggm->alignment;
+  const auto parentIndex = parentID * ggm->alignment;
+  const auto &transform = ggm->node[index];
+  const auto rotationMatrix = glm::toMat4(transform.rotation);
+  const auto mMatrix = glm::translate(transform.translation) *
+                       glm::scale(transform.scale) * rotationMatrix;
+  if (parentID < index) {
+    ggm->modelMatrices[i] = ggm->modelMatrices[parentIndex] * mMatrix;
+  } else {
+    ggm->modelMatrices[i] = mMatrix;
+  }
+  ggm->modelMatrices[i + 1] = rotationMatrix;
+}
+
 main::Error GameGraphicsModule::init() {
   assetResolver.push_back(&util::wholeFile);
   const auto size = this->node.size();
@@ -305,19 +342,11 @@ main::Error GameGraphicsModule::init() {
   std::fill(begin(modelMatrices), end(modelMatrices), glm::mat4(1));
   this->alignment = (uint32_t)ceil(
       (double)this->apiLayer->getAligned(tge::graphics::DataType::Uniform) /
-      (double)sizeof(glm::mat4));
+      (double)MIN_ALIGNMENT);
+  this->alignment = std::max(this->alignment, 2u);
   PLOG_VERBOSE << "Alignment: " << this->alignment;
   for (size_t i = 0; i < size; i++) {
-    const auto &transform = this->node[i];
-    const auto parantID = this->parents[i] * alignment;
-    const auto mMatrix = glm::translate(transform.translation) *
-                         glm::scale(transform.scale) *
-                         glm::toMat4(transform.rotation);
-    if (parantID < size) {
-      modelMatrices[i * alignment] = modelMatrices[parantID] * mMatrix;
-    } else {
-      modelMatrices[i * alignment] = mMatrix;
-    }
+    calculateMatrix(this, i, this->parents[i]);
   }
   nextNode = size;
 
@@ -351,7 +380,7 @@ main::Error GameGraphicsModule::init() {
     info.data[i * 4 + 3] = 255;
   }
   defaultTextureID = apiLayer->pushTexture(1, &info)[0];
-  bufferChange.reserve(100);
+  bufferChange.reserve(128);
   bufferChange.push_back({projection, &projectionView, sizeof(glm::mat4), 0});
   return main::Error::NONE;
 }
@@ -363,20 +392,11 @@ void GameGraphicsModule::tick(double time) {
   bool status = false;
   bufferChange.resize(1);
   for (size_t i = 0; i < size; i++) {
-    const auto parantID = this->parents[i];
-    if (this->status[i] == 1 || (parantID < size && this->status[parantID])) {
+    const auto parentID = this->parents[i];
+    if (this->status[i] == 1 || (parentID < size && this->status[parentID])) {
       status = true;
-      const auto &transform = this->node[i];
-      const auto mMatrix = glm::translate(transform.translation) *
-                           glm::scale(transform.scale) *
-                           glm::toMat4(transform.rotation);
-      if (parantID < size) {
-        modelMatrices[i] = modelMatrices[parantID] * mMatrix;
-      } else {
-        modelMatrices[i] = mMatrix;
-      }
-      bufferChange.push_back({modelHolder, modelMatrices.data(),
-                              sizeof(glm::mat4),
+      calculateMatrix(this, i, parentID);
+      bufferChange.push_back({modelHolder, modelMatrices.data(), MIN_ALIGNMENT,
                               i * sizeof(glm::mat4) * alignment});
     }
   }
@@ -804,8 +824,7 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
     std::vector<char> file;
     for (auto &function : assetResolver) {
       file = function(name);
-      if (!file.empty()) 
-          break;
+      if (!file.empty()) break;
     }
     if (file.empty()) {
       localtextureIDs[i] = defaultTextureID;
@@ -842,32 +861,27 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
     const auto nodeI = nodeInfos[i];
     const auto nodeIndex = (nodeID + i);
     node.push_back(nodeI.transforms);
+    parents.push_back(nodeI.parent);
 
-    const auto mMatrix = glm::translate(nodeI.transforms.translation) *
-                         glm::scale(nodeI.transforms.scale) *
-                         glm::toMat4(nodeI.transforms.rotation);
-    if (nodeI.parent < nodeIndex) {
-      modelMatrices[nextNode++] = modelMatrices[nodeI.parent] * mMatrix;
-      parents.push_back(nodeI.parent);
-    } else {
-      modelMatrices[nextNode++] = mMatrix;
-      parents.push_back(INVALID_SIZE_T);
-    }
+    calculateMatrix(this, nodeIndex, nodeI.parent);
+    nextNode++;
+
     status.push_back(0);
     if (nodeI.bindingID != INVALID_SIZE_T) [[likely]] {
-      const auto mvp = modelMatrices[nodeID];
-      const auto off = sizeof(mvp) * (nodeID + i) * alignment;
-      changeBuffer.push_back({modelHolder, &modelMatrices[nodeID], sizeof(mvp),
-                              sizeof(mvp) * (nodeID + i) * alignment});
+      const auto off = sizeof(glm::mat4) * nodeIndex * alignment;
+      changeBuffer.push_back({modelHolder,
+                              modelMatrices.data() + nodeIndex * alignment,
+                              MIN_ALIGNMENT, off});
       shader::BindingInfo binding;
       binding.bindingSet = nodeI.bindingID;
       binding.type = shader::BindingType::UniformBuffer;
-      binding.data.buffer.size = sizeof(mvp);
+      binding.data.buffer.size = MIN_ALIGNMENT;
       binding.data.buffer.dataID = modelHolder;
       binding.data.buffer.offset = off;
       binding.binding = 2;
       bindings.push_back(binding);
       binding.binding = 3;
+      binding.data.buffer.size = sizeof(glm::mat4);
       binding.data.buffer.dataID = projection;
       binding.data.buffer.offset = 0;
       bindings.push_back(binding);
