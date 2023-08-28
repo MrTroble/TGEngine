@@ -342,7 +342,7 @@ main::Error GameGraphicsModule::init() {
   std::fill(begin(modelMatrices), end(modelMatrices), glm::mat4(1));
   this->alignment = (uint32_t)ceil(
       (double)this->apiLayer->getAligned(tge::graphics::DataType::Uniform) /
-      (double)MIN_ALIGNMENT);
+      (double)2);
   this->alignment = std::max(this->alignment, 2u);
   PLOG_VERBOSE << "Alignment: " << this->alignment;
   for (size_t i = 0; i < size; i++) {
