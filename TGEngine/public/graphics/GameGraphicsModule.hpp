@@ -45,13 +45,12 @@ class GameGraphicsModule : public main::Module {
   glm::mat4 viewMatrix;
   size_t nextNode = 0;
   std::vector<glm::mat4> modelMatrices;
+  std::vector<TDataHolder> dataHolder;
   std::vector<NodeTransform> node;
   std::vector<size_t> parents;
   std::vector<size_t> bindingID;
   std::vector<char> status;
   TDataHolder projection;
-  TDataHolder modelHolder;
-  uint32_t alignment = 1;
   std::vector<BufferChange> bufferChange;
   std::mutex protectNodes;
   std::vector<std::function<std::vector<char>(const std::string &)>>

@@ -295,7 +295,7 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
   return nId;
 }
 
-constexpr uint8_t MIN_ALIGNMENT = sizeof(glm::mat4) * 2;
+constexpr uint8_t AMOUNT_OF_DATA = 2;
 
 inline glm::mat4 adjoint(const glm::mat4 &matrix) {
   glm::mat4 output;
@@ -320,8 +320,8 @@ inline glm::mat4 adjoint(const glm::mat4 &matrix) {
 
 inline void calculateMatrix(GameGraphicsModule *ggm, const size_t index,
                             const size_t parentID) {
-  const auto i = index * ggm->alignment;
-  const auto parentIndex = parentID * ggm->alignment;
+  const auto i = index * AMOUNT_OF_DATA;
+  const auto parentIndex = parentID * AMOUNT_OF_DATA;
   const auto &transform = ggm->node[index];
   const auto rotationMatrix = glm::toMat4(transform.rotation);
   const auto mMatrix = glm::translate(transform.translation) *
@@ -338,27 +338,25 @@ main::Error GameGraphicsModule::init() {
   assetResolver.push_back(&util::wholeFile);
   const auto size = this->node.size();
   glm::mat4 projView = this->projectionMatrix * this->viewMatrix;
-  modelMatrices.resize(UINT16_MAX);
+  modelMatrices.resize(128);
   std::fill(begin(modelMatrices), end(modelMatrices), glm::mat4(1));
-  this->alignment = (uint32_t)ceil(
-      (double)this->apiLayer->getAligned(tge::graphics::DataType::Uniform) /
-      (double)2);
-  this->alignment = std::max(this->alignment, 2u);
-  PLOG_VERBOSE << "Alignment: " << this->alignment;
   for (size_t i = 0; i < size; i++) {
     calculateMatrix(this, i, this->parents[i]);
   }
   nextNode = size;
 
-  std::array<BufferInfo, 2> bufferInfos = {
-      BufferInfo{modelMatrices.data(), modelMatrices.size() * sizeof(glm::mat4),
-                 DataType::Uniform},
+  std::vector<BufferInfo> bufferInfos = {
       BufferInfo{&projView, sizeof(glm::mat4), DataType::Uniform}};
+  bufferInfos.resize(modelMatrices.size() + 1);
+  for (size_t i = 0; i < modelMatrices.size(); i++) {
+    bufferInfos[i + 1] =
+        BufferInfo{&modelMatrices[i], sizeof(glm::mat4), DataType::Uniform};
+  }
 
   const auto &bufferList =
       apiLayer->pushData(bufferInfos.size(), bufferInfos.data());
-  modelHolder = bufferList[0];
-  projection = bufferList[1];
+  projection = bufferList[0];
+  dataHolder = std::vector(bufferList.begin() + 1, bufferList.end());
   defaultPipe = apiLayer->getShaderAPI()->loadShaderPipeAndCompile(
       {"assets/testvec4.vert", "assets/test.frag"});
   const Material defMat(defaultPipe);
@@ -396,8 +394,11 @@ void GameGraphicsModule::tick(double time) {
     if (this->status[i] == 1 || (parentID < size && this->status[parentID])) {
       status = true;
       calculateMatrix(this, i, parentID);
-      bufferChange.push_back({modelHolder, modelMatrices.data(), MIN_ALIGNMENT,
-                              i * sizeof(glm::mat4) * alignment});
+      const auto index = i * AMOUNT_OF_DATA;
+      bufferChange.push_back(
+          {dataHolder[index], &modelMatrices[index], sizeof(glm::mat4)});
+      bufferChange.push_back({dataHolder[index + 1], &modelMatrices[index + 1],
+                              sizeof(glm::mat4)});
     }
   }
   apiLayer->changeData(bufferChange.size(), bufferChange.data());
@@ -854,6 +855,20 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
   std::lock_guard guard(protectNodes);
   const auto nodeID = node.size();
   node.reserve(nodeID + count);
+  const auto oldSize = modelMatrices.size();
+  if (oldSize < node.capacity() * AMOUNT_OF_DATA) {
+    const auto amount = oldSize * oldSize;
+    modelMatrices.resize(amount);
+    std::fill(modelMatrices.begin() + oldSize, modelMatrices.end(),
+              glm::mat4(1));
+    std::vector<BufferInfo> bufferInfos(amount - oldSize);
+    std::fill(bufferInfos.begin(), bufferInfos.end(),
+              BufferInfo{modelMatrices.data() + oldSize, sizeof(glm::mat4),
+                         DataType::Uniform});
+    const auto allData = apiLayer->pushData(bufferInfos);
+    dataHolder.resize(amount);
+    dataHolder.insert(dataHolder.begin() + oldSize, allData.begin(), allData.end());
+  }
   std::vector<shader::BindingInfo> bindings;
   bindings.reserve(count);
   std::vector<BufferChange> changeBuffer;
@@ -868,16 +883,16 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
 
     status.push_back(0);
     if (nodeI.bindingID != INVALID_SIZE_T) [[likely]] {
-      const auto off = sizeof(glm::mat4) * nodeIndex * alignment;
-      changeBuffer.push_back({modelHolder,
-                              modelMatrices.data() + nodeIndex * alignment,
-                              MIN_ALIGNMENT, off});
+      const auto offsetIndex = nodeIndex * AMOUNT_OF_DATA;
+      changeBuffer.push_back({dataHolder[offsetIndex],
+                              modelMatrices.data() + offsetIndex,
+                              sizeof(glm::mat4)});
       shader::BindingInfo binding;
       binding.bindingSet = nodeI.bindingID;
       binding.type = shader::BindingType::UniformBuffer;
-      binding.data.buffer.size = MIN_ALIGNMENT;
-      binding.data.buffer.dataID = modelHolder;
-      binding.data.buffer.offset = off;
+      binding.data.buffer.size = sizeof(glm::mat4);
+      binding.data.buffer.dataID = dataHolder[offsetIndex];
+      binding.data.buffer.offset = 0;
       binding.binding = 2;
       bindings.push_back(binding);
       binding.binding = 3;
