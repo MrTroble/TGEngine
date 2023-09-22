@@ -265,7 +265,7 @@ struct GlslSettings {
 
 SPR_STATIC std::map<std::string, int> lookupCounter;
 
-SPR_STATIC std::string next(const std::string &input) {
+inline std::string next(const std::string &input) {
   const auto id = lookupCounter[input];
   lookupCounter[input]++;
 #ifdef SPR_USE_FORMAT_LIB
@@ -285,7 +285,9 @@ SPR_STATIC std::string next(const std::string &input) {
 
 SPR_STATIC lookup glslLookup
 #ifndef SPR_NO_STATIC
-    = {{"next", next}}
+    = {{"next", next}};
+#else
+    ;
 #endif  // SPR_STATIC
 ;
 

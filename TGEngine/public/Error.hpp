@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <plog/Log.h>
 
 #include <cstddef>
 #include <limits>

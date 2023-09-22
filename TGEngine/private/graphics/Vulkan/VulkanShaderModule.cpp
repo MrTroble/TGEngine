@@ -14,7 +14,14 @@
 #undef ERROR
 #define SPR_NO_DEBUG_OUTPUT 1
 #define SPR_NO_GLSL_INCLUDE 1
+#define SPR_NO_STATIC 1
+#define SPR_STATIC extern
 #include "../../../public/headerlibs/ShaderPermute.hpp"
+
+namespace permute {
+std::map<std::string, int> lookupCounter;
+permute::lookup glslLookup = {{"next", next}};
+}  // namespace permute
 
 namespace tge::shader {
 
