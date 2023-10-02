@@ -95,15 +95,21 @@ inline void debugExpect(const BindingInfo& info) {
 #define DEBUG_EXPECT(input)
 #endif
 
+struct ShaderCreateInfo {
+  std::function<size_t(size_t)> inputLayoutTranslation = [](auto) { return 0; };
+};
+
 class ShaderAPI {
  public:
   virtual ~ShaderAPI() {}
 
   [[nodiscard]] virtual ShaderPipe loadShaderPipeAndCompile(
-      const std::vector<std::string>& shadernames) = 0;
+      const std::vector<std::string>& shadernames,
+      const ShaderCreateInfo& createInfo = {}) = 0;
 
   [[nodiscard]] virtual ShaderPipe compile(
-      const std::vector<ShaderInfo>& shadernames) = 0;
+      const std::vector<ShaderInfo>& shadernames,
+      const ShaderCreateInfo& createInfo = {}) = 0;
 
   [[nodiscard]] virtual size_t createBindings(ShaderPipe pipe,
                                            const size_t count = 1) = 0;

@@ -86,9 +86,13 @@ inline Format getFormatFromElf(const glslang::TType& format) {
 
 struct VertexShaderAnalizer : public glslang::TIntermTraverser {
   VulkanShaderPipe* shaderPipe;
+  const ShaderCreateInfo& createInfo;
 
-  VertexShaderAnalizer(VulkanShaderPipe* pipe)
-      : glslang::TIntermTraverser(false, true, false), shaderPipe(pipe) {
+  VertexShaderAnalizer(VulkanShaderPipe* pipe,
+                       const ShaderCreateInfo& createInfo)
+      : glslang::TIntermTraverser(false, true, false),
+        shaderPipe(pipe),
+        createInfo(createInfo) {
     ioVars.reserve(10);
   }
   std::unordered_set<size_t> ioVars;
@@ -99,9 +103,10 @@ struct VertexShaderAnalizer : public glslang::TIntermTraverser {
     ioVars.emplace(symbol->getId());
     if (qualifier.layoutLocation < NO_LAYOUT_GIVEN) {
       if (qualifier.storage == glslang::TStorageQualifier::EvqVaryingIn) {
-        const auto bind = qualifier.layoutBinding == NO_BINDING_GIVEN
-                              ? 0
-                              : qualifier.layoutBinding;
+        const uint32_t bind = qualifier.layoutBinding == NO_BINDING_GIVEN
+                                  ? (uint32_t)createInfo.inputLayoutTranslation(
+                                        qualifier.layoutLocation)
+                                  : qualifier.layoutBinding;
         shaderPipe->vertexInputAttributes.push_back(
             VertexInputAttributeDescription(
                 qualifier.layoutLocation, bind,
@@ -199,10 +204,11 @@ struct GeneralShaderAnalizer : public glslang::TIntermTraverser {
 
 void __implIntermToVulkanPipe(VulkanShaderPipe* shaderPipe,
                               const glslang::TIntermediate* interm,
-                              const EShLanguage langName) {
+                              const EShLanguage langName,
+                              const ShaderCreateInfo& createInfo) {
   const auto node = interm->getTreeRoot();
   if (langName == EShLangVertex) {
-    VertexShaderAnalizer analizer(shaderPipe);
+    VertexShaderAnalizer analizer(shaderPipe, createInfo);
     node->traverse(&analizer);
     analizer.post();
   }
@@ -263,7 +269,7 @@ std::unique_ptr<glslang::TShader> __implGenerateIntermediate(
 }
 
 VulkanShaderPipe* __implLoadShaderPipeAndCompile(
-    const std::vector<ShaderInfo>& vector) {
+    const std::vector<ShaderInfo>& vector, const ShaderCreateInfo& createInfo) {
   if (vector.size() == 0) {
     PLOG_ERROR << "Wrong shader count!";
     return nullptr;
@@ -284,21 +290,23 @@ VulkanShaderPipe* __implLoadShaderPipeAndCompile(
       return nullptr;
     }
     __implIntermToVulkanPipe(shaderPipe, shader->getIntermediate(),
-                             getLangFromShaderLang(pair.language));
+                             getLangFromShaderLang(pair.language), createInfo);
   }
 
   return shaderPipe;
 }
 
-ShaderPipe VulkanShaderModule::compile(const std::vector<ShaderInfo>& vector) {
+ShaderPipe VulkanShaderModule::compile(const std::vector<ShaderInfo>& vector,
+                                       const ShaderCreateInfo& createInfo) {
   std::lock_guard guard(this->mutex);
-  const auto loadedPipes = __implLoadShaderPipeAndCompile(vector);
+  const auto loadedPipes = __implLoadShaderPipeAndCompile(vector, createInfo);
   if (loadedPipes) __implCreateDescSets(loadedPipes, this);
   return loadedPipes;
 }
 
 ShaderPipe VulkanShaderModule::loadShaderPipeAndCompile(
-    const std::vector<std::string>& shadernames) {
+    const std::vector<std::string>& shadernames,
+    const ShaderCreateInfo& createInfo) {
   std::vector<ShaderInfo> vector;
   vector.reserve(shadernames.size());
   for (const auto& name : shadernames) {
@@ -310,7 +318,7 @@ ShaderPipe VulkanShaderModule::loadShaderPipeAndCompile(
     }
     vector.push_back({getLang(abrivation), content});
   }
-  return compile(vector);
+  return compile(vector, createInfo);
 }
 
 size_t VulkanShaderModule::createBindings(ShaderPipe pipe, const size_t count) {

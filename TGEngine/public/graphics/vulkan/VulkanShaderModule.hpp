@@ -32,10 +32,12 @@ namespace tge::shader {
 		std::vector<std::vector<BindingInfo>> defaultbindings;
 
 		ShaderPipe loadShaderPipeAndCompile(
-			const std::vector<std::string>& shadernames) override;
+			const std::vector<std::string>& shadernames, 
+			const ShaderCreateInfo& createInfo = {}) override;
 
 		ShaderPipe compile(
-			const std::vector<ShaderInfo>& shadernames) override;
+                    const std::vector<ShaderInfo>& shadernames,
+                    const ShaderCreateInfo& createInfo = {}) override;
 
 		size_t createBindings(ShaderPipe pipe, const size_t count = 1) override;
 
