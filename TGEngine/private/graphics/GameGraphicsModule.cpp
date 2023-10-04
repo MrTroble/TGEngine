@@ -112,19 +112,14 @@ inline std::vector<TDataHolder> loadDataBuffers(const Model &model,
 inline void pushRender(const Model &model, APILayer *apiLayer,
                        const std::vector<TDataHolder> &dataId,
                        const std::vector<TPipelineHolder> &materialId,
-                       const size_t nodeID,
-                       const std::vector<size_t> bindings) {
+                       const std::vector<TNodeHolder> nodeID,
+                       GameGraphicsModule *ggm) {
   std::vector<RenderInfo> renderInfos;
   renderInfos.reserve(1000);
+  const auto &bindings = ggm->getBinding(nodeID);
   for (size_t i = 0; i < model.meshes.size(); i++) {
     const auto &mesh = model.meshes[i];
-    const auto bItr = model.nodes.begin();
-    const auto eItr = model.nodes.end();
-    const auto oItr = std::find_if(
-        bItr, eItr, [idx = i](const Node &node) { return node.mesh == idx; });
-    const auto nID =
-        oItr != eItr ? std::distance(bItr, oItr) + nodeID : INVALID_SIZE_T;
-    const auto bID = bindings[nID];
+    const auto bID = bindings[i];
     for (const auto &prim : mesh.primitives) {
       std::vector<std::tuple<int, TDataHolder, int>> strides;
       strides.reserve(prim.attributes.size());
@@ -187,9 +182,9 @@ inline void pushRender(const Model &model, APILayer *apiLayer,
   apiLayer->pushRender(renderInfos.size(), renderInfos.data());
 }
 
-inline size_t loadNodes(const Model &model, APILayer *apiLayer,
-                        const size_t nextNodeID, GameGraphicsModule *ggm,
-                        const std::vector<shader::ShaderPipe> &created) {
+inline std::vector<TNodeHolder> loadNodes(
+    const Model &model, APILayer *apiLayer, GameGraphicsModule *ggm,
+    const std::vector<shader::ShaderPipe> &created) {
   std::vector<NodeInfo> nodeInfos = {};
   const auto amount = model.nodes.size();
   nodeInfos.resize(amount + 1);
@@ -214,7 +209,7 @@ inline size_t loadNodes(const Model &model, APILayer *apiLayer,
                       (float)node.rotation[1], (float)node.rotation[2]);
       }
       for (const auto id : node.children) {
-        nodeInfos[id + 1].parent = nextNodeID + infoID;
+        nodeInfos[id + 1].parent = infoID;
       }
       if (node.mesh >= 0 && created.size() > node.mesh) [[likely]] {
         info.bindingID =
@@ -226,7 +221,7 @@ inline size_t loadNodes(const Model &model, APILayer *apiLayer,
     }
     for (auto &nInfo : nodeInfos) {
       if (nInfo.parent == INVALID_SIZE_T) {
-        nInfo.parent = nextNodeID;
+        nInfo.parent = 0;
       }
     }
   } else {
@@ -253,10 +248,9 @@ GameGraphicsModule::GameGraphicsModule(APILayer *apiLayer,
                                  glm::vec3(0, 1, 0));
 }
 
-size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
-                                     const bool binary,
-                                     const std::string &baseDir,
-                                     void *shaderPipe) {
+std::vector<TNodeHolder> GameGraphicsModule::loadModel(
+    const std::vector<char> &data, const bool binary,
+    const std::string &baseDir, void *shaderPipe) {
   TinyGLTF loader;
   std::string error;
   std::string warning;
@@ -270,7 +264,7 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
                                           data.size(), baseDir);
   if (!rst) {
     PLOG_ERROR << "Loading failed\n" << error << std::endl << warning;
-    return INVALID_SIZE_T;
+    return {};
   }
 
   if (!warning.empty()) {
@@ -288,11 +282,21 @@ size_t GameGraphicsModule::loadModel(const std::vector<char> &data,
       model.materials.size());  // TODO fix this
   std::fill(begin(materials), end(materials), defaultMaterial);
 
-  const auto nId = loadNodes(model, apiLayer, node.size(), this, createdShader);
+  const auto nId = loadNodes(model, apiLayer, this, createdShader);
 
-  pushRender(model, apiLayer, dataId, materials, nId + 1, this->bindingID);
+  pushRender(model, apiLayer, dataId, materials, nId, this);
 
   return nId;
+}
+
+inline glm::mat4 calculateMatrixSingle(const NodeTransform &transform) {
+  const auto rotationMatrix = glm::toMat4(transform.rotation);
+  return glm::translate(transform.translation) * glm::scale(transform.scale) *
+         rotationMatrix;
+}
+
+inline glm::mat4 calculateMatrixNormals(const NodeTransform &transform) {
+  return glm::toMat4(transform.rotation);
 }
 
 constexpr uint8_t AMOUNT_OF_DATA = 2;
@@ -318,45 +322,15 @@ inline glm::mat4 adjoint(const glm::mat4 &matrix) {
   return glm::transpose(output);
 }
 
-inline void calculateMatrix(GameGraphicsModule *ggm, const size_t index,
-                            const size_t parentID) {
-  const auto i = index * AMOUNT_OF_DATA;
-  const auto parentIndex = parentID * AMOUNT_OF_DATA;
-  const auto &transform = ggm->node[index];
-  const auto rotationMatrix = glm::toMat4(transform.rotation);
-  const auto mMatrix = glm::translate(transform.translation) *
-                       glm::scale(transform.scale) * rotationMatrix;
-  if (parentID < index) {
-    ggm->modelMatrices[i] = ggm->modelMatrices[parentIndex] * mMatrix;
-  } else {
-    ggm->modelMatrices[i] = mMatrix;
-  }
-  ggm->modelMatrices[i + 1] = rotationMatrix;
-}
-
 main::Error GameGraphicsModule::init() {
   assetResolver.push_back(&util::wholeFile);
-  const auto size = this->node.size();
   glm::mat4 projView = this->projectionMatrix * this->viewMatrix;
-  modelMatrices.resize(128);
-  std::fill(begin(modelMatrices), end(modelMatrices), glm::mat4(1));
-  for (size_t i = 0; i < size; i++) {
-    calculateMatrix(this, i, this->parents[i]);
-  }
-  nextNode = size;
-
   std::vector<BufferInfo> bufferInfos = {
       BufferInfo{&projView, sizeof(glm::mat4), DataType::Uniform}};
-  bufferInfos.resize(modelMatrices.size() + 1);
-  for (size_t i = 0; i < modelMatrices.size(); i++) {
-    bufferInfos[i + 1] =
-        BufferInfo{&modelMatrices[i], sizeof(glm::mat4), DataType::Uniform};
-  }
 
   const auto &bufferList =
       apiLayer->pushData(bufferInfos.size(), bufferInfos.data());
   projection = bufferList[0];
-  dataHolder = std::vector(bufferList.begin() + 1, bufferList.end());
   defaultPipe = apiLayer->getShaderAPI()->loadShaderPipeAndCompile(
       {"assets/testvec4.vert", "assets/test.frag"});
   const Material defMat(defaultPipe);
@@ -384,25 +358,32 @@ main::Error GameGraphicsModule::init() {
 }
 
 void GameGraphicsModule::tick(double time) {
-  std::lock_guard guard(protectNodes);
-  const auto size = this->node.size();
+  const auto size = nodeHolder.size();
+  std::lock_guard guard(nodeHolder.mutex);
   projectionView = this->projectionMatrix * this->viewMatrix;
   bool status = false;
   bufferChange.resize(1);
+  const auto &parents = std::get<2>(nodeHolder.internalValues);
+  const auto &dataHolder = std::get<0>(nodeHolder.internalValues);
+  const auto &transforms = std::get<1>(nodeHolder.internalValues);
+  auto &statuses = std::get<4>(nodeHolder.internalValues);
+  auto &modelMatrices = std::get<5>(nodeHolder.internalValues);
   for (size_t i = 0; i < size; i++) {
-    const auto parentID = this->parents[i];
-    if (this->status[i] == 1 || (parentID < size && this->status[parentID])) {
+    const auto parentID = nodeHolder.translationTable[parents[i]];
+    if (statuses[i] == 1 || (parentID < size && statuses[parentID])) {
       status = true;
-      calculateMatrix(this, i, parentID);
-      const auto index = i * AMOUNT_OF_DATA;
-      bufferChange.push_back(
-          {dataHolder[index], &modelMatrices[index], sizeof(glm::mat4)});
-      bufferChange.push_back({dataHolder[index + 1], &modelMatrices[index + 1],
-                              sizeof(glm::mat4)});
+      if (parentID < i) {
+        modelMatrices[i] =
+            modelMatrices[parentID] * calculateMatrixSingle(transforms[i]);
+      } else {
+        modelMatrices[i] = calculateMatrixSingle(transforms[i]);
+      }
+      bufferChange.emplace_back(dataHolder[i], &modelMatrices[i],
+                                sizeof(glm::mat4));
     }
   }
   apiLayer->changeData(bufferChange.size(), bufferChange.data());
-  if (status) std::fill(begin(this->status), end(this->status), 0);
+  if (status) std::fill(begin(statuses), end(statuses), 0);
 }
 
 void GameGraphicsModule::destroy() {}
@@ -850,48 +831,38 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
   return localtextureIDs;
 }
 
-size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
-                                   const size_t count) {
-  std::lock_guard guard(protectNodes);
-  const auto nodeID = node.size();
-  node.reserve(nodeID + count);
-  const auto oldSize = modelMatrices.size();
-  if (oldSize < node.capacity() * AMOUNT_OF_DATA) {
-    const auto amount = oldSize * oldSize;
-    modelMatrices.resize(amount);
-    std::fill(modelMatrices.begin() + oldSize, modelMatrices.end(),
-              glm::mat4(1));
-    std::vector<BufferInfo> bufferInfos(amount - oldSize);
-    std::fill(bufferInfos.begin(), bufferInfos.end(),
-              BufferInfo{modelMatrices.data() + oldSize, sizeof(glm::mat4),
-                         DataType::Uniform});
-    const auto allData = apiLayer->pushData(bufferInfos);
-    dataHolder.resize(amount);
-    dataHolder.insert(dataHolder.begin() + oldSize, allData.begin(), allData.end());
-  }
+std::vector<TNodeHolder> GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
+                                                     const size_t count) {
   std::vector<shader::BindingInfo> bindings;
   bindings.reserve(count);
-  std::vector<BufferChange> changeBuffer;
+  std::vector<BufferInfo> bufferInfos(2 * count);
+  auto allocation = nodeHolder.allocate(count);
+  auto [dataHolder, transform, parent, binding, status, cache, cacheNormal] =
+      allocation.iterator;
+  std::fill(status, status + count, 1);
   for (size_t i = 0; i < count; i++) {
-    const auto nodeI = nodeInfos[i];
-    const auto nodeIndex = (nodeID + i);
-    node.push_back(nodeI.transforms);
-    parents.push_back(nodeI.parent);
-
-    calculateMatrix(this, nodeIndex, nodeI.parent);
-    nextNode++;
-
-    status.push_back(0);
-    if (nodeI.bindingID != INVALID_SIZE_T) [[likely]] {
-      const auto offsetIndex = nodeIndex * AMOUNT_OF_DATA;
-      changeBuffer.push_back({dataHolder[offsetIndex],
-                              modelMatrices.data() + offsetIndex,
-                              sizeof(glm::mat4)});
+    const NodeInfo &nodeInfo = nodeInfos[i];
+    binding[i] = nodeInfo.bindingID;
+    transform[i] = nodeInfo.transforms;
+    parent[i] = !nodeInfo.parentHolder ? allocation.beginIndex + nodeInfo.parent
+                                       : nodeInfo.parentHolder.internalHandle;
+    bufferInfos[i] =
+        BufferInfo{&cache[i], sizeof(glm::mat4), DataType::Uniform};
+    bufferInfos[i + count] =
+        BufferInfo{&cacheNormal[i], sizeof(glm::mat4), DataType::Uniform};
+  }
+  const auto allData = apiLayer->pushData(bufferInfos);
+  std::vector<TNodeHolder> nodeHolder(count);
+  for (size_t i = 0; i < count; i++) {
+    const NodeInfo &nodeInfo = nodeInfos[i];
+    nodeHolder[i] = TNodeHolder(allocation.beginIndex + i);
+    dataHolder[i] = allData[i];
+    if (nodeInfo.bindingID != INVALID_SIZE_T) [[likely]] {
       shader::BindingInfo binding;
-      binding.bindingSet = nodeI.bindingID;
+      binding.bindingSet = nodeInfo.bindingID;
       binding.type = shader::BindingType::UniformBuffer;
       binding.data.buffer.size = sizeof(glm::mat4);
-      binding.data.buffer.dataID = dataHolder[offsetIndex];
+      binding.data.buffer.dataID = allData[i];
       binding.data.buffer.offset = 0;
       binding.binding = 2;
       bindings.push_back(binding);
@@ -901,18 +872,10 @@ size_t GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
       binding.data.buffer.offset = 0;
       bindings.push_back(binding);
     }
-    bindingID.push_back(nodeI.bindingID);
   }
-  if (!changeBuffer.empty())
-    apiLayer->changeData(changeBuffer.size(), changeBuffer.data());
-  apiLayer->getShaderAPI()->bindData(bindings.data(), bindings.size());
-  return nodeID;
-}
 
-void GameGraphicsModule::updateTransform(const size_t nodeID,
-                                         const NodeTransform &transform) {
-  this->node[nodeID] = transform;
-  this->status[nodeID] = 1;
+  apiLayer->getShaderAPI()->bindData(bindings.data(), bindings.size());
+  return nodeHolder;
 }
 
 }  // namespace tge::graphics

@@ -96,7 +96,7 @@ enum class DataType {
 };
 
 struct BufferInfo {
-  void* data = nullptr;
+  const void* data = nullptr;
   size_t size = INVALID_SIZE_T;
   DataType type = DataType::Invalid;
 };

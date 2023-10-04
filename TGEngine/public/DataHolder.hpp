@@ -121,7 +121,6 @@ struct DataHolder {
 
   template <size_t index = 0>
   TypeAt<index> const &get(const size_t pIndex) {
-    std::lock_guard guard(this->mutex);
     auto &vector = std::get<index>(internalValues);
     auto newIndex = translationTable.find(pIndex);
     if (newIndex == std::end(translationTable)) {

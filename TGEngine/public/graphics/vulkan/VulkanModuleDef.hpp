@@ -45,7 +45,6 @@ struct QueueSync {
   Queue queue;
   bool armed = false;
   std::mutex handle;
-  std::thread::id threadID;
 
   QueueSync() : device(nullptr), fence(nullptr), queue(nullptr) {}
 
@@ -55,58 +54,46 @@ struct QueueSync {
     fence = device.createFence(info);
   }
 
-  void internalUnlock() {
-    threadID = std::thread::id();
-    handle.unlock();
-  }
-
-  void internalWaitStopWithoutUnlock() {
-    if (threadID != std::this_thread::get_id()) {
-      handle.lock();
-      threadID = std::this_thread::get_id();
-      if (armed) {
-        const auto result2 = device.waitForFences(fence, true, INVALID_SIZE_T);
-        VERROR(result2);
-        device.resetFences(fence);
-        armed = false;
-      }
-    } else {
-      PLOG_WARNING << "Synchronization called within the same thread twice!";
+  [[nodiscard]] std::unique_lock<std::mutex> waitAndGet() {
+    std::unique_lock guard(handle);
+    if (armed) {
+      const auto result2 = device.waitForFences(fence, true, INVALID_SIZE_T);
+      VERROR(result2);
+      device.resetFences(fence);
+      armed = false;
     }
+    return std::move(guard);
   }
 
-  void waitAndDisarm() {
-    internalWaitStopWithoutUnlock();
-    internalUnlock();
-  }
+  void waitAndDisarm() { auto guard = waitAndGet(); }
 
-  void begin(const CommandBuffer buffer, const CommandBufferBeginInfo &info) {
-    internalWaitStopWithoutUnlock();
+  [[nodiscard]] std::unique_lock<std::mutex> begin(
+      const CommandBuffer buffer, const CommandBufferBeginInfo &info) {
+    auto guard = waitAndGet();
     buffer.begin(info);
+    return std::move(guard);
   }
 
-  void end(const CommandBuffer buffer) {
+  void end(const CommandBuffer buffer, std::unique_lock<std::mutex> &&lock) {
     buffer.end();
-    internalUnlock();
   }
 
   void submit(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
-    internalWaitStopWithoutUnlock();
+    auto guard = waitAndGet();
     queue.submit(submitInfos, fence);
     armed = true;
-    internalUnlock();
   }
 
   void submitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
-    internalWaitStopWithoutUnlock();
+    auto guard = waitAndGet();
     queue.submit(submitInfos, fence);
     const auto result = device.waitForFences(fence, true, INVALID_SIZE_T);
     VERROR(result);
     device.resetFences(fence);
-    internalUnlock();
   }
 
-  void endSubmitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
+  void endSubmitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos,
+                        std::unique_lock<std::mutex> &&lock) {
     for (const auto &submit : submitInfos) {
       for (size_t i = 0; i < submit.commandBufferCount; i++) {
         submit.pCommandBuffers[i].end();
@@ -121,7 +108,6 @@ struct QueueSync {
     const auto result = device.waitForFences(fence, true, INVALID_SIZE_T);
     VERROR(result);
     device.resetFences(fence);
-    internalUnlock();
   }
 
   Fence getFence() { return fence; }

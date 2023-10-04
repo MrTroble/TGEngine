@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "../../public/DataHolder.hpp"
 #include "../../public/Error.hpp"
 #include "../../public/Module.hpp"
 #include "APILayer.hpp"
@@ -16,6 +17,8 @@
 #include "WindowModule.hpp"
 
 namespace tge::graphics {
+
+DEFINE_HOLDER(Node);
 
 struct NodeTransform {
   glm::vec3 translation = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -27,6 +30,7 @@ struct NodeInfo {
   size_t bindingID = INVALID_SIZE_T;
   NodeTransform transforms = {};
   size_t parent = INVALID_SIZE_T;
+  TNodeHolder parentHolder;
 };
 
 struct FeatureSet {
@@ -44,15 +48,11 @@ class GameGraphicsModule : public main::Module {
   glm::mat4 projectionMatrix;
   glm::mat4 viewMatrix;
   size_t nextNode = 0;
-  std::vector<glm::mat4> modelMatrices;
-  std::vector<TDataHolder> dataHolder;
-  std::vector<NodeTransform> node;
-  std::vector<size_t> parents;
-  std::vector<size_t> bindingID;
-  std::vector<char> status;
+  DataHolder<TDataHolder, NodeTransform, size_t, size_t, char, glm::mat4,
+             glm::mat4>
+      nodeHolder;
   TDataHolder projection;
   std::vector<BufferChange> bufferChange;
-  std::mutex protectNodes;
   std::vector<std::function<std::vector<char>(const std::string &)>>
       assetResolver;
 
@@ -67,15 +67,18 @@ class GameGraphicsModule : public main::Module {
   GameGraphicsModule(APILayer *apiLayer, WindowModule *winModule,
                      const FeatureSet &set = {});
 
+  inline std::vector<size_t> getBinding(std::span<const TNodeHolder> holders) {
+    return nodeHolder.get<3>(holders);
+  }
+
   void addAssetResolver(
       std::function<std::vector<char>(const std::string &)> &&function) {
     assetResolver.push_back(function);
   }
 
-  [[nodiscard]] size_t loadModel(const std::vector<char> &data,
-                                 const bool binary,
-                                 const std::string &baseDir = "",
-                                 void *shaderPipe = nullptr);
+  [[nodiscard]] std::vector<TNodeHolder> loadModel(
+      const std::vector<char> &data, const bool binary,
+      const std::string &baseDir = "", void *shaderPipe = nullptr);
 
   std::vector<TTextureHolder> loadTextures(
       const std::vector<std::vector<char>> &data,
@@ -85,26 +88,25 @@ class GameGraphicsModule : public main::Module {
       const std::vector<std::string> &names,
       const LoadType type = LoadType::STBI);
 
-  [[nodiscard]] size_t addNode(const NodeInfo *nodeInfos, const size_t count);
+  [[nodiscard]] std::vector<TNodeHolder> addNode(const NodeInfo *nodeInfos,
+                                                 const size_t count);
 
-  [[nodiscard]] size_t addNode(const std::span<const NodeInfo> nodeInfos) {
+  [[nodiscard]] std::vector<TNodeHolder> addNode(
+      const std::span<const NodeInfo> nodeInfos) {
     return addNode(nodeInfos.data(), nodeInfos.size());
   }
 
-  [[nodiscard]] size_t nextNodeID() { return node.size(); }
-
-  void updateTransform(const size_t nodeID, const NodeTransform &transform);
+  void updateTransform(const TNodeHolder nodeID,
+                       const NodeTransform &transform) {
+    { nodeHolder.change<1>(nodeID) = transform; }
+    { nodeHolder.change<4>(nodeID) = 1; }
+  }
 
   void updateViewMatrix(const glm::mat4 matrix) {
     this->projectionMatrix = matrix;
   }
 
   void updateCameraMatrix(const glm::mat4 matrix) { this->viewMatrix = matrix; }
-
-  void updateScale(const size_t nodeID, const glm::vec3 scale) {
-    this->node[nodeID].scale = scale;
-    this->status[nodeID] = 1;
-  }
 
   main::Error init() override;
 

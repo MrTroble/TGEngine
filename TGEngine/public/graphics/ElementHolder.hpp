@@ -1,7 +1,7 @@
 #pragma once
 
 #include <functional>
-
+#include <concepts>
 #include "../Error.hpp"
 
 namespace tge::graphics {
@@ -38,11 +38,12 @@ DEFINE_HOLDER(Data);
 }  // namespace tge::graphics
 
 namespace std {
-template <>
-struct std::hash<tge::graphics::EntryHolder> {
+template <std::derived_from<tge::graphics::EntryHolder> T>
+struct std::hash<T> {
   [[nodiscard]] inline std::size_t operator()(
-      tge::graphics::EntryHolder const& s) const noexcept {
-    return std::hash<size_t>{}(s.internalHandle);
+      const tge::graphics::EntryHolder& s) const noexcept {
+    const std::hash<std::size_t> test;
+    return test(s.internalHandle);
   }
 };
 }  // namespace std

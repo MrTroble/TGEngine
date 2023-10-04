@@ -545,7 +545,7 @@ std::vector<TDataHolder> VulkanGraphicsModule::pushData(
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit);
-  secondarySync->begin(cmdBuf, beginInfo);
+  auto guard = secondarySync->begin(cmdBuf, beginInfo);
 
   size_t currentOffset = 0;
   size_t tempCurrentOffset = 0;
@@ -572,7 +572,7 @@ std::vector<TDataHolder> VulkanGraphicsModule::pushData(
   }
 
   const SubmitInfo info({}, {}, cmdBuf);
-  secondarySync->endSubmitAndWait(info);
+  secondarySync->endSubmitAndWait(info, std::move(guard));
 
   device.freeMemory(hostVisibleMemory);
   for (const auto buf : tempBuffer) device.destroyBuffer(buf);
@@ -611,7 +611,7 @@ void VulkanGraphicsModule::changeData(const size_t sizes,
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit);
-  secondarySync->begin(cmdBuf, beginInfo);
+  auto guard = secondarySync->begin(cmdBuf, beginInfo);
 
   for (size_t i = 0; i < sizes; i++) {
     const auto& change = changeInfos[i];
@@ -623,7 +623,7 @@ void VulkanGraphicsModule::changeData(const size_t sizes,
   }
 
   const SubmitInfo info({}, {}, cmdBuf);
-  secondarySync->endSubmitAndWait(info);
+  secondarySync->endSubmitAndWait(info, std::move(guard));
 
   device.freeMemory(memory);
   for (const auto& buffer : bufferList) {
@@ -728,7 +728,7 @@ std::vector<TTextureHolder> VulkanGraphicsModule::pushTexture(
 
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit, {});
-  secondarySync->begin(commandBuffer, beginInfo);
+  auto guard = secondarySync->begin(commandBuffer, beginInfo);
 
   constexpr ImageSubresourceRange range = {ImageAspectFlagBits::eColor, 0, 1, 0,
                                            1};
@@ -790,7 +790,7 @@ std::vector<TTextureHolder> VulkanGraphicsModule::pushTexture(
   }
 
   const SubmitInfo info({}, {}, commandBuffer);
-  secondarySync->endSubmitAndWait(info);
+  secondarySync->endSubmitAndWait(info, std::move(guard));
   return internalImageHolder;
 }
 
@@ -903,7 +903,7 @@ inline void oneTimeWait(VulkanGraphicsModule* vgm,
                         QueueSync* synchronizer) {
   const CommandBufferBeginInfo beginInfo(
       CommandBufferUsageFlagBits::eOneTimeSubmit, {});
-  synchronizer->begin(commandBuffer, beginInfo);
+  auto guard = synchronizer->begin(commandBuffer, beginInfo);
 
   waitForImageTransition(
       commandBuffer, ImageLayout::eUndefined, ImageLayout::eGeneral,
@@ -925,7 +925,7 @@ inline void oneTimeWait(VulkanGraphicsModule* vgm,
   }
 
   const SubmitInfo info({}, {}, commandBuffer);
-  synchronizer->endSubmitAndWait(info);
+  synchronizer->endSubmitAndWait(info, std::move(guard));
 }
 
 inline void createSwapchain(VulkanGraphicsModule* vgm) {
@@ -1551,8 +1551,10 @@ void VulkanGraphicsModule::removeRender(const size_t renderInfoCount,
     secondaryCommandBuffer.erase(toErase);
     const auto tuple = secondaryCommandBuffer.compact();
     const auto& lostBuffer = std::get<0>(tuple);
-    if (!lostBuffer.empty())
+    if (!lostBuffer.empty()) {
+      auto guard = this->primarySync->waitAndGet();
       device.freeCommandBuffers(secondaryBufferPool, lostBuffer);
+    }
   }
 }
 
@@ -1585,10 +1587,11 @@ std::pair<std::vector<char>, TDataHolder> VulkanGraphicsModule::getImageData(
 
   const auto buffer = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
   static constexpr CommandBufferBeginInfo info;
+  std::unique_lock<std::mutex> lockGuard;
   if (secondarySync != primarySync) {
-    secondarySync->handle.lock();
+    lockGuard = std::unique_lock(secondarySync->handle);
   }
-  primarySync->begin(buffer, info);
+  auto guard = primarySync->begin(buffer, info);
 
   constexpr ImageSubresourceRange range(ImageAspectFlagBits::eColor, 0, 1, 0,
                                         1);
@@ -1608,7 +1611,7 @@ std::pair<std::vector<char>, TDataHolder> VulkanGraphicsModule::getImageData(
                          range);
 
   const SubmitInfo submit({}, {}, buffer, {});
-  primarySync->endSubmitAndWait(submit);
+  primarySync->endSubmitAndWait(submit, std::move(guard));
 
   std::vector<char> vector(requireMents.size);
   const char* readMemory =
@@ -1616,9 +1619,6 @@ std::pair<std::vector<char>, TDataHolder> VulkanGraphicsModule::getImageData(
   std::copy(readMemory, (readMemory + requireMents.size), vector.begin());
   device.unmapMemory(memoryBuffer);
 
-  if (secondarySync != primarySync) {
-    secondarySync->handle.unlock();
-  }
   return std::make_pair(vector, dataHolder);
 }
 

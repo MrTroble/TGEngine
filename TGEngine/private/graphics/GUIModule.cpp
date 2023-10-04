@@ -46,7 +46,7 @@ inline void render(gui::GUIModule *gmod) {
   ImDrawData *draw_data = ImGui::GetDrawData();
 
   const CommandBufferBeginInfo beginInfo;
-  vgm->primarySync->begin(buffer, beginInfo);
+  auto guard = vgm->primarySync->begin(buffer, beginInfo);
 
   constexpr std::array clearColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
@@ -60,7 +60,7 @@ inline void render(gui::GUIModule *gmod) {
   buffer.beginRenderPass(renderPassBeginInfo, {});
   ImGui_ImplVulkan_RenderDrawData(draw_data, (VkCommandBuffer)buffer);
   buffer.endRenderPass();
-  vgm->primarySync->end(buffer);
+  vgm->primarySync->end(buffer, std::move(guard));
 
   vgm->primary[gmod->primary] = buffer;
 }
