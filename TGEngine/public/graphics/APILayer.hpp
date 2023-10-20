@@ -67,10 +67,10 @@ enum class AddressMode {
 };
 
 struct SamplerInfo {
-  FilterSetting minFilter;
-  FilterSetting magFilter;
-  AddressMode uMode;
-  AddressMode vMode;
+  FilterSetting minFilter = FilterSetting::LINEAR;
+  FilterSetting magFilter = FilterSetting::LINEAR;
+  AddressMode uMode = AddressMode::REPEAT;
+  AddressMode vMode = AddressMode::REPEAT;
   int anisotropy = 0;
 };
 

@@ -92,7 +92,7 @@ struct DataHolder {
   }
 
   template <size_t index = 0, HolderConcept HolderType>
-  TypeAt<index> const &get(HolderType pIndex) {
+  TypeAt<index> get(HolderType pIndex) {
     return get<index>(pIndex.internalHandle);
   }
 
@@ -120,13 +120,14 @@ struct DataHolder {
   }
 
   template <size_t index = 0>
-  TypeAt<index> const &get(const size_t pIndex) {
-    auto &vector = std::get<index>(internalValues);
+  TypeAt<index> get(const size_t pIndex) {
+    std::lock_guard guard(mutex);
     auto newIndex = translationTable.find(pIndex);
     if (newIndex == std::end(translationTable)) {
       PLOG_ERROR << "Index " << pIndex << " not in DataHolder!";
       throw std::runtime_error("Index not in DataHolder!");
     }
+    auto &vector = std::get<index>(internalValues);
     return vector[newIndex->second];
   }
 

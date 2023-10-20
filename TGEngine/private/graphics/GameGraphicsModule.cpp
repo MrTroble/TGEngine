@@ -354,6 +354,7 @@ main::Error GameGraphicsModule::init() {
   defaultTextureID = apiLayer->pushTexture(1, &info)[0];
   bufferChange.reserve(128);
   bufferChange.push_back({projection, &projectionView, sizeof(glm::mat4), 0});
+  textureMap[""] = defaultTextureID;
   return main::Error::NONE;
 }
 

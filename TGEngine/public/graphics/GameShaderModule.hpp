@@ -3,9 +3,10 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include "../Util.hpp"
+#include <span>
 
 #include "../Error.hpp"
+#include "../Util.hpp"
 #include "Material.hpp"
 
 namespace tge::shader {
@@ -112,13 +113,17 @@ class ShaderAPI {
       const ShaderCreateInfo& createInfo = {}) = 0;
 
   [[nodiscard]] virtual size_t createBindings(ShaderPipe pipe,
-                                           const size_t count = 1) = 0;
+                                              const size_t count = 1) = 0;
 
   virtual void changeInputBindings(const ShaderPipe pipe,
                                    const size_t bindingID,
                                    const size_t buffer) = 0;
 
   virtual void bindData(const BindingInfo* info, const size_t count) = 0;
+
+  virtual void bindData(const std::span<const BindingInfo> infos) {
+    bindData(infos.data(), infos.size());
+  }
 
   virtual void addToRender(const size_t* bindingID, const size_t size,
                            void* customData) = 0;
