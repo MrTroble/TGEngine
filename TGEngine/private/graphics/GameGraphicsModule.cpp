@@ -748,13 +748,16 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
   textureInfos.reserve(data.size());
   for (const auto &ddsVec : data) {
     if (ddsVec.empty()) {
-      PLOG_FATAL << "Found empty texture";
-      exit(-1);
+      PLOG_ERROR << "Found empty texture";
       continue;
     }
     uint8_t *ddsData = (uint8_t *)ddsVec.data();
     ddspp::Descriptor desc;
-    ddspp::decode_header(ddsData, desc);
+    const auto result = ddspp::decode_header(ddsData, desc);
+    if (result == ddspp::Result::Error) {
+      PLOG_ERROR << "DDS texture not valid!";
+      continue;
+    }
     TextureInfo info;
     info.data = ddsData + desc.headerSize;
     info.width = desc.width;
