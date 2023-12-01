@@ -1,7 +1,8 @@
 #pragma once
 
-#include <functional>
 #include <concepts>
+#include <functional>
+
 #include "../Error.hpp"
 
 namespace tge::graphics {
@@ -36,6 +37,10 @@ DEFINE_HOLDER(Texture);
 DEFINE_HOLDER(Data);
 
 }  // namespace tge::graphics
+
+namespace tge::shader {
+DEFINE_HOLDER(Binding);
+}
 
 namespace std {
 template <std::derived_from<tge::graphics::EntryHolder> T>

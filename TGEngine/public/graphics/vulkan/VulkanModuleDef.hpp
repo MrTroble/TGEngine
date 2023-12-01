@@ -169,7 +169,7 @@ class VulkanGraphicsModule : public APILayer {
 
   DataHolder<vk::CommandBuffer, std::vector<RenderInfo>,
              std::shared_ptr<std::mutex>, std::vector<TDataHolder>,
-             std::vector<TPipelineHolder>>
+             std::vector<TPipelineHolder>, RenderTarget>
       secondaryCommandBuffer;
 
   DataHolder<vk::Image, vk::ImageView, vk::DeviceMemory, size_t,
@@ -190,7 +190,7 @@ class VulkanGraphicsModule : public APILayer {
 
   TDataHolder lightData;
   TPipelineHolder lightPipe;
-  size_t lightBindings = INVALID_SIZE_T;
+  shader::TBindingHolder lightBindings{};
   Material lightMat;
   std::vector<PipelineShaderStageCreateInfo> lightCreateInfos;
 
@@ -239,9 +239,10 @@ class VulkanGraphicsModule : public APILayer {
 
   void changeData(const size_t sizes, const BufferChange *changeInfos) override;
 
-  TRenderHolder pushRender(
-      const size_t renderInfoCount, const RenderInfo *renderInfos,
-      const TRenderHolder toOverride = TRenderHolder()) override;
+  TRenderHolder pushRender(const size_t renderInfoCount,
+                           const RenderInfo *renderInfos,
+                           const TRenderHolder toOverride = TRenderHolder(),
+                           const RenderTarget target = RenderTarget::OPAQUE_TARGET) override;
 
   TSamplerHolder pushSampler(const SamplerInfo &sampler) override;
 

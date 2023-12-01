@@ -328,25 +328,33 @@ ShaderPipe VulkanShaderModule::loadShaderPipeAndCompile(
   return compile(vector, createInfo);
 }
 
-size_t VulkanShaderModule::createBindings(ShaderPipe pipe, const size_t count) {
+std::vector<TBindingHolder> VulkanShaderModule::createBindings(
+    ShaderPipe pipe, const size_t count) {
   VulkanShaderPipe* shaderPipe = (VulkanShaderPipe*)pipe;
   const auto layout = shaderPipe->layoutID;
-  if (layout == INVALID_SIZE_T) return INVALID_SIZE_T;
-  std::vector<DescriptorSetLayout> layouts(count);
-  std::fill(layouts.begin(), layouts.end(), this->setLayouts[layout]);
+  if (layout == INVALID_SIZE_T) return {};
+  auto output = bindingHolder.allocate(count);
+  auto [descriptorSets, layoutsOut, pipeLayouts, status, expected] =
+      output.iterator;
+  std::fill(layoutsOut, layoutsOut + count, this->setLayouts[layout]);
+#ifdef DEBUG
+  std::fill(status, status + count, 0);
+  size_t allBindings = 0;
+  for (const auto x : shaderPipe->descriptorLayoutBindings) {
+    allBindings |= 1 << x.binding;
+  }
+  std::fill(expected, expected + count, allBindings);
+  std::fill(status, status + count, 0);
+#endif  // DEBUG
+
   const DescriptorSetAllocateInfo allocInfo(this->descPools[layout], count,
-                                            layouts.data());
+                                            &layoutsOut[0]);
   graphics::VulkanGraphicsModule* vgm =
       (graphics::VulkanGraphicsModule*)this->vgm;
   const auto sets = vgm->device.allocateDescriptorSets(allocInfo);
-  const auto nextID = this->descSets.size();
-  this->descSets.resize(nextID + count);
-  std::copy(sets.begin(), sets.end(), this->descSets.begin() + nextID);
-
-  for (size_t i = 0; i < count; i++) {
-    pipeInfos.push_back({nextID + i, layout});
-  }
-  return nextID;
+  std::ranges::copy(sets, descriptorSets);
+  std::fill(pipeLayouts, pipeLayouts + count, this->pipeLayouts[layout]);
+  return output.generateOutputArray<TBindingHolder>(count);
 }
 
 void VulkanShaderModule::changeInputBindings(const ShaderPipe pipe,
@@ -366,6 +374,11 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
   for (size_t i = 0; i < count; i++) {
     const auto& cinfo = info[i];
     DEBUG_EXPECT(cinfo);
+    const auto descriptorSet = bindingHolder.get<0>(cinfo.bindingSet);
+#ifdef DEBUG
+    const auto old = bindingHolder.get<3>(cinfo.bindingSet);
+    { bindingHolder.change<3>(cinfo.bindingSet) = old | (1 << cinfo.binding); }
+#endif  // DEBUG
     switch (cinfo.type) {
       case BindingType::Storage:
       case BindingType::UniformBuffer: {
@@ -375,7 +388,7 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
         bufferInfo[i] = (DescriptorBufferInfo(buffer, bufferBindingInfo.offset,
                                               bufferBindingInfo.size));
         set.push_back(
-            WriteDescriptorSet(descSets[cinfo.bindingSet], cinfo.binding, 0, 1,
+            WriteDescriptorSet(descriptorSet, cinfo.binding, 0, 1,
                                cinfo.type == BindingType::UniformBuffer
                                    ? DescriptorType::eUniformBuffer
                                    : DescriptorType::eStorageBuffer,
@@ -392,7 +405,7 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
                          : vgm->textureImageHolder.get<1>(tex.texture),
             ImageLayout::eShaderReadOnlyOptimal);
         set.push_back(WriteDescriptorSet(
-            descSets[cinfo.bindingSet], cinfo.binding, cinfo.arrayID, 1,
+            descriptorSet, cinfo.binding, cinfo.arrayID, 1,
             cinfo.type == BindingType::Texture ? DescriptorType::eSampledImage
             : (cinfo.type == BindingType::InputAttachment)
                 ? DescriptorType::eInputAttachment
@@ -407,23 +420,21 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
   return;
 }
 
-void VulkanShaderModule::addToRender(const size_t* bids, const size_t size,
-                                     void* customData) {
-  std::vector<DescriptorSet> sets;
-  PipelineLayout pipeLayout;
-  for (size_t i = 0; i < size; i++) {
-    const auto bindingID = bids[i];
-    if (this->pipeInfos.size() > bindingID && bindingID >= 0) {
-      const auto& bInfo = pipeInfos[bindingID];
-      const auto descSet = descSets[bInfo.descSet];
-      pipeLayout = pipeLayouts[bInfo.pipeline];
-      sets.push_back(descSet);
-    }
-  }
-  if (!sets.empty()) {
+void VulkanShaderModule::addToRender(
+    const std::span<const TBindingHolder> bindings, void* customData) {
+  for (const auto binding : bindings) {
+    const auto pipeLayout = bindingHolder.get<2>(binding);
+    const auto descriptorSet = bindingHolder.get<0>(binding);
+#ifdef DEBUG
+    auto bitset = bindingHolder.get<3>(binding);
+    auto expected = bindingHolder.get<4>(binding);
+    debugExpect(bitset == expected, "Binding not updatet at index [" +
+                                        std::to_string(bitset ^ expected) + "] !");
+#endif  // DEBUG
+
     ((CommandBuffer*)customData)
-        ->bindDescriptorSets(PipelineBindPoint::eGraphics, pipeLayout, 0, sets,
-                             {});
+        ->bindDescriptorSets(PipelineBindPoint::eGraphics, pipeLayout, 0,
+                             descriptorSet, {});
   }
 }
 

@@ -30,6 +30,15 @@ struct DataHolderOutput : public std::unique_lock<std::mutex> {
 
   explicit DataHolderOutput(std::mutex &mutex)
       : std::unique_lock<std::mutex>(mutex), beginIndex(0) {}
+
+  template <HolderConcept Holder>
+  inline std::vector<Holder> generateOutputArray(const size_t count) {
+    std::vector<Holder> outputHolder(count);
+    for (size_t i = 0; i < count; i++) {
+      outputHolder[i] = Holder(beginIndex + i);
+    }
+    return outputHolder;
+  }
 };
 
 template <typename Tuple, typename Tuple2, std::size_t... I>

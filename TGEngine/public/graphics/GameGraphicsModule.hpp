@@ -27,7 +27,7 @@ struct NodeTransform {
 };
 
 struct NodeInfo {
-  size_t bindingID = INVALID_SIZE_T;
+  shader::TBindingHolder bindingID{};
   NodeTransform transforms = {};
   size_t parent = INVALID_SIZE_T;
   TNodeHolder parentHolder;
@@ -48,7 +48,7 @@ class GameGraphicsModule : public main::Module {
   glm::mat4 projectionMatrix;
   glm::mat4 viewMatrix;
   size_t nextNode = 0;
-  DataHolder<TDataHolder, NodeTransform, size_t, size_t, char, glm::mat4,
+  DataHolder<TDataHolder, NodeTransform, size_t, shader::TBindingHolder, char, glm::mat4,
              glm::mat4>
       nodeHolder;
   TDataHolder projection;
@@ -67,7 +67,7 @@ class GameGraphicsModule : public main::Module {
   GameGraphicsModule(APILayer *apiLayer, WindowModule *winModule,
                      const FeatureSet &set = {});
 
-  inline std::vector<size_t> getBinding(std::span<const TNodeHolder> holders) {
+  inline std::vector<shader::TBindingHolder> getBinding(std::span<const TNodeHolder> holders) {
     return nodeHolder.get<3>(holders);
   }
 

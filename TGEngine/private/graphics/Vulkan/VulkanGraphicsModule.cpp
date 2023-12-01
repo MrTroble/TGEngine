@@ -293,20 +293,21 @@ void VulkanGraphicsModule::removeMaterials(
 
 TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
                                                const RenderInfo* renderInfos,
-                                               const TRenderHolder toOverride) {
+                                               const TRenderHolder toOverride,
+                                               const RenderTarget target) {
   EXPECT(renderInfoCount != 0 && renderInfos != nullptr);
 
   std::unique_lock<std::mutex> lockGuard;
   vk::CommandBuffer commandBuffer;
   TRenderHolder nextHolder = toOverride;
   std::unique_lock<std::mutex> generalLock;
+  auto& secondaryCommandBuffer = this->secondaryCommandBuffer;
   if (!toOverride) {
     const CommandBufferAllocateInfo commandBufferAllocate(
         secondaryBufferPool, CommandBufferLevel::eSecondary, 1);
     commandBuffer = device.allocateCommandBuffers(commandBufferAllocate)[0];
   } else {
-    primarySync->waitAndDisarm();
-    generalLock = std::unique_lock(primarySync->handle);
+    generalLock = primarySync->waitAndGet();
     lockGuard =
         std::unique_lock(*secondaryCommandBuffer.get<2>(toOverride).get());
     commandBuffer = secondaryCommandBuffer.get<0>(toOverride);
@@ -341,12 +342,13 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
       }
     }
 
-    if (info.bindingID != INVALID_SIZE_T) {
-      shaderAPI->addToRender(&info.bindingID, 1, (void*)&commandBuffer);
-    } else {
+    if (!info.bindingID) {
       const auto binding = shaderAPI->createBindings(
           shaderPipes[info.materialId.internalHandle]);
-      shaderAPI->addToRender(&binding, 1, (void*)&commandBuffer);
+      shaderAPI->addToRender(binding, (void*)&commandBuffer);
+    } else {
+      shaderAPI->addToRender(std::span(&info.bindingID, 1),
+                             (void*)&commandBuffer);
     }
 
     commandBuffer.bindPipeline(
@@ -375,7 +377,9 @@ TRenderHolder VulkanGraphicsModule::pushRender(const size_t renderInfoCount,
 
   if (!toOverride) {
     auto allocation = secondaryCommandBuffer.allocate(1);
-    auto& [buffer, retry, mutex, dataHolder, pipeline] = allocation.iterator;
+    auto& [buffer, retry, mutex, dataHolder, pipeline, targetOut] =
+        allocation.iterator;
+    *targetOut = target;
     *mutex = std::make_unique<std::mutex>();
     lockGuard = std::unique_lock(*mutex->get());
     *buffer = commandBuffer;
@@ -1374,7 +1378,7 @@ main::Error VulkanGraphicsModule::init() {
   const auto pipe = (VulkanShaderPipe*)shaderAPI->loadShaderPipeAndCompile(
       {"assets/lightPass.vert", "assets/lightPass.frag"});
   shaderPipes.push_back(pipe);
-  lightBindings = shaderAPI->createBindings(pipe, 1);
+  lightBindings = shaderAPI->createBindings(pipe)[0];
   getOrCreate(this, pipe, lightCreateInfos);
   lightMat = Material(pipe);
 
@@ -1444,8 +1448,7 @@ void VulkanGraphicsModule::tick(double time) {
                                materialHolder.get<0>(lightPipe.internalHandle));
 
     const std::array lights = {lightBindings};
-    getShaderAPI()->addToRender(lights.data(), lights.size(),
-                                (CommandBuffer*)&currentBuffer);
+    getShaderAPI()->addToRender(lights, (CommandBuffer*)&currentBuffer);
 
     currentBuffer.draw(3, 1, 0, 0);
 

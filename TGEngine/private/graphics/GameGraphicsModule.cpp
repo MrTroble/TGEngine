@@ -213,10 +213,10 @@ inline std::vector<TNodeHolder> loadNodes(
       }
       if (node.mesh >= 0 && created.size() > node.mesh) [[likely]] {
         info.bindingID =
-            apiLayer->getShaderAPI()->createBindings(created[node.mesh]);
+            apiLayer->getShaderAPI()->createBindings(created[node.mesh])[0];
       } else {
         info.bindingID =
-            apiLayer->getShaderAPI()->createBindings(ggm->defaultPipe);
+            apiLayer->getShaderAPI()->createBindings(ggm->defaultPipe)[0];
       }
     }
     for (auto &nInfo : nodeInfos) {
@@ -226,7 +226,7 @@ inline std::vector<TNodeHolder> loadNodes(
     }
   } else {
     const auto startID =
-        apiLayer->getShaderAPI()->createBindings(ggm->defaultPipe);
+        apiLayer->getShaderAPI()->createBindings(ggm->defaultPipe)[0];
     nodeInfos[0].bindingID = startID;
   }
   return ggm->addNode(nodeInfos.data(), nodeInfos.size());
@@ -861,7 +861,7 @@ std::vector<TNodeHolder> GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
     const NodeInfo &nodeInfo = nodeInfos[i];
     nodeHolder[i] = TNodeHolder(allocation.beginIndex + i);
     dataHolder[i] = allData[i];
-    if (nodeInfo.bindingID != INVALID_SIZE_T) [[likely]] {
+    if (!(!nodeInfo.bindingID)) [[likely]] {
       shader::BindingInfo binding;
       binding.bindingSet = nodeInfo.bindingID;
       binding.type = shader::BindingType::UniformBuffer;

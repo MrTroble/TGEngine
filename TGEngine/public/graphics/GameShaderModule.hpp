@@ -1,9 +1,9 @@
 #pragma once
 
 #include <iostream>
+#include <span>
 #include <string>
 #include <vector>
-#include <span>
 
 #include "../Error.hpp"
 #include "../Util.hpp"
@@ -39,7 +39,7 @@ struct TextureBindingData {
 
 struct BindingInfo {
   size_t binding = INVALID_SIZE_T;
-  size_t bindingSet = INVALID_SIZE_T;
+  TBindingHolder bindingSet{};
   BindingType type = BindingType::Invalid;
   union BindingData {
     TextureBindingData texture;
@@ -112,8 +112,8 @@ class ShaderAPI {
       const std::vector<ShaderInfo>& shadernames,
       const ShaderCreateInfo& createInfo = {}) = 0;
 
-  [[nodiscard]] virtual size_t createBindings(ShaderPipe pipe,
-                                              const size_t count = 1) = 0;
+  [[nodiscard]] virtual std::vector<TBindingHolder> createBindings(
+      ShaderPipe pipe, const size_t count = 1) = 0;
 
   virtual void changeInputBindings(const ShaderPipe pipe,
                                    const size_t bindingID,
@@ -125,7 +125,7 @@ class ShaderAPI {
     bindData(infos.data(), infos.size());
   }
 
-  virtual void addToRender(const size_t* bindingID, const size_t size,
+  virtual void addToRender(const std::span<const TBindingHolder> bindings,
                            void* customData) = 0;
 
   virtual void addToMaterial(const graphics::Material* material,

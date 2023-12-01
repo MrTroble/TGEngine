@@ -42,7 +42,7 @@ struct RenderInfo {
   size_t indexOffset = 0;
   IndexSize indexSize = IndexSize::UINT32;
   std::vector<size_t> vertexOffsets;
-  size_t bindingID = INVALID_SIZE_T;
+  shader::TBindingHolder bindingID{};
   size_t firstInstance = 0;
   std::vector<PushConstRanges> constRanges;
 };
@@ -94,6 +94,8 @@ enum class DataType {
   All,
   Invalid
 };
+
+enum class RenderTarget { OPAQUE_TARGET, TRANSLUCENT_TARGET };
 
 struct BufferInfo {
   const void* data = nullptr;
@@ -170,7 +172,8 @@ class APILayer : public main::Module {  // Interface
 
   [[nodiscard]] virtual TRenderHolder pushRender(
       const size_t renderInfoCount, const RenderInfo* renderInfos,
-      const TRenderHolder toOverride = TRenderHolder()) = 0;
+      const TRenderHolder toOverride = TRenderHolder(),
+      const RenderTarget target = RenderTarget::OPAQUE_TARGET) = 0;
 
   [[nodiscard]] virtual TSamplerHolder pushSampler(
       const SamplerInfo& sampler) = 0;
@@ -180,8 +183,10 @@ class APILayer : public main::Module {  // Interface
 
   [[nodiscard]] virtual TRenderHolder pushRender(
       const std::span<const RenderInfo> renderInfos,
-      const TRenderHolder toOverride = TRenderHolder()) {
-    return pushRender(renderInfos.size(), renderInfos.data());
+      const TRenderHolder toOverride = TRenderHolder(),
+      const RenderTarget target = RenderTarget::OPAQUE_TARGET) {
+    return pushRender(renderInfos.size(), renderInfos.data(), toOverride,
+                      target);
   }
 
   [[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
