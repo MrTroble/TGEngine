@@ -753,7 +753,8 @@ namespace tge::graphics {
 
 	inline uint32_t getMipMapsNeeded(uint32_t allLevel, const TextureInfo& info) {
 		uint32_t mipMaps = std::min(allLevel, info.mipMapOverrider);
-		return std::max(mipMaps, (uint32_t)1);
+		if (mipMaps != INVALID_UINT32) return std::max(mipMaps, (uint32_t)1);
+		return (uint32_t)std::floor(std::log2(std::max(info.height, info.width)));
 	}
 
 	std::vector<TTextureHolder> VulkanGraphicsModule::pushTexture(
@@ -777,17 +778,18 @@ namespace tge::graphics {
 			CommandBufferUsageFlagBits::eOneTimeSubmit, {});
 		auto guard = secondarySync->begin(commandBuffer, beginInfo);
 
-		const ImageSubresourceRange range(ImageAspectFlagBits::eColor, 0,
-			(uint32_t)features.mipMapLevels, 0, 1);
 		std::vector<InternalImageInfo> imagesIn(textureCount);
 		for (size_t i = 0; i < textureCount; i++) {
-			const TextureInfo& tex = textures[i];
-			const Format format = (Format)tex.internalFormatOverride;
-			const Extent2D ext = { tex.width, tex.height };
+			const TextureInfo& textureInfo = textures[i];
+			const Format format = (Format)textureInfo.internalFormatOverride;
+			const Extent2D ext = { textureInfo.width, textureInfo.height };
+			const auto mipMapCount = getMipMapsNeeded(features.mipMapLevels, textureInfo);
+			const ImageSubresourceRange range(ImageAspectFlagBits::eColor, 0,
+				mipMapCount, 0, 1);
 			imagesIn[i] = {
 				format, ext,
 				ImageUsageFlagBits::eTransferDst | ImageUsageFlagBits::eSampled,
-				SampleCountFlagBits::e1, features.mipMapLevels };
+				SampleCountFlagBits::e1, mipMapCount };
 		}
 
 		const auto internalImageHolder = createInternalImages(this, imagesIn);
@@ -819,6 +821,9 @@ namespace tge::graphics {
 
 			const Format format = (Format)textureInfo.internalFormatOverride;
 
+			const ImageSubresourceRange range(ImageAspectFlagBits::eColor, 0,
+				mipMapCount, 0, 1);
+
 			waitForImageTransition(
 				commandBuffer, ImageLayout::eUndefined,
 				ImageLayout::eTransferDstOptimal, currentImage, range,
@@ -838,15 +843,17 @@ namespace tge::graphics {
 				const auto ratio = formatRatio(format);
 				auto currentOffset = textureInfo.width * textureInfo.height / ratio;
 				auto entry = currentOffset;
-				for (size_t i = 1; i < features.mipMapLevels; i++) {
+				for (size_t i = 1; i < mipMapCount; i++) {
 					const uint32_t divider = 1 << i;
 					currentOffset >>= 2;
-					currentOffset = std::max(currentOffset, (size_t)8);
+					currentOffset = std::max(currentOffset, (size_t)8u);
 					const auto width = std::max(textureInfo.width / divider, 1u);
 					const auto height = std::max(textureInfo.height / divider, 1u);
+					const auto texelWidth = std::max(width, 4u);
+					const auto texelHeight = std::max(height, 4u);
 					bufferToImage.emplace_back(entry,
-						width,
-						height,
+						texelWidth,
+						texelHeight,
 						ImageSubresourceLayers{ ImageAspectFlagBits::eColor, (uint32_t)i, 0, 1 },
 						Offset3D{},
 						Extent3D{ width, height, 1 });
@@ -902,10 +909,10 @@ namespace tge::graphics {
 			const auto rangeLast =
 				blitNeeded
 				? ImageSubresourceRange{ ImageAspectFlagBits::eColor,
-										(uint32_t)features.mipMapLevels - 1, 1, 0,
+										(uint32_t)mipMapCount - 1, 1, 0,
 										1 }
 				: ImageSubresourceRange{ ImageAspectFlagBits::eColor, 0,
-										(uint32_t)features.mipMapLevels, 0, 1 };
+										(uint32_t)mipMapCount, 0, 1 };
 
 			waitForImageTransition(
 				commandBuffer, ImageLayout::eTransferDstOptimal,
