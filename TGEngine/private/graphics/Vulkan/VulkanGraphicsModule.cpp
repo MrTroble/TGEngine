@@ -752,9 +752,9 @@ namespace tge::graphics {
 	}
 
 	inline uint32_t getMipMapsNeeded(uint32_t allLevel, const TextureInfo& info) {
-		uint32_t mipMaps = std::min(allLevel, info.mipMapOverrider);
-		if (mipMaps != INVALID_UINT32) return std::max(mipMaps, (uint32_t)1);
-		return (uint32_t)std::floor(std::log2(std::max(info.height, info.width)));
+		const auto mipMaps = std::min(allLevel, info.mipMapOverrider);
+		const auto clampedMaps = std::max(mipMaps, (uint32_t)1);
+		return std::min((uint32_t)std::floor(std::log2(std::max(info.height, info.width))), clampedMaps);
 	}
 
 	std::vector<TTextureHolder> VulkanGraphicsModule::pushTexture(

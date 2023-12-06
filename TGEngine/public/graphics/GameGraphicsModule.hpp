@@ -34,8 +34,8 @@ struct NodeInfo {
 };
 
 struct FeatureSet {
-  bool wideLines = false;
-  int anisotropicfiltering = INT_MAX;
+  uint32_t wideLines = false;
+  uint32_t anisotropicfiltering = INT_MAX;
   uint32_t mipMapLevels = 4;
 };
 
