@@ -30,4 +30,6 @@ graphics::APILayer *getAPILayer();
 
 graphics::GameGraphicsModule *getGameGraphicsModule();
 
+void* getMainWindowHandle();
+
 } // namespace tge::main

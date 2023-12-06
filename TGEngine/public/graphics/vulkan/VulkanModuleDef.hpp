@@ -128,6 +128,7 @@ struct InternalImageInfo {
   Extent2D extent;
   ImageUsageFlags usage = ImageUsageFlagBits::eColorAttachment;
   SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
+  size_t mipmapCount = 1;
 };
 
 class VulkanGraphicsModule : public APILayer {
@@ -150,6 +151,7 @@ class VulkanGraphicsModule : public APILayer {
   CommandPool guiPool;
   std::vector<CommandBuffer> cmdbuffer;
   std::vector<CommandBuffer> noneRenderCmdbuffer;
+  std::vector<char> needsRefresh;
 
   DataHolder<vk::Pipeline, vk::PipelineLayout, Material> materialHolder;
 

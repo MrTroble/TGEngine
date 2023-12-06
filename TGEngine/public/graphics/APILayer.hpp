@@ -47,6 +47,11 @@ struct RenderInfo {
   std::vector<PushConstRanges> constRanges;
 };
 
+enum class BlitMode : uint32_t {
+    NONE,
+    LINEAR
+};
+
 struct TextureInfo {
   uint8_t* data = nullptr;
   uint32_t size;
@@ -54,6 +59,8 @@ struct TextureInfo {
   uint32_t height;
   uint32_t channel;
   size_t internalFormatOverride = 37;
+  uint32_t mipMapOverrider = INVALID_UINT32;
+  BlitMode blitMode = BlitMode::LINEAR;
 };
 
 enum class FilterSetting { NEAREST, LINEAR };

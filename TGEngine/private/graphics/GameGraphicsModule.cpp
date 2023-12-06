@@ -764,6 +764,8 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
     info.height = desc.height;
     info.size = ddsVec.size() - desc.headerSize;
     info.internalFormatOverride = fromDXGI(desc.format);
+    info.mipMapOverrider = desc.numMips;
+    info.blitMode = BlitMode::NONE;
     textureInfos.push_back(info);
   }
   return textureInfos;
