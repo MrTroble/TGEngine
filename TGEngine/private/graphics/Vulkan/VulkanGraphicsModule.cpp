@@ -846,7 +846,7 @@ namespace tge::graphics {
 				for (size_t i = 1; i < mipMapCount; i++) {
 					const uint32_t divider = 1 << i;
 					currentOffset >>= 2;
-					currentOffset = std::max(currentOffset, (size_t)8u);
+					currentOffset = std::max(currentOffset, (size_t)16u / ratio);
 					const auto width = std::max(textureInfo.width / divider, 1u);
 					const auto height = std::max(textureInfo.height / divider, 1u);
 					const auto texelWidth = std::max(width, 4u);
@@ -1695,7 +1695,10 @@ namespace tge::graphics {
 			const auto tuple = secondaryCommandBuffer.compact();
 			const auto& lostBuffer = std::get<0>(tuple);
 			if (!lostBuffer.empty()) {
-				auto guard = this->primarySync->waitAndGet();
+				auto guard1 = this->primarySync->waitAndGet();
+				std::unique_lock<std::mutex> guard2;
+				if (this->primarySync != this->secondarySync)
+					guard2 = this->secondarySync->waitAndGet();
 				device.freeCommandBuffers(secondaryBufferPool, lostBuffer);
 				std::ranges::fill(needsRefresh, 1);
 			}
