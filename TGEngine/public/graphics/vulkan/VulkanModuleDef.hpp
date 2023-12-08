@@ -35,6 +35,17 @@
     printf("Vulkan error %s in %s L%d!\n", s.c_str(), file, line); \
   }  // namespace tge::graphics
 
+namespace std {
+    template<>
+    struct hash<vk::DeviceMemory> {
+        [[nodiscard]] inline std::size_t operator()(
+            const vk::DeviceMemory& s) const noexcept {
+            const std::hash<std::size_t> test;
+            return test((size_t)(VkDeviceMemory)s);
+        }
+    };
+}
+
 namespace tge::graphics {
 using namespace vk;
 extern Result verror;
@@ -168,6 +179,8 @@ class VulkanGraphicsModule : public APILayer {
   vk::PhysicalDeviceLimits deviceLimits;
   DataHolder<vk::Buffer, vk::DeviceMemory, size_t, size_t, size_t>
       bufferDataHolder;
+
+  std::unordered_map<vk::DeviceMemory, size_t> memoryCounter;
 
   DataHolder<vk::CommandBuffer, std::vector<RenderInfo>,
              std::shared_ptr<std::mutex>, std::vector<TDataHolder>,

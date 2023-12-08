@@ -5,6 +5,7 @@
 #include <mutex>
 #include <ranges>
 #include <unordered_set>
+#include <numeric>
 
 #define DEBUG 1
 
@@ -237,16 +238,26 @@ namespace tge::graphics {
 				}
 				const std::lock_guard guard(this->bufferDataHolder.mutex);
 				const auto& memorys = std::get<1>(compactation);
+				for (const auto memory : memorys) {
+					memoryCounter[memory] -= 1;
+				}
 				const auto& allMemorys =
 					std::get<1>(this->bufferDataHolder.internalValues);
 				std::vector<vk::DeviceMemory> uniqueMemory;
 				uniqueMemory.reserve(memorys.size());
 				std::ranges::unique_copy(memorys, std::back_inserter(uniqueMemory));
 				for (const auto memory : uniqueMemory) {
-					if (std::ranges::none_of(allMemorys, [&](auto memoryIn) {
-						return memory == memoryIn;
-						})) {
+					if (memoryCounter[memory] <= 0) {
 						device.freeMemory(memory);
+#ifdef DEBUG
+						PLOG_DEBUG << "Check passed for memory [" + std::to_string((size_t)((VkDeviceMemory)memory)) +
+							"], mc=" << memoryCounter[memory];
+#endif // DEBUG
+					}
+					else {
+#ifdef DEBUG
+						PLOG_WARNING << "Memory counter not <= 0, mc=" << memoryCounter[memory];
+#endif // DEBUG
 					}
 				}
 			}
@@ -547,6 +558,7 @@ namespace tge::graphics {
 
 		const MemoryAllocateInfo allocLocalInfo(actualMemory, memoryTypeDeviceLocal);
 		const auto localMem = device.allocateMemory(allocLocalInfo);
+		memoryCounter[localMem] = dataCount;
 		this->bufferDataHolder.fill_adjacent<1>(returnIndex, localMem, dataCount);
 
 		const MemoryAllocateInfo allocInfo(tempMemory, memoryTypeHostVisibleCoherent);
@@ -1702,6 +1714,17 @@ namespace tge::graphics {
 				device.freeCommandBuffers(secondaryBufferPool, lostBuffer);
 				std::ranges::fill(needsRefresh, 1);
 			}
+			std::vector<TDataHolder> holder;
+			const auto& holderVectors = std::get<3>(tuple);
+			const auto resizeCount = std::accumulate(holderVectors.begin(), holderVectors.end(), 0u, [](auto last, auto& x) { return x.size() + last; });
+			holder.reserve(resizeCount);
+			for (const auto& values : holderVectors)
+			{
+				const auto oldSize = holder.size();
+				holder.resize(oldSize + values.size());
+				std::copy(values.begin(), values.end(), holder.begin() + oldSize);
+			}
+			removeData(holder, true);
 		}
 	}
 
