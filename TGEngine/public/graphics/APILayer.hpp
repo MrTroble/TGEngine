@@ -45,6 +45,7 @@ struct RenderInfo {
   shader::TBindingHolder bindingID{};
   size_t firstInstance = 0;
   std::vector<PushConstRanges> constRanges;
+  std::string debugName{};
 };
 
 enum class BlitMode : uint32_t {
@@ -61,6 +62,7 @@ struct TextureInfo {
   size_t internalFormatOverride = 37;
   uint32_t mipMapOverrider = INVALID_UINT32;
   BlitMode blitMode = BlitMode::LINEAR;
+  std::string debugInfo{};
 };
 
 enum class FilterSetting { NEAREST, LINEAR };
@@ -104,10 +106,15 @@ enum class DataType {
 
 enum class RenderTarget { OPAQUE_TARGET, TRANSLUCENT_TARGET };
 
+struct BufferDebugInfo {
+    std::string info;
+};
+
 struct BufferInfo {
   const void* data = nullptr;
   size_t size = INVALID_SIZE_T;
   DataType type = DataType::Invalid;
+  std::shared_ptr<BufferDebugInfo> debugInfo;
 };
 
 struct BufferChange {

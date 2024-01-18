@@ -140,6 +140,7 @@ struct InternalImageInfo {
   ImageUsageFlags usage = ImageUsageFlagBits::eColorAttachment;
   SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
   size_t mipmapCount = 1;
+  std::string debugInfo;
 };
 
 class VulkanGraphicsModule : public APILayer {
@@ -211,6 +212,12 @@ class VulkanGraphicsModule : public APILayer {
 
   uint32_t nextImage = 0;
 
+#ifdef DEBUG
+  DebugUtilsMessengerEXT debugMessenger;
+  vk::DispatchLoaderDynamic dynamicLoader;
+  bool debugEnabled = false;
+#endif
+
   bool isInitialiazed = false;
   bool exitFailed = false;
 
@@ -219,9 +226,6 @@ class VulkanGraphicsModule : public APILayer {
     int lightCount;
   } lights;
 
-#ifdef DEBUG
-  DebugUtilsMessengerEXT debugMessenger;
-#endif
 
   VulkanGraphicsModule() : APILayer(new shader::VulkanShaderModule(this)) {}
 

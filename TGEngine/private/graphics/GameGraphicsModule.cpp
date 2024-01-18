@@ -389,10 +389,11 @@ void GameGraphicsModule::tick(double time) {
 
 void GameGraphicsModule::destroy() {}
 
-std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>> &data) {
+std::vector<TextureInfo> loadSTBI(const std::vector<TextureLoadInternal> &data) {
   std::vector<TextureInfo> textureInfos;
   textureInfos.reserve(data.size());
-  for (const auto &dataIn : data) {
+  for (const auto &values : data) {
+    const auto& dataIn = values.textureInfo;
     if (dataIn.empty()) {
       PLOG_FATAL << "Found empty texture!";
       exit(-1);
@@ -403,6 +404,7 @@ std::vector<TextureInfo> loadSTBI(const std::vector<std::vector<char>> &data) {
                                       (int *)&info.width, (int *)&info.height,
                                       (int *)&info.channel, 0);
     info.size = info.width * info.height * info.channel;
+    info.debugInfo = values.debugName;
     if (info.channel == 3) {
       PLOG_FATAL << "Texture with 3 channels not supported!";
       exit(-1);
@@ -743,10 +745,11 @@ inline size_t fromDXGI(ddspp::DXGIFormat format) {
   throw std::runtime_error("Translation table not found for DXGI!");
 }
 
-std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
+std::vector<TextureInfo> loadDDS(const std::vector<TextureLoadInternal> &data) {
   std::vector<TextureInfo> textureInfos;
   textureInfos.reserve(data.size());
-  for (const auto &ddsVec : data) {
+  for (const auto &values : data) {
+    const auto& ddsVec = values.textureInfo;
     if (ddsVec.empty()) {
       PLOG_ERROR << "Found empty texture";
       continue;
@@ -766,13 +769,14 @@ std::vector<TextureInfo> loadDDS(const std::vector<std::vector<char>> &data) {
     info.internalFormatOverride = fromDXGI(desc.format);
     info.mipMapOverrider = desc.numMips;
     info.blitMode = BlitMode::NONE;
+    info.debugInfo = values.debugName;
     textureInfos.push_back(info);
   }
   return textureInfos;
 }
 
 std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
-    const std::vector<std::vector<char>> &data, const LoadType type) {
+    const std::vector<TextureLoadInternal> &data, const LoadType type) {
   if (data.empty()) return {};
   std::vector<TextureInfo> textureInfos;
 
@@ -797,7 +801,7 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
     const std::vector<std::string> &names, const LoadType type) {
   const auto amount = names.size();
   std::vector<TTextureHolder> localtextureIDs(amount);
-  std::vector<std::vector<char>> data;
+  std::vector<TextureLoadInternal> data;
   data.reserve(amount);
   for (size_t i = 0; i < amount; i++) {
     const auto &name = names[i];
@@ -820,7 +824,7 @@ std::vector<TTextureHolder> GameGraphicsModule::loadTextures(
       PLOG_ERROR << "Couldn't find asset: " << name << "!";
       continue;
     }
-    data.push_back(file);
+    data.emplace_back(file, name);
     localtextureIDs[i] = TTextureHolder();
   }
   if (!data.empty()) {
@@ -843,7 +847,7 @@ std::vector<TNodeHolder> GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
   bindings.reserve(count);
   std::vector<BufferInfo> bufferInfos(2 * count);
   auto allocation = nodeHolder.allocate(count);
-  auto [dataHolder, transform, parent, binding, status, cache, cacheNormal] =
+  auto [dataHolder, transform, parent, binding, status, cache, cacheNormal, debug] =
       allocation.iterator;
   std::fill(status, status + count, 1);
   for (size_t i = 0; i < count; i++) {
@@ -856,6 +860,7 @@ std::vector<TNodeHolder> GameGraphicsModule::addNode(const NodeInfo *nodeInfos,
         BufferInfo{&cache[i], sizeof(glm::mat4), DataType::Uniform};
     bufferInfos[i + count] =
         BufferInfo{&cacheNormal[i], sizeof(glm::mat4), DataType::Uniform};
+    debug[i] = nodeInfo.debugInfo;
   }
   const auto allData = apiLayer->pushData(bufferInfos);
   std::vector<TNodeHolder> nodeHolder(count);

@@ -26,17 +26,28 @@ namespace tge::graphics {
 		glm::quat rotation = glm::quat(0.0f, 0.0f, 0.0f, 0.0f);
 	};
 
+	struct NodeDebugInfo {
+		std::string name;
+		void* data;
+	};
+
 	struct NodeInfo {
 		shader::TBindingHolder bindingID{};
 		NodeTransform transforms = {};
 		size_t parent = INVALID_SIZE_T;
 		TNodeHolder parentHolder;
+		std::shared_ptr<NodeDebugInfo> debugInfo;
 	};
 
 	struct FeatureSet {
 		uint32_t wideLines = false;
 		uint32_t anisotropicfiltering = INT_MAX;
 		uint32_t mipMapLevels = 4;
+	};
+
+	struct TextureLoadInternal {
+		std::vector<char> textureInfo;
+		std::string debugName{};
 	};
 
 	enum class LoadType { STBI, DDSPP };
@@ -50,8 +61,7 @@ namespace tge::graphics {
 		glm::mat4 viewMatrix;
 		size_t nextNode = 0;
 		DataHolder<TDataHolder, NodeTransform, size_t, shader::TBindingHolder, char, glm::mat4,
-			glm::mat4>
-			nodeHolder;
+			glm::mat4, std::shared_ptr<NodeDebugInfo>> nodeHolder;
 		TDataHolder projection;
 		std::vector<BufferChange> bufferChange;
 		std::vector<std::function<std::vector<char>(const std::string&)>>
@@ -82,7 +92,7 @@ namespace tge::graphics {
 			const std::string& baseDir = "", void* shaderPipe = nullptr);
 
 		std::vector<TTextureHolder> loadTextures(
-			const std::vector<std::vector<char>>& data,
+			const std::vector<TextureLoadInternal>& data,
 			const LoadType type = LoadType::STBI);
 
 		std::vector<TTextureHolder> loadTextures(

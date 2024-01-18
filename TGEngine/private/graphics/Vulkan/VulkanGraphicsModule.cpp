@@ -240,26 +240,22 @@ namespace tge::graphics {
 				const auto& memorys = std::get<1>(compactation);
 				for (const auto memory : memorys) {
 					memoryCounter[memory] -= 1;
-				}
-				const auto& allMemorys =
-					std::get<1>(this->bufferDataHolder.internalValues);
-				std::vector<vk::DeviceMemory> uniqueMemory;
-				uniqueMemory.reserve(memorys.size());
-				std::ranges::unique_copy(memorys, std::back_inserter(uniqueMemory));
-				for (const auto memory : uniqueMemory) {
-					if (memoryCounter[memory] <= 0) {
+
+					const auto value = memoryCounter[memory];
+					if (value <= 0) {
 						device.freeMemory(memory);
 #ifdef DEBUG
 						PLOG_DEBUG << "Check passed for memory [" + std::to_string((size_t)((VkDeviceMemory)memory)) +
-							"], mc=" << memoryCounter[memory];
-#endif // DEBUG
+							"], mc=" << value;
+#endif // DEBUG1
 					}
 					else {
 #ifdef DEBUG
-						PLOG_WARNING << "Memory counter not <= 0, mc=" << memoryCounter[memory];
+						PLOG_WARNING << "Memory counter not <= 0, mc=" << value << ", memory=" << std::to_string((size_t)((VkDeviceMemory)memory));
 #endif // DEBUG
 					}
 				}
+
 			}
 		}
 	}
@@ -338,6 +334,12 @@ namespace tge::graphics {
 		commandBuffer.begin(beginInfo);
 		for (size_t i = 0; i < renderInfoCount; i++) {
 			auto& info = renderInfos[i];
+#ifdef DEBUG
+			if (debugEnabled && !info.debugName.empty()) {
+				vk::DebugUtilsLabelEXT labelInfo(info.debugName.c_str(), {0, 1.0, 0.0, 1.0});
+				commandBuffer.beginDebugUtilsLabelEXT(labelInfo, dynamicLoader);
+			}
+#endif // DEBUG
 
 			const std::vector<Buffer> vertexBuffer =
 				bufferDataHolder.get<0>(std::span(info.vertexBuffer));
@@ -389,6 +391,11 @@ namespace tge::graphics {
 			else {
 				commandBuffer.draw(info.indexCount, info.instanceCount, 0, 0);
 			}
+#ifdef DEBUG
+			if(debugEnabled && !info.debugName.empty())
+				commandBuffer.endDebugUtilsLabelEXT(dynamicLoader);
+#endif // DEBUG
+
 		}
 		commandBuffer.end();
 
@@ -671,7 +678,7 @@ namespace tge::graphics {
 	inline std::vector<TTextureHolder> createInternalImages(
 		VulkanGraphicsModule* vgm,
 		const std::vector<InternalImageInfo>& internalImageInfos) {
-		std::vector<std::tuple<ImageViewCreateInfo, size_t>> memoryAndOffsets;
+		std::vector<std::tuple<ImageViewCreateInfo, size_t, std::string>> memoryAndOffsets;
 		memoryAndOffsets.reserve(internalImageInfos.size());
 		size_t wholeSize = 0;
 
@@ -710,7 +717,7 @@ namespace tge::graphics {
 			}
 
 			memoryAndOffsets.push_back(
-				std::make_tuple(depthImageViewCreateInfo, wholeSize));
+				std::make_tuple(depthImageViewCreateInfo, wholeSize, imageInfo.debugInfo));
 			wholeSize += memoryRequirements.size;
 		}
 
@@ -724,10 +731,19 @@ namespace tge::graphics {
 		const auto output =
 			vgm->textureImageHolder.allocate(internalImageInfos.size());
 		auto [imageItr, viewItr, memoryItr, offsetItr, internalItr] = output.iterator;
-		for (const auto& [image, offset] : memoryAndOffsets) {
+		for (const auto& [image, offset, debug] : memoryAndOffsets) {
 			vgm->device.bindImageMemory(image.image, imageMemory, offset);
 
 			const auto imageView = vgm->device.createImageView(image);
+#ifdef DEBUG
+			if (vgm->debugEnabled && !debug.empty()) {
+				DebugUtilsObjectNameInfoEXT objectName(ObjectType::eImageView, (uint64_t)(VkImageView)imageView, debug.c_str());
+				vgm->device.setDebugUtilsObjectNameEXT(objectName, vgm->dynamicLoader);
+
+				DebugUtilsObjectNameInfoEXT imageName(ObjectType::eImage, (uint64_t)(VkImage)image.image, debug.c_str());
+				vgm->device.setDebugUtilsObjectNameEXT(imageName, vgm->dynamicLoader);
+			}
+#endif // DEBUG
 			*(imageItr++) = image.image;
 			*(viewItr++) = imageView;
 			*(memoryItr++) = imageMemory;
@@ -801,7 +817,7 @@ namespace tge::graphics {
 			imagesIn[i] = {
 				format, ext,
 				ImageUsageFlagBits::eTransferDst | ImageUsageFlagBits::eSampled,
-				SampleCountFlagBits::e1, mipMapCount };
+				SampleCountFlagBits::e1, mipMapCount, textureInfo.debugInfo };
 		}
 
 		const auto internalImageHolder = createInternalImages(this, imagesIn);
@@ -1239,11 +1255,19 @@ namespace tge::graphics {
 			return strcmp(x, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0;
 			}) != end(extensionEnabled)) {
 			PLOG_DEBUG << "Create debug utils!";
-
-			DispatchLoaderDynamic stat;
-			stat.vkCreateDebugUtilsMessengerEXT =
+			debugEnabled = true;
+			dynamicLoader.vkCreateDebugUtilsMessengerEXT =
 				(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
 					instance, "vkCreateDebugUtilsMessengerEXT");
+			dynamicLoader.vkCmdBeginDebugUtilsLabelEXT =
+				(PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(
+					instance, "vkCmdBeginDebugUtilsLabelEXT");
+			dynamicLoader.vkCmdEndDebugUtilsLabelEXT =
+				(PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(
+					instance, "vkCmdEndDebugUtilsLabelEXT");
+			dynamicLoader.vkSetDebugUtilsObjectNameEXT =
+				(PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(
+					instance, "vkSetDebugUtilsObjectNameEXT");
 			const DebugUtilsMessengerCreateInfoEXT debugUtilsMsgCreateInfo(
 				{},
 				(DebugUtilsMessageSeverityFlagsEXT)
@@ -1252,7 +1276,7 @@ namespace tge::graphics {
 				FlagTraits<DebugUtilsMessageTypeFlagBitsEXT>::allFlags,
 				(PFN_vkDebugUtilsMessengerCallbackEXT)debugMessage);
 			debugMessenger = instance.createDebugUtilsMessengerEXT(
-				debugUtilsMsgCreateInfo, nullptr, stat);
+				debugUtilsMsgCreateInfo, nullptr, dynamicLoader);
 		}
 #endif
 #pragma endregion
