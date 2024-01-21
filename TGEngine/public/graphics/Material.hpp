@@ -18,5 +18,6 @@ struct Material {
   void *costumShaderData = nullptr; // API dependent
   bool doubleSided = false;
   uint32_t primitiveType = INVALID_UINT32;
+  bool clockwise = false;
 };
 } // namespace tge::graphics

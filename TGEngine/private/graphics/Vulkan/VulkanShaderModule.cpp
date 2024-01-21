@@ -193,9 +193,17 @@ struct GeneralShaderAnalizer : public glslang::TIntermTraverser {
       if (uset.contains(quali.layoutBinding)) return;
       uset.insert(quali.layoutBinding);
       const auto desc = getDescTypeFromELF(type);
-      const DescriptorSetLayoutBinding descBinding(
-          quali.layoutBinding, desc.first, desc.second, flags);
-      shaderPipe->descriptorLayoutBindings.push_back(descBinding);
+      auto foundDesc = std::ranges::find_if(shaderPipe->descriptorLayoutBindings, [&](auto& value) {
+          return value.binding == quali.layoutBinding;
+          });
+      if (foundDesc == std::end(shaderPipe->descriptorLayoutBindings)) {
+          const DescriptorSetLayoutBinding descBinding(
+              quali.layoutBinding, desc.first, desc.second, flags);
+          shaderPipe->descriptorLayoutBindings.push_back(descBinding);
+      }
+      else {
+          foundDesc->stageFlags |= flags;
+      }
     } else if (quali.isPushConstant() && !pushConst) {
       pushConst = true;
       const auto& structure = *type.getStruct();

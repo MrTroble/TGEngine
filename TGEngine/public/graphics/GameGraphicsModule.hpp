@@ -1,9 +1,11 @@
 #pragma once
 
 #include <functional>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtc/matrix_transform.hpp> 
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -52,22 +54,31 @@ namespace tge::graphics {
 
 	enum class LoadType { STBI, DDSPP };
 
+	struct ValueSystem {
+		glm::mat4 model = glm::mat4(1.0f);
+		glm::mat4 normalModel = glm::mat4(1.0f);
+		glm::vec4 color = glm::vec4(0);
+		size_t offset = 0;
+		char padding[104];
+	};
+	static_assert(sizeof(ValueSystem) == 256);
+
 	class GameGraphicsModule : public main::Module {
 		APILayer* apiLayer;
 		WindowModule* windowModule;
 		glm::mat4 projectionView;
-
 		glm::mat4 projectionMatrix;
 		glm::mat4 viewMatrix;
 		size_t nextNode = 0;
-		DataHolder<TDataHolder, NodeTransform, size_t, shader::TBindingHolder, char, glm::mat4,
-			glm::mat4, std::shared_ptr<NodeDebugInfo>> nodeHolder;
 		TDataHolder projection;
 		std::vector<BufferChange> bufferChange;
 		std::vector<std::function<std::vector<char>(const std::string&)>>
 			assetResolver;
 
 	public:
+		DataHolder<TDataHolder, NodeTransform, size_t, shader::TBindingHolder, char, 
+			ValueSystem, std::vector<size_t>, std::shared_ptr<NodeDebugInfo>> nodeHolder;
+
 		TTextureHolder defaultTextureID;
 		std::mutex protectTexture;
 		std::unordered_map<std::string, TTextureHolder> textureMap;

@@ -170,7 +170,7 @@ namespace tge::graphics {
 				{}, false, false, {},
 				material.doubleSided ? CullModeFlagBits::eNone
 				: CullModeFlagBits::eFront,
-				FrontFace::eCounterClockwise, false, 0, 0, 0, 1.0f);
+				material.clockwise ? FrontFace::eClockwise : FrontFace::eCounterClockwise, false, 0, 0, 0, 1.0f);
 
 			input[i] = PipelineInputAssemblyStateCreateInfo(
 				{},
@@ -1131,7 +1131,7 @@ namespace tge::graphics {
 			 ImageUsageFlagBits::eColorAttachment |
 				 ImageUsageFlagBits::eInputAttachment |
 				 ImageUsageFlagBits::eTransferSrc},
-			{Format::eR32Sfloat, extent,
+			{Format::eR32G32B32A32Sfloat, extent,
 			 ImageUsageFlagBits::eColorAttachment |
 				 ImageUsageFlagBits::eInputAttachment |
 				 ImageUsageFlagBits::eTransferSrc},
@@ -1466,7 +1466,7 @@ namespace tge::graphics {
 				AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
 				ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
 			AttachmentDescription(
-				{}, Format::eR32Sfloat, SampleCountFlagBits::e1,
+				{}, Format::eR32G32B32A32Sfloat, SampleCountFlagBits::e1,
 				AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
 				AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
 				ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
