@@ -15,6 +15,7 @@ enum class PressMode {
 
 struct KeyboardEvent {
   unsigned int signal;
+  PressMode mode;
 };
 
 struct MouseEvent {

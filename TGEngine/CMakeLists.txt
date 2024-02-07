@@ -32,7 +32,7 @@ set(ENGINE_DATA
 	"private/graphics/GUIModule.cpp" 
 	
 	"private/imgui/imgui_impl_vulkan.cpp"
-)
+ )
 
 if(WIN32)
 list(APPEND ENGINE_DATA

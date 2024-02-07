@@ -306,6 +306,7 @@ VulkanShaderPipe* __implLoadShaderPipeAndCompile(
     }
     __implIntermToVulkanPipe(shaderPipe, shader->getIntermediate(),
                              getLangFromShaderLang(pair.language), createInfo);
+    shaderPipe->shaderNames.push_back(pair.debug);
   }
 
   return shaderPipe;
@@ -316,6 +317,7 @@ ShaderPipe VulkanShaderModule::compile(const std::vector<ShaderInfo>& vector,
   std::lock_guard guard(this->mutex);
   const auto loadedPipes = __implLoadShaderPipeAndCompile(vector, createInfo);
   if (loadedPipes) __implCreateDescSets(loadedPipes, this);
+  if (loadedPipes) this->shaderPipes.push_back(loadedPipes);
   return loadedPipes;
 }
 
@@ -331,7 +333,7 @@ ShaderPipe VulkanShaderModule::loadShaderPipeAndCompile(
       PLOG_WARNING << "File [" << name << "] not found";
       continue;
     }
-    vector.push_back({getLang(abrivation), content});
+    vector.push_back({ getLang(abrivation), content, {}, name });
   }
   return compile(vector, createInfo);
 }

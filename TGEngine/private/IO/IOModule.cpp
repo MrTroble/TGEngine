@@ -54,7 +54,10 @@ LRESULT CALLBACK callback(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
       for (const auto io : ios) io->mouseEvent({zDelta, zDelta, SCROLL});
     } break;
     case WM_KEYDOWN: {
-      for (const auto io : ios) io->keyboardEvent({(uint32_t)wParam});
+      for (const auto io : ios) io->keyboardEvent({(uint32_t)wParam, PressMode::CLICKED});
+    } break;
+    case WM_KEYUP: {
+      for (const auto io : ios) io->keyboardEvent({ (uint32_t)wParam, PressMode::RELEASED });
     } break;
     default:
       break;

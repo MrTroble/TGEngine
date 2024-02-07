@@ -61,7 +61,7 @@
   }
 
 #if !defined(SPR_NO_GLSL) && !defined(SPR_NO_GLSL_INCLUDE)
-#include <SPIRV/GlslangToSpv.h>
+#include <glslang/SPIRV/GlslangToSpv.h>
 #include <glslang/Public/ShaderLang.h>
 #endif
 

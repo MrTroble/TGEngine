@@ -27,6 +27,7 @@ struct VulkanShaderPipe {
 
   std::mutex pipeMutex;
   std::vector<std::pair<ShaderStageFlagBits, ShaderModule>> modules;
+  std::vector<std::string> shaderNames;
 
 };
 

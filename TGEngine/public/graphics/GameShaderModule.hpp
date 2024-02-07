@@ -55,6 +55,7 @@ struct ShaderInfo {
   ShaderType language = ShaderType::INVALID;
   std::vector<char> code;
   std::vector<std::string> additionalCode;
+  std::string debug;
 };
 
 #ifdef DEBUG

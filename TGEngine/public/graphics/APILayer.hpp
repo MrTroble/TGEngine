@@ -29,7 +29,7 @@ struct CacheIndex {
 };
 
 struct PushConstRanges {
-  std::vector<char> pushConstData;
+  std::span<std::byte> pushConstData;
   shader::ShaderType type;
 };
 
@@ -85,7 +85,7 @@ struct SamplerInfo {
 
 struct Light {
   glm::vec3 pos;
-  float __alignment = 0;
+  float minRatio = 0;
   glm::vec3 color;
   float intensity;
 

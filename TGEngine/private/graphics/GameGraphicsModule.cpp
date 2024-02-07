@@ -844,8 +844,10 @@ namespace tge::graphics {
 			const auto parentID = !nodeInfo.parentHolder ? allocation.beginIndex + nodeInfo.parent
 				: nodeInfo.parentHolder.internalHandle;
 			parent[i] = parentID;
-			const auto currentOffset = nodeHolder.translationTable[parentID];
-			children[currentOffset].push_back(allocation.beginIndex + i);
+			if (parentID != INVALID_SIZE_T) {
+				const auto currentOffset = nodeHolder.translationTable[parentID];
+				children[currentOffset].push_back(allocation.beginIndex + i);
+			}
 
 			cache[i].offset = i * sizeof(ValueSystem);
 			debug[i] = nodeInfo.debugInfo;
