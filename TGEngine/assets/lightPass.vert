@@ -5,8 +5,6 @@
 	"codes": [
 		{
 			"code": [
-				"#version 450",
-				"#extension GL_KHR_vulkan_glsl: enable",
 				"out gl_PerVertex {",
 				"   vec4 gl_Position;",
 				"};",

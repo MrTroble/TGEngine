@@ -76,9 +76,11 @@ namespace tge::graphics {
 		};
 
 		[[nodiscard]] virtual std::vector<TDataHolder> pushData(
-			const size_t dataCount, const BufferInfo* bufferInfo) override {
+                    const size_t dataCount, const BufferInfo* bufferInfo,
+                    const std::string& debugTag = "Unknown") override {
 			TimingAdder adder(dataCounter);
-			const auto rtc = api->pushData(dataCount, bufferInfo);
+                  const auto rtc =
+                      api->pushData(dataCount, bufferInfo, debugTag);
 			return rtc;
 		}
 

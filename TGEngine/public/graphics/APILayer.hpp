@@ -29,7 +29,7 @@ struct CacheIndex {
 };
 
 struct PushConstRanges {
-  std::span<std::byte> pushConstData;
+  std::vector<std::byte> pushConstData;
   shader::ShaderType type;
 };
 
@@ -143,7 +143,8 @@ class APILayer : public main::Module {  // Interface
       const size_t materialcount, const Material* materials) = 0;
 
   [[nodiscard]] virtual std::vector<TDataHolder> pushData(
-      const size_t dataCount, const BufferInfo* bufferInfo) = 0;
+      const size_t dataCount, const BufferInfo* bufferInfo,
+      const std::string& debugTag = "Unkown") = 0;
 
   virtual void changeData(const size_t sizes,
                           const BufferChange* changeInfos) = 0;
@@ -156,9 +157,9 @@ class APILayer : public main::Module {  // Interface
     return pushMaterials(materials.size(), materials.data());
   }
 
-  [[nodiscard]] virtual std::vector<TDataHolder> pushData(
-      const std::span<const BufferInfo> bufferInfo) {
-    return pushData(bufferInfo.size(), bufferInfo.data());
+  [[nodiscard]] std::vector<TDataHolder> pushData(
+      const std::span<const BufferInfo> bufferInfo, const std ::string& debugInfo = "Unknown") {
+    return pushData(bufferInfo.size(), bufferInfo.data(), debugInfo);
   }
 
   void changeData(const std::span<const BufferChange> changeInfos) {

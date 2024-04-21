@@ -6,7 +6,14 @@
 		{
 			"code": [
 				"#version 460",
-				"",
+				"struct ValueSystem {",
+				"   mat4 model;",
+				"   mat4 normalModel;",
+				"   vec4 color;",
+				"   vec4 padding[7];",
+				"};",
+				"layout(binding=2) uniform _system { ValueSystem values; } system;",
+
 				"layout(location=0) out vec4 COLOR;",
 				"layout(location=1) out vec4 NORMAL;",
 				"layout(location=2) out float ROUGHNESS;",

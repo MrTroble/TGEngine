@@ -135,7 +135,7 @@ constexpr size_t TEXTURE_ONLY_BUFFER = 1;
 constexpr size_t DATA_CHANGE_ONLY_BUFFER = 2;
 
 struct InternalImageInfo {
-  Format format;
+  Format format = Format::eUndefined;
   Extent2D extent;
   ImageUsageFlags usage = ImageUsageFlagBits::eColorAttachment;
   SampleCountFlagBits sampleCount = SampleCountFlagBits::e1;
@@ -216,6 +216,7 @@ class VulkanGraphicsModule : public APILayer {
   DebugUtilsMessengerEXT debugMessenger;
   vk::DispatchLoaderDynamic dynamicLoader;
   bool debugEnabled = false;
+  std::unordered_map<vk::DeviceMemory, std::string> memoryDebugTags;
 #endif
 
   bool isInitialiazed = false;
@@ -254,7 +255,8 @@ class VulkanGraphicsModule : public APILayer {
       const size_t materialcount, const Material *materials) override;
 
   std::vector<TDataHolder> pushData(const size_t dataCount,
-                                    const BufferInfo *bufferInfo) override;
+                                    const BufferInfo *bufferInfo,
+                                    const std::string &debugTag = "Unknown") override;
 
   void changeData(const size_t sizes, const BufferChange *changeInfos) override;
 

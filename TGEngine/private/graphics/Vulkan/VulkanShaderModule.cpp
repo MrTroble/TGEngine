@@ -350,7 +350,7 @@ std::vector<TBindingHolder> VulkanShaderModule::createBindings(
 #ifdef DEBUG
   std::fill(status, status + count, 0);
   size_t allBindings = 0;
-  for (const auto x : shaderPipe->descriptorLayoutBindings) {
+  for (const auto &x : shaderPipe->descriptorLayoutBindings) {
     allBindings |= 1 << x.binding;
   }
   std::fill(expected, expected + count, allBindings);
