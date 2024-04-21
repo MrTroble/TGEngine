@@ -84,7 +84,10 @@ class GameGraphicsModule : public main::Module {
   std::mutex protectTexture;
   std::unordered_map<std::string, TTextureHolder> textureMap;
   TPipelineHolder defaultMaterial;
+  std::vector<char> vertexShader;
+  std::vector<char> fragmentShader;
   tge::shader::ShaderPipe defaultPipe;
+  tge::shader::ShaderPipe glbWidget;
   FeatureSet features;
 
   GameGraphicsModule(APILayer* apiLayer, WindowModule* winModule,
@@ -154,9 +157,6 @@ class GameGraphicsModule : public main::Module {
   [[nodiscard]] APILayer* getAPILayer() { return apiLayer; }
 
   [[nodiscard]] WindowModule* getWindowModule() { return windowModule; }
-
-  friend void calculateMatrix(GameGraphicsModule* ggm, const size_t index,
-                              const size_t parentID);
 };
 
 }  // namespace tge::graphics
