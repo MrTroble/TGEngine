@@ -104,8 +104,6 @@ enum class DataType {
   Invalid
 };
 
-enum class RenderTarget { OPAQUE_TARGET, TRANSLUCENT_TARGET };
-
 struct BufferDebugInfo {
     std::string info;
 };
@@ -169,6 +167,8 @@ class APILayer : public main::Module {  // Interface
   void removeRender(const std::span<const TRenderHolder> renderIDs) {
     removeRender(renderIDs.size(), renderIDs.data());
   }
+
+  virtual void hideRender(const std::span<const TRenderHolder> renderIDs, bool hide) = 0;
 
   virtual void removeData(const std::span<const TDataHolder> dataHolder,
                           bool instant = false) = 0;

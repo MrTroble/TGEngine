@@ -251,6 +251,8 @@ class VulkanGraphicsModule : public APILayer {
   void removeMaterials(const std::span<const TPipelineHolder> pipelineHolder,
                        bool instant = false) override;
 
+  void hideRender(const std::span<const TRenderHolder> renderIDs, bool hide) override;
+
   std::vector<TPipelineHolder> pushMaterials(
       const size_t materialcount, const Material *materials) override;
 

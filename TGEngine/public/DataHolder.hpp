@@ -145,12 +145,32 @@ struct DataHolder {
     std::unique_lock guard(this->mutex);
     auto &vector = std::get<index>(internalValues);
     auto newIndex = translationTable.find(pIndex);
+#ifdef DEBUG
     if (newIndex == std::end(translationTable)) {
       PLOG_ERROR << "Index " << pIndex << " not in DataHolder!";
       throw std::runtime_error("Index not in DataHolder!");
     }
+#endif // DEBUG
     return DataHolderSingleOutput<TypeAt<index>>(std::move(guard),
                                                  vector[newIndex->second]);
+  }
+
+
+  template <size_t index = 0, HolderConcept HolderType>
+  void changeAll(const std::span<const HolderType> pIndex, std::invocable<TypeAt<index>> auto invocable) {
+      std::unique_lock guard(this->mutex);
+      auto& vector = std::get<index>(internalValues);
+      for (const auto holder : pIndex)
+      {
+          auto newIndex = translationTable.find(holder.internalHandle);
+#ifdef DEBUG
+          if (newIndex == std::end(translationTable)) {
+              PLOG_ERROR << "Index " << holder.internalHandle << " not in DataHolder!";
+              throw std::runtime_error("Index not in DataHolder!");
+          }
+#endif // DEBUG
+          vector[newIndex->second] = invocable(vector[newIndex->second]);
+      }
   }
 
   template <size_t index = 0, HolderConcept HolderType>

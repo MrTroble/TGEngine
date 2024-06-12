@@ -10,14 +10,17 @@ class ShaderUI {
 public:
 	void renderGUI(tge::shader::ShaderAPI* shader) {
 		if (shader == nullptr) return;
-		tge::shader::VulkanShaderModule* shaderModule = (tge::shader::VulkanShaderModule*) shader;
 		std::vector<std::string> namesUsed;
-		namesUsed.reserve(2 * shaderModule->shaderPipes.size());
-		for (auto value : shaderModule->shaderPipes) {
-			for (auto& name : value->shaderNames) {
-				if (name.empty())
-					continue;
-				namesUsed.push_back(name);
+		{
+			tge::shader::VulkanShaderModule* shaderModule = (tge::shader::VulkanShaderModule*)shader;
+			std::lock_guard guard(shaderModule->mutex);
+			namesUsed.reserve(2 * shaderModule->shaderPipes.size());
+			for (auto value : shaderModule->shaderPipes) {
+				for (auto& name : value->shaderNames) {
+					if (name.empty())
+						continue;
+					namesUsed.push_back(name);
+				}
 			}
 		}
 		if (namesUsed.empty())

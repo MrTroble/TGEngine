@@ -64,6 +64,10 @@ namespace tge::graphics {
 				removeRenderCounter.fullDebug() + "\n" + removeDataCounter.fullDebug() + "\n";
 		}
 
+		void hideRender(const std::span<const TRenderHolder> renderIDs, bool hide) override {
+			api->hideRender(renderIDs, hide);
+		}
+
 		void destroy() override { api->destroy(); }
 
 		void recreate() override { api->recreate(); }
@@ -95,6 +99,8 @@ namespace tge::graphics {
 			return api->removeRender(renderInfoCount, renderIDs);
 		}
 
+				
+
 		virtual void removeData(const std::span<const TDataHolder> dataHolder,
 			bool instant = false) override {
 			TimingAdder adder(removeDataCounter);
@@ -124,7 +130,7 @@ namespace tge::graphics {
 			const TRenderHolder holder,
 			const RenderTarget target) override {
 			TimingAdder adder(renderCounter);
-			return api->pushRender(renderInfoCount, renderInfos, holder);
+			return api->pushRender(renderInfoCount, renderInfos, holder, target);
 		}
 
 		[[nodiscard]] virtual TSamplerHolder pushSampler(

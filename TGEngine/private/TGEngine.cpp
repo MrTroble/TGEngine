@@ -62,14 +62,23 @@ namespace tge::main {
 
 		using namespace std::chrono;
 		auto startpoint = steady_clock::now();
-		double deltatime = 0;
+		std::array<double, 10> deltaTimes{ 0 };
+		size_t currentIndex = 0;
 		isRunning = true;
 		for (;;) {
 			if (util::exitRequest || winModule->closeRequest) break;
-			for (auto mod : modules) mod->tick(deltatime);
+			double average = 0;
+			for (const auto time : deltaTimes)
+			{
+				average += time;
+			}
+			average /= deltaTimes.size();
+			for (auto mod : modules) mod->tick(average);
 
 			auto endpoint = steady_clock::now();
-			deltatime = duration_cast<duration<double>>(endpoint - startpoint).count();
+			const std::chrono::duration<double> newDeltaTime = endpoint - startpoint;
+			deltaTimes[currentIndex] = newDeltaTime.count();
+			currentIndex = (currentIndex + 1) % deltaTimes.size();
 			startpoint = endpoint;
 		}
 		for (auto bItr = modules.rbegin(); bItr < modules.rend(); bItr++) {
