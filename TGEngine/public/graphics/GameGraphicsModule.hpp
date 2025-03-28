@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#define GLM_ENABLE_EXPERIMENTAL 1
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
