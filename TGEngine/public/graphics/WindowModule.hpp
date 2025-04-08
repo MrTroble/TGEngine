@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "../Module.hpp"
+#include <vulkan/vulkan.hpp>
 
 namespace tge::graphics {
 
@@ -46,6 +47,10 @@ class WindowModule : public main::Module {
   WindowProperties getWindowProperties();
 
   WindowBounds getBounds();
+
+  std::vector<const char*> getExtensionRequirements();
+
+  vk::SurfaceKHR getVulkanSurface(const vk::Instance instance);
 };
 
 }  // namespace tge::graphics

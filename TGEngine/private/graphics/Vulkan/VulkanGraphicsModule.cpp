@@ -6,8 +6,11 @@
 #include <ranges>
 #include <unordered_set>
 
+#ifndef NDEBUG
 #define DEBUG 1
+#endif // !NDEBUG
 
+#include <vulkan/vulkan.hpp>
 #include "../../../public/Error.hpp"
 #include "../../../public/Util.hpp"
 #include "../../../public/graphics/WindowModule.hpp"
@@ -25,21 +28,7 @@ namespace tge::graphics {
 
 	constexpr std::array layerToEnable = { "VK_LAYER_KHRONOS_validation" };
 
-	constexpr std::array extensionToEnable = { VK_KHR_SURFACE_EXTENSION_NAME
-	#ifdef WIN32
-											  ,
-											  VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-	#endif  // WIN32
-	#ifdef __linux__
-											  ,
-											  VK_KHR_XLIB_SURFACE_EXTENSION_NAME
-	#endif  // __linux__
-	#ifdef DEBUG
-											  ,
-											  VK_EXT_DEBUG_UTILS_EXTENSION_NAME
-	#endif
-
-	};
+	constexpr std::array extensionToEnable = { VK_EXT_DEBUG_UTILS_EXTENSION_NAME };
 
 	using namespace vk;
 
@@ -1285,6 +1274,10 @@ namespace tge::graphics {
 				extensionEnabled.push_back(lname);
 			}
 		}
+	
+		const auto winM = graphicsModule->getWindowModule();
+		const auto values = winM->getExtensionRequirements();
+		std::ranges::copy(values, std::back_inserter(extensionEnabled));
 
 		const InstanceCreateInfo createInfo(
 			{}, &applicationInfo, (uint32_t)layerEnabled.size(), layerEnabled.data(),
@@ -1399,17 +1392,7 @@ namespace tge::graphics {
 #pragma endregion
 
 #pragma region Queue, Surface, Prepipe, MemTypes
-		const auto winM = graphicsModule->getWindowModule();
-#ifdef WIN32
-		Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, (HINSTANCE)winM->hInstance,
-			(HWND)winM->hWnd);
-		surface = instance.createWin32SurfaceKHR(surfaceCreateInfo);
-#endif  // WIN32
-#ifdef __linux__
-		XlibSurfaceCreateInfoKHR surfaceCreateInfo({}, (Display*)winM->hInstance,
-			(Window)winM->hWnd);
-		surface = instance.createXlibSurfaceKHR(surfaceCreateInfo);
-#endif
+		this->surface = winM->getVulkanSurface(this->instance);
 
 		if (!physicalDevice.getSurfaceSupportKHR(queueIndex, surface))
 			return main::Error::NO_SURFACE_SUPPORT;

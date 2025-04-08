@@ -13,160 +13,75 @@
 #define APPLICATION_VERSION VK_MAKE_VERSION(1, 0, 0)
 #endif
 
-#ifdef WIN32
-#include <Windows.h>
-#endif
-#ifdef __linux__
-#include <X11/X.h>
-#include <X11/Xlib.h>
-#endif
+#define VERROR(rslt)                                               \
+  if (rslt != vk::Result::eSuccess) {                              \
+    std::string s = to_string(rslt);                               \
+    const auto file = __FILE__;                                    \
+    const auto line = __LINE__;                                    \
+    printf("Vulkan error %s in %s L%d!\n", s.c_str(), file, line); \
+  }  // namespace tge::graphics
+
+#include <GLFW/glfw3.h>
 
 namespace tge::graphics {
 
-#ifdef WIN32
-LRESULT CALLBACK callback(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
-  if (Msg == WM_CLOSE) {
-    util::requestExit();
-    return 0;
-  }
-  return DefWindowProc(hWnd, Msg, wParam, lParam);
-}
+	main::Error init(WindowModule* winModule) {
+		if (!glfwInit()) return main::Error::COULD_NOT_CREATE_WINDOW_CLASS;
+		const auto windowProperties = winModule->getWindowProperties();
 
-main::Error init(WindowModule *winModule) {
-  HMODULE systemHandle = GetModuleHandle(nullptr);
-  if (!systemHandle) return main::Error::NO_MODULE_HANDLE;
-  winModule->hInstance = systemHandle;
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		GLFWwindow* window = glfwCreateWindow(windowProperties.width,
+			windowProperties.height, APPLICATION_NAME, NULL, NULL);
+		if (!window) return main::Error::COULD_NOT_CREATE_WINDOW;
+		glfwSetWindowPos(window, windowProperties.x,
+			windowProperties.y);
 
-  const auto windowProperties = winModule->getWindowProperties();
+		winModule->hWnd = window;
+		return main::Error::NONE;
+	}
 
-  WNDCLASSEX wndclass;
-  FillMemory(&wndclass, sizeof(WNDCLASSEX), 0);
-  wndclass.cbSize = sizeof(WNDCLASSEX);
-  wndclass.style = CS_ENABLE | CS_OWNDC | CS_HREDRAW;
-  wndclass.lpfnWndProc = callback;
-  wndclass.hInstance = systemHandle;
-  wndclass.lpszClassName = ENGINE_NAME;
+	void pool(WindowModule* winModule) {
+		glfwPollEvents();
+	}
 
-  auto regWndClass = RegisterClassEx(&wndclass);
-  if (!regWndClass) {
-    if (GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
-      return main::Error::COULD_NOT_CREATE_WINDOW_CLASS;
-  }
+	void destroy(WindowModule* winModule) {
+		glfwDestroyWindow((GLFWwindow*)winModule->hWnd);
+		glfwTerminate();
+	}
 
-  auto window = CreateWindowEx(
-      WS_EX_APPWINDOW, ENGINE_NAME, APPLICATION_NAME,
-      WS_CLIPSIBLINGS | WS_CAPTION | WS_SIZEBOX | WS_SYSMENU,
-      windowProperties.x, windowProperties.y, windowProperties.width,
-      windowProperties.height, NULL, NULL, systemHandle, NULL);
-  if (!window) return main::Error::COULD_NOT_CREATE_WINDOW;
-  winModule->hWnd = window;
-  ShowWindow(window, SW_SHOW);
-  UpdateWindow(window);
-  return main::Error::NONE;
-}
+	main::Error WindowModule::init() { return tge::graphics::init(this); }
 
-void pool(WindowModule *winModule) {
-  MSG msg;
-  const HWND wnd = (HWND)winModule->hWnd;
-  while (PeekMessage(&msg, wnd, 0, 0, PM_REMOVE)) {
-    TranslateMessage(&msg);
-    DispatchMessage(&msg);
-    if (msg.message == WM_SIZING) {
-      winModule->resizeMutex.lock();
-    } else if (msg.message == WM_SIZE) {
-      winModule->resizeMutex.unlock();
-    }
-    for (const auto fun : winModule->customFn)
-      ((WNDPROC)fun)(wnd, msg.message, msg.wParam, msg.lParam);
-  }
-}
+	void WindowModule::tick(double deltatime) { tge::graphics::pool(this); }
 
-void destroy(WindowModule *winModule) { DestroyWindow((HWND)winModule->hWnd); }
+	void WindowModule::destroy() {
+		this->closing = true;
+		tge::graphics::destroy(this);
+	}
 
-#endif  // WIN32
+	WindowProperties WindowModule::getWindowProperties() {
+		return WindowProperties();
+	}
 
-#ifdef __linux__
-typedef int (*WNDPROC)(XEvent &ev);
+	WindowBounds WindowModule::getBounds() {
+		WindowBounds bounds;
+		const auto window = (GLFWwindow*)this->hWnd;
+		glfwGetWindowPos(window, &bounds.x, &bounds.y);
+		glfwGetWindowSize(window, &bounds.width, &bounds.height);
+		return bounds;
+	}
 
-int errorHandle(Display *display, XErrorEvent *event) {
-  std::array<char, 400> str;
-  XGetErrorText(display, event->error_code, str.data(), str.size());
-  printf("%s\n", str.data());
-  return 1;
-}
+	std::vector<const char*> WindowModule::getExtensionRequirements() {
+		uint32_t count;
+		const char** extensions = glfwGetRequiredInstanceExtensions(&count);
+		return std::vector(extensions, extensions + count);
+	}
 
-main::Error init(WindowModule *winModule) {
-  XSetErrorHandler(&errorHandle);
-  XInitThreads();
-  winModule->hInstance = XOpenDisplay(NULL);
-  if (!winModule->hInstance) return main::Error::NO_MODULE_HANDLE;
-  Display *display = (Display *)winModule->hInstance;
-  const auto root = DefaultRootWindow(display);
-  if (!root) return main::Error::NO_MODULE_HANDLE;
-
-  const auto windowProperties = winModule->getWindowProperties();
-  const auto screen_num = DefaultScreen(display);
-  const auto color = WhitePixel(winModule->hInstance, screen_num);
-
-  winModule->hWnd = (void *)XCreateSimpleWindow(
-      display, root, windowProperties.x, windowProperties.y,
-      windowProperties.width, windowProperties.height, 4, color, color);
-  if (!winModule->hWnd) return main::Error::COULD_NOT_CREATE_WINDOW;
-  const auto window = (Window)winModule->hWnd;
-
-  if (!XSelectInput(display, window,
-                    ButtonPressMask | ButtonReleaseMask | KeyPressMask |
-                        PointerMotionMask | KeyReleaseMask |
-                        StructureNotifyMask | FocusChangeMask))
-    return main::Error::COULD_NOT_CREATE_WINDOW;
-  if (!XStoreName(display, window, APPLICATION_NAME))
-    return main::Error::COULD_NOT_CREATE_WINDOW;
-  if (!XMapWindow(display, window)) return main::Error::COULD_NOT_CREATE_WINDOW;
-  return tge::main::Error::NONE;
-}
-
-void pool(WindowModule *winModule) {
-  const auto display = (Display *)winModule->hInstance;
-  while (XPending(display)) {
-    XEvent xev;
-    XNextEvent(display, &xev);
-    if (xev.type == DestroyNotify) {
-      winModule->closeRequest = true;
-    }
-    for (const auto fun : winModule->customFn) ((WNDPROC)fun)(xev);
-  }
-}
-
-void destroy(WindowModule *winModule) {
-  XDestroyWindow((Display *)winModule->hInstance, (Window)winModule->hWnd);
-  XCloseDisplay((Display *)winModule->hInstance);
-}
-#endif
-
-main::Error WindowModule::init() { return tge::graphics::init(this); }
-
-void WindowModule::tick(double deltatime) { tge::graphics::pool(this); }
-
-void WindowModule::destroy() {
-  this->closing = true;
-  tge::graphics::destroy(this);
-}
-
-WindowProperties WindowModule::getWindowProperties() {
-  return WindowProperties();
-}
-
-WindowBounds WindowModule::getBounds() {
-  WindowBounds bounds;
-#ifdef WIN32
-  RECT rect;
-  GetWindowRect((HWND)this->hWnd, &rect);
-  bounds.x = rect.left;
-  bounds.y = rect.top;
-  bounds.width = rect.right - bounds.x;
-  bounds.height = rect.bottom - bounds.y;
-#endif  // WIN32
-  return bounds;
-}
+	vk::SurfaceKHR WindowModule::getVulkanSurface(const vk::Instance instance) {
+		VkSurfaceKHR surface;
+		const auto window = (GLFWwindow*)this->hWnd;
+		vk::Result err{ glfwCreateWindowSurface(instance, window, NULL, &surface) };
+		VERROR(err);
+		return surface;
+	}
 
 }  // namespace tge::graphics
