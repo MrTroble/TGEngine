@@ -214,10 +214,10 @@ class VulkanGraphicsModule : public APILayer {
 
 #ifdef DEBUG
   DebugUtilsMessengerEXT debugMessenger;
-  vk::DispatchLoaderDynamic dynamicLoader;
   bool debugEnabled = false;
   std::unordered_map<vk::DeviceMemory, std::string> memoryDebugTags;
 #endif
+  detail::DispatchLoaderDynamic dynamicLoader;
 
   bool isInitialiazed = false;
   bool exitFailed = false;

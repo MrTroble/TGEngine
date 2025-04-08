@@ -1291,24 +1291,14 @@ namespace tge::graphics {
 			(uint32_t)extensionEnabled.size(), extensionEnabled.data());
 		this->instance = createInstance(createInfo);
 
+		this->dynamicLoader = detail::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
+
 #ifdef DEBUG
 		if (std::find_if(begin(extensionEnabled), end(extensionEnabled), [](auto x) {
 			return strcmp(x, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0;
 			}) != end(extensionEnabled)) {
 			PLOG_DEBUG << "Create debug utils!";
 			debugEnabled = true;
-			dynamicLoader.vkCreateDebugUtilsMessengerEXT =
-				(PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-					instance, "vkCreateDebugUtilsMessengerEXT");
-			dynamicLoader.vkCmdBeginDebugUtilsLabelEXT =
-				(PFN_vkCmdBeginDebugUtilsLabelEXT)vkGetInstanceProcAddr(
-					instance, "vkCmdBeginDebugUtilsLabelEXT");
-			dynamicLoader.vkCmdEndDebugUtilsLabelEXT =
-				(PFN_vkCmdEndDebugUtilsLabelEXT)vkGetInstanceProcAddr(
-					instance, "vkCmdEndDebugUtilsLabelEXT");
-			dynamicLoader.vkSetDebugUtilsObjectNameEXT =
-				(PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(
-					instance, "vkSetDebugUtilsObjectNameEXT");
 			const DebugUtilsMessengerCreateInfoEXT debugUtilsMsgCreateInfo(
 				{},
 				(DebugUtilsMessageSeverityFlagsEXT)
@@ -1768,11 +1758,7 @@ namespace tge::graphics {
 		instance.destroySurfaceKHR(surface);
 #ifdef DEBUG
 		if (debugMessenger) {
-			DispatchLoaderDynamic stat;
-			stat.vkDestroyDebugUtilsMessengerEXT =
-				(PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-					instance, "vkDestroyDebugUtilsMessengerEXT");
-			instance.destroyDebugUtilsMessengerEXT(debugMessenger, nullptr, stat);
+			instance.destroyDebugUtilsMessengerEXT(debugMessenger, nullptr, this->dynamicLoader);
 		}
 #endif
 		instance.destroy();
