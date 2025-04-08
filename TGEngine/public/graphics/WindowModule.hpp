@@ -51,6 +51,8 @@ class WindowModule : public main::Module {
   std::vector<const char*> getExtensionRequirements();
 
   vk::SurfaceKHR getVulkanSurface(const vk::Instance instance);
+
+  bool isMinimized();
 };
 
 }  // namespace tge::graphics

@@ -1589,7 +1589,8 @@ namespace tge::graphics {
 	}
 
 	void VulkanGraphicsModule::tick(double time) {
-		if (exitFailed) return;
+		const auto winModule = this->getGraphicsModule()->getWindowModule();
+		if (winModule->isMinimized() || exitFailed) return;
 
 		if (this->nextImage > cmdbuffer.size()) {
 			PLOG(plog::fatal) << "Size greater command buffer size!";

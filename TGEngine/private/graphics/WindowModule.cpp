@@ -30,6 +30,9 @@ namespace tge::graphics {
 		const auto windowProperties = winModule->getWindowProperties();
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+		glfwWindowHint(GLFW_DECORATED, true);
+		glfwWindowHint(GLFW_RESIZABLE, true);
+
 		GLFWwindow* window = glfwCreateWindow(windowProperties.width,
 			windowProperties.height, APPLICATION_NAME, NULL, NULL);
 		if (!window) return main::Error::COULD_NOT_CREATE_WINDOW;
@@ -82,6 +85,11 @@ namespace tge::graphics {
 		vk::Result err{ glfwCreateWindowSurface(instance, window, NULL, &surface) };
 		VERROR(err);
 		return surface;
+	}
+
+	bool WindowModule::isMinimized() {
+		const auto window = (GLFWwindow*)this->hWnd;
+		return glfwGetWindowAttrib(window, GLFW_ICONIFIED);
 	}
 
 }  // namespace tge::graphics
