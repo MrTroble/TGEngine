@@ -73,7 +73,7 @@ struct QueueSync {
       device.resetFences(fence);
       armed = false;
     }
-    return std::move(guard);
+    return guard;
   }
 
   void waitAndDisarm() { auto guard = waitAndGet(); }
@@ -82,7 +82,7 @@ struct QueueSync {
       const CommandBuffer buffer, const CommandBufferBeginInfo &info) {
     auto guard = waitAndGet();
     buffer.begin(info);
-    return std::move(guard);
+    return guard;
   }
 
   void end(const CommandBuffer buffer, std::unique_lock<std::mutex> &&lock) {

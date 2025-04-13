@@ -158,9 +158,9 @@ namespace tge::graphics {
 
 			colorBlendStates[i] = isOpaque
 				? PipelineColorBlendStateCreateInfo(
-					{}, false, LogicOp::eClear, blendAttachment) : 
-				  PipelineColorBlendStateCreateInfo(
-				    {}, true, LogicOp::eClear, blendTranslutaned);
+					{}, false, LogicOp::eClear, blendAttachment) :
+				PipelineColorBlendStateCreateInfo(
+					{}, false, LogicOp::eClear, blendTranslutaned);
 
 			const auto shaderPipe = (VulkanShaderPipe*)material.costumShaderData;
 
@@ -343,7 +343,7 @@ namespace tge::graphics {
 			std::copy(renderInfos, renderInfos + renderInfoCount, retry.begin());
 		}
 
-		const CommandBufferInheritanceInfo inheritance(renderpass, target == RenderTarget::OPAQUE_TARGET ? 0:2);
+		const CommandBufferInheritanceInfo inheritance(renderpass, target & RenderTarget::OPAQUE_TARGET ? 0:2);
 		const CommandBufferBeginInfo beginInfo(
 			CommandBufferUsageFlagBits::eRenderPassContinue |
 			CommandBufferUsageFlagBits::eSimultaneousUse,
@@ -1579,12 +1579,6 @@ namespace tge::graphics {
 		updateDescriptors(this, this->shaderAPI);
 
 		createLightPass(this);
-
-		auto nextimage =
-			device.acquireNextImageKHR(swapchain, INVALID_SIZE_T, waitSemaphore, {});
-		VERROR(nextimage.result);
-		this->nextImage = nextimage.value;
-
 		return main::Error::NONE;
 	}
 
@@ -1596,6 +1590,11 @@ namespace tge::graphics {
 			PLOG(plog::fatal) << "Size greater command buffer size!";
 		}
 
+		const auto currentLock = primarySync->waitAndGet();
+		auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
+			waitSemaphore, {});
+		checkAndRecreate(this, nextimage.result);
+		this->nextImage = nextimage.value;
 		const auto currentBuffer = cmdbuffer[this->nextImage];
 
 		if (needsRefresh[this->nextImage] != 0) {
@@ -1686,25 +1685,14 @@ namespace tge::graphics {
 			PipelineStageFlagBits::eLateFragmentTests;
 		const SubmitInfo submitInfo(waitSemaphore, stageFlag, primary,
 			signalSemaphore);
-		primarySync->submit(submitInfo);
 
 		const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
 			nullptr);
-		const Result result = primarySync->queue.presentKHR(&presentInfo);
-		if (checkAndRecreate(this, result)) {
-			currentBuffer.reset();
-			auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
-				waitSemaphore, {});
-			this->nextImage = nextimage.value;
-			return;
-		}
+		primarySync->queue.submit(submitInfo);
+		primarySync->armed = true;
 
-		while (true) {
-			auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
-				waitSemaphore, {});
-			this->nextImage = nextimage.value;
-			if (!checkAndRecreate(this, nextimage.result)) break;
-		}
+		const Result result = primarySync->queue.presentKHR(&presentInfo);
+		checkAndRecreate(this, result);
 	}
 
 	void VulkanGraphicsModule::destroy() {
