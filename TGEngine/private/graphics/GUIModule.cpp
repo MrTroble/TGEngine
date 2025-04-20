@@ -1,49 +1,35 @@
 #include "../../public/graphics/GUIModule.hpp"
 
+#include <vulkan/vulkan.hpp>
+
 #include "../../public/TGEngine.hpp"
 #include "../../public/graphics/WindowModule.hpp"
 #include "../../public/graphics/vulkan/VulkanModuleDef.hpp"
 //
+#include <backends/imgui_impl_glfw.h>
+#include <backends/imgui_impl_vulkan.h>
 #include <imgui.h>
-#include "../../public/imgui/imgui_impl_vulkan.h"
 //
-#ifdef WIN32
-#include <Windows.h>
-#include "../../public/imgui/imgui_impl_win32.h"
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd,
-                                                             UINT msg,
-                                                             WPARAM wParam,
-                                                             LPARAM lParam);
-#endif
-#ifdef __linux__
-#include "../../public/imgui/imgui_impl_x11.h"
-extern IMGUI_IMPL_API int ImGui_ImplX11_EventHandler(XEvent &event);
-#endif
 
 namespace tge::gui {
 
 using namespace vk;
 
-inline void render(gui::GUIModule *gmod) {
+inline void render(gui::GUIModule* gmod) {
   const RenderPass pass((VkRenderPass)gmod->renderpass);
-  auto vgm = (graphics::VulkanGraphicsModule *)main::getAPILayer()->backend();
+  auto vgm = (graphics::VulkanGraphicsModule*)main::getAPILayer()->backend();
   const CommandBuffer buffer = vgm->cmdbuffer[gmod->buffer + vgm->nextImage];
-  const Framebuffer frame = ((Framebuffer *)gmod->framebuffer)[vgm->nextImage];
+  const Framebuffer frame = ((Framebuffer*)gmod->framebuffer)[vgm->nextImage];
 
   ImGui_ImplVulkan_NewFrame();
-#ifdef WIN32
-  ImGui_ImplWin32_NewFrame();
-#endif  // WIN32
-#ifdef __linux__
-  ImGui_ImplX11_NewFrame();
-#endif
+  ImGui_ImplGlfw_NewFrame();
 
   ImGui::NewFrame();
 
   gmod->renderGUI();
 
   ImGui::Render();
-  ImDrawData *draw_data = ImGui::GetDrawData();
+  ImDrawData* draw_data = ImGui::GetDrawData();
 
   const CommandBufferBeginInfo beginInfo;
   auto guard = vgm->primarySync->begin(buffer, beginInfo);
@@ -60,9 +46,9 @@ inline void render(gui::GUIModule *gmod) {
   buffer.beginRenderPass(renderPassBeginInfo, {});
   ImGui_ImplVulkan_RenderDrawData(draw_data, (VkCommandBuffer)buffer);
   buffer.endRenderPass();
-  vgm->primarySync->end(buffer, std::move(guard));
 
   vgm->primary[gmod->primary] = buffer;
+  vgm->primarySync->end(buffer, std::move(guard));
 }
 
 main::Error GUIModule::init() {
@@ -70,20 +56,10 @@ main::Error GUIModule::init() {
   auto api = main::getAPILayer();
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
+  ImGuiIO& io = ImGui::GetIO();
   (void)io;
   ImGui::StyleColorsDark();
-#ifdef WIN32
-  winModule->customFn.push_back((void *)&ImGui_ImplWin32_WndProcHandler);
-  const bool winInit = ImGui_ImplWin32_Init(winModule->hWnd);
-  if (!winInit) return main::Error::COULD_NOT_CREATE_WINDOW;
-#endif
-#ifdef __linux__
-  winModule->customFn.push_back((void *)&ImGui_ImplX11_EventHandler);
-  if (!ImGui_ImplX11_Init(winModule->hInstance, winModule->hWnd))
-    return main::Error::COULD_NOT_CREATE_WINDOW;
-#endif
-  const auto vmod = (graphics::VulkanGraphicsModule *)api->backend();
+  const auto vmod = (graphics::VulkanGraphicsModule*)api->backend();
 
   const std::array attachments = {AttachmentDescription(
       {}, vmod->format.format, SampleCountFlagBits::e1, AttachmentLoadOp::eLoad,
@@ -106,7 +82,7 @@ main::Error GUIModule::init() {
   const RenderPassCreateInfo renderPassCreateInfo(
       {}, attachments, subpassDescriptions, subpassDependencies);
   this->renderpass =
-      (void *)VkRenderPass(vmod->device.createRenderPass(renderPassCreateInfo));
+      (void*)VkRenderPass(vmod->device.createRenderPass(renderPassCreateInfo));
 
   GUIModule::recreate();
 
@@ -129,26 +105,37 @@ main::Error GUIModule::init() {
   pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
   pool_info.pPoolSizes = pool_sizes;
   const auto result = vkCreateDescriptorPool(
-      (VkDevice)vmod->device, &pool_info, nullptr, ((VkDescriptorPool *)&pool));
+      (VkDevice)vmod->device, &pool_info, nullptr, ((VkDescriptorPool*)&pool));
   if (result != VK_SUCCESS) return main::Error::VULKAN_ERROR;
 
-  ImGui_ImplVulkan_InitInfo instinfo = {(VkInstance)vmod->instance,
+  ImGui_ImplVulkan_InitInfo instinfo = {VK_API_VERSION_1_0,
+                                        (VkInstance)vmod->instance,
                                         (VkPhysicalDevice)vmod->physicalDevice,
                                         (VkDevice)vmod->device,
                                         vmod->queueFamilyIndex,
                                         (VkQueue)vmod->primarySync->queue,
-                                        VK_NULL_HANDLE,
                                         (VkDescriptorPool)pool,
-                                        0,
+                                        (VkRenderPass)this->renderpass,
                                         3,
                                         3,
                                         VK_SAMPLE_COUNT_1_BIT,
                                         nullptr,
+                                        0,
+                                        0,
+                                        false,
+                                        {},
+                                        nullptr,
                                         [](VkResult rslt) {
                                           if (rslt != VK_SUCCESS)
                                             printf("ERROR IN VK");
-                                        }};
-  ImGui_ImplVulkan_Init(&instinfo, (VkRenderPass)this->renderpass);
+                                        },
+                                        1024 * 1024};
+
+  if (!ImGui_ImplVulkan_Init(&instinfo))
+    return main::Error::COULD_NOT_CREATE_WINDOW_CLASS;
+  
+  if(!ImGui_ImplGlfw_InitForVulkan((GLFWwindow*)winModule->hWnd, true))
+      return main::Error::COULD_NOT_CREATE_WINDOW;
 
   const CommandPoolCreateInfo poolCreateInfo(
       CommandPoolCreateFlagBits::eResetCommandBuffer, vmod->queueFamilyIndex);
@@ -160,14 +147,13 @@ main::Error GUIModule::init() {
   const auto beginInfo =
       CommandBufferBeginInfo(CommandBufferUsageFlagBits::eOneTimeSubmit);
   sCmd.begin(beginInfo);
-  ImGui_ImplVulkan_CreateFontsTexture((VkCommandBuffer)sCmd);
+  ImGui_ImplVulkan_CreateFontsTexture();
   sCmd.end();
 
   const auto submitInfo = SubmitInfo({}, {}, sCmd, {});
   vmod->primarySync->submitAndWait(submitInfo);
 
   vmod->device.waitIdle();
-  ImGui_ImplVulkan_DestroyFontUploadObjects();
 
   const auto allocInfo =
       CommandBufferAllocateInfo(vmod->guiPool, CommandBufferLevel::ePrimary,
@@ -179,7 +165,6 @@ main::Error GUIModule::init() {
 
   this->primary = vmod->primary.size();
   vmod->primary.push_back(vmod->cmdbuffer[this->buffer]);
-  render(this);
 
   return main::Error::NONE;
 }
@@ -187,7 +172,8 @@ main::Error GUIModule::init() {
 void GUIModule::tick(double deltatime) { render(this); }
 
 void GUIModule::destroy() {
-  const auto vmod = (graphics::VulkanGraphicsModule *)main::getAPILayer()->backend();
+  const auto vmod =
+      (graphics::VulkanGraphicsModule*)main::getAPILayer()->backend();
   vmod->device.waitIdle();
   ImGui_ImplVulkan_Shutdown();
   vmod->device.destroyDescriptorPool(
@@ -195,25 +181,20 @@ void GUIModule::destroy() {
   vmod->device.destroyRenderPass(
       vk::RenderPass((VkRenderPass)this->renderpass));
   for (size_t i = 0; i < vmod->swapchainImageviews.size(); i++) {
-    vmod->device.destroyFramebuffer(((Framebuffer *)framebuffer)[i]);
+    vmod->device.destroyFramebuffer(((Framebuffer*)framebuffer)[i]);
   }
-  delete[] (Framebuffer *)framebuffer;
-#ifdef WIN32
-  ImGui_ImplWin32_Shutdown();
-#endif  // WIN32
-#ifdef __linux__
-  ImGui_ImplX11_Shutdown();
-#endif
+  delete[] (Framebuffer*)framebuffer;
 }
 
 void GUIModule::recreate() {
-  const auto vmod = (graphics::VulkanGraphicsModule *)main::getAPILayer()->backend();
+  const auto vmod =
+      (graphics::VulkanGraphicsModule*)main::getAPILayer()->backend();
 
   if (framebuffer != nullptr) {
     for (size_t i = 0; i < vmod->swapchainImageviews.size(); i++) {
-      vmod->device.destroyFramebuffer(((Framebuffer *)framebuffer)[i]);
+      vmod->device.destroyFramebuffer(((Framebuffer*)framebuffer)[i]);
     }
-    delete[] (Framebuffer *)framebuffer;
+    delete[] (Framebuffer*)framebuffer;
   }
   framebuffer = new Framebuffer[vmod->swapchainImageviews.size()];
 
@@ -222,7 +203,7 @@ void GUIModule::recreate() {
     const FramebufferCreateInfo framebufferCreateInfo(
         {}, vk::RenderPass((VkRenderPass)renderpass), imview,
         vmod->viewport.width, vmod->viewport.height, 1);
-    ((Framebuffer *)framebuffer)[i] =
+    ((Framebuffer*)framebuffer)[i] =
         vmod->device.createFramebuffer(framebufferCreateInfo);
   }
 }

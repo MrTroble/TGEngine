@@ -30,26 +30,13 @@ set(ENGINE_DATA
 	"private/graphics/Material.cpp"  
 	"private/IO/IOModule.cpp"
 	"private/graphics/GUIModule.cpp" 
-	
-	"private/imgui/imgui_impl_vulkan.cpp"
- )
-
-if(WIN32)
-list(APPEND ENGINE_DATA
-    "private/imgui/imgui_impl_win32.cpp"
 )
-else()
-list(APPEND ENGINE_DATA
-    "private/imgui/imgui_impl_x11.cpp"
-)
-endif()
 
 add_library(TGEngine STATIC ${ENGINE_DATA})
 
-include(FindVulkan)
 target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan)
 message(${Vulkan_INCLUDE_DIRS})
-target_include_directories(TGEngine PUBLIC ../submodules/glfw)
+target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui)
 target_link_libraries(TGEngine PUBLIC glfw)
 
 find_package(glm CONFIG REQUIRED)
@@ -58,11 +45,8 @@ target_link_libraries(TGEngine PUBLIC glm::glm)
 find_package(glslang CONFIG REQUIRED)
 target_link_libraries(TGEngine PUBLIC glslang::OSDependent glslang::glslang glslang::MachineIndependent glslang::GenericCodeGen glslang::glslang-default-resource-limits glslang::OGLCompiler glslang::SPVRemapper glslang::SPIRV glslang::HLSL)
 
-find_package(imgui CONFIG REQUIRED)
-target_link_libraries(TGEngine PUBLIC imgui::imgui)
-
 find_package(plog CONFIG REQUIRED)
-target_link_libraries(TGEngine PRIVATE plog::plog)
+target_link_libraries(TGEngine PRIVATE plog::plog imgui)
 
 enable_testing()
 
