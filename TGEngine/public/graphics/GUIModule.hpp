@@ -1,19 +1,20 @@
 #pragma once
 
-#include "../Module.hpp"
 #include <cstddef>
+
+#include "../../public/graphics/WindowModule.hpp"
+#include "../Module.hpp"
 
 namespace tge::gui {
 
 class GUIModule : public tge::main::Module {
-
-public:
-
+ public:
   void *pool;
   size_t buffer;
   size_t primary;
   void *renderpass;
   void *framebuffer = nullptr;
+  graphics::WindowModule *winModule = nullptr;
 
   main::Error init() override;
 
@@ -26,4 +27,4 @@ public:
   virtual void renderGUI() = 0;
 };
 
-} // namespace tge::gui
+}  // namespace tge::gui

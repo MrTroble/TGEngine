@@ -1590,7 +1590,7 @@ namespace tge::graphics {
 			PLOG(plog::fatal) << "Size greater command buffer size!";
 		}
 
-		const auto currentLock = primarySync->waitAndGet();
+		auto currentLock = primarySync->waitAndGet();
 		auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
 			waitSemaphore, {});
 		checkAndRecreate(this, nextimage.result);
@@ -1688,11 +1688,11 @@ namespace tge::graphics {
 
 		const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
 			nullptr);
-		primarySync->queue.submit(submitInfo);
-		primarySync->armed = true;
+		primarySync->submit(submitInfo, std::move(currentLock));
 
 		const Result result = primarySync->queue.presentKHR(&presentInfo);
 		checkAndRecreate(this, result);
+		primarySync->waitAndDisarm();
 	}
 
 	void VulkanGraphicsModule::destroy() {

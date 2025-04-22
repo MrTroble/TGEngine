@@ -95,6 +95,11 @@ struct QueueSync {
     armed = true;
   }
 
+  void submit(const vk::ArrayProxy<SubmitInfo>& submitInfos, std::unique_lock<std::mutex>&& lock) {
+      queue.submit(submitInfos, fence);
+      armed = true;
+  }
+
   void submitAndWait(const vk::ArrayProxy<SubmitInfo> &submitInfos) {
     auto guard = waitAndGet();
     queue.submit(submitInfos, fence);
