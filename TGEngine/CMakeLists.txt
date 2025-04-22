@@ -36,11 +36,8 @@ add_library(TGEngine STATIC ${ENGINE_DATA})
 
 target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan)
 message(${Vulkan_INCLUDE_DIRS})
-target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui)
+target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui ../submodules/glm)
 target_link_libraries(TGEngine PUBLIC glfw)
-
-find_package(glm CONFIG REQUIRED)
-target_link_libraries(TGEngine PUBLIC glm::glm)
 
 find_package(glslang CONFIG REQUIRED)
 target_link_libraries(TGEngine PUBLIC glslang::OSDependent glslang::glslang glslang::MachineIndependent glslang::GenericCodeGen glslang::glslang-default-resource-limits glslang::OGLCompiler glslang::SPVRemapper glslang::SPIRV glslang::HLSL)
