@@ -12,9 +12,9 @@ jobs:
   build_win:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
            path: ${{github.workspace}}\build\_deps
            key: wincache
@@ -23,7 +23,7 @@ jobs:
       - name: Build
         run: cmake --build ${{github.workspace}}\build --config ${{env.BUILD_TYPE}}
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v3.1.0
+        uses: actions/upload-artifact@v4
         with:
           name: libTGEngineWindows
           path: |
@@ -41,9 +41,9 @@ jobs:
           sudo apt install vulkan-sdk
       - name: Update Clang
         run: sudo apt install clang-14 --install-suggests
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
            path: ${{github.workspace}}/build/_deps
            key: linuxcache
@@ -52,7 +52,7 @@ jobs:
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
       - name: Upload a Build Artifact
-        uses: actions/upload-artifact@v3.1.0
+        uses: actions/upload-artifact@v4
         with:
           name: libTGEngineLinux
           path: |
