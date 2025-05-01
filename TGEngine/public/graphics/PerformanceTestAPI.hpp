@@ -170,5 +170,7 @@ namespace tge::graphics {
 		}
 
 		virtual APILayer* backend() override { return api->backend(); }
+
+		virtual void initDebugGUI() override { return api->initDebugGUI(); }
 	};
 }  // namespace tge::graphics

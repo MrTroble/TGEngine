@@ -27,7 +27,6 @@ set(ENGINE_DATA
     "private/Util.cpp"
 	"private/graphics/WindowModule.cpp" 
 	"private/graphics/Vulkan/VulkanShaderModule.cpp" 
-	"private/graphics/Material.cpp"  
 	"private/IO/IOModule.cpp"
 	"private/graphics/GUIModule.cpp" 
 )
