@@ -207,7 +207,7 @@ namespace tge::graphics {
         std::vector<shader::ShaderPipe> shaderPipes;
         std::vector<CommandBuffer> primary = { CommandBuffer() };
 
-        std::vector<TRenderHolder> renderInfosForRetry;
+        std::vector<std::pair<TRenderHolder, RenderTarget>> renderInfosForRetry;
         std::mutex renderInfosForRetryHolder;
 
         std::array<TTextureHolder, 6> internalImageData;

@@ -433,7 +433,7 @@ namespace tge::graphics {
             std::copy(renderInfos, renderInfos + renderInfoCount, retry->begin());
             nextHolder = TRenderHolder(allocation.beginIndex);
             std::lock_guard guard(renderInfosForRetryHolder);
-            renderInfosForRetry.push_back(nextHolder);
+            renderInfosForRetry.emplace_back(nextHolder, target);
             std::vector<TDataHolder>& dataHolderToAdd = *dataHolder;
             dataHolderToAdd.reserve(renderInfoCount * 100);
             std::vector<TPipelineHolder>& pipelineHolder = *pipeline;
@@ -604,36 +604,38 @@ namespace tge::graphics {
 
         const auto& cmdBuf = noneRenderCmdbuffer[DATA_ONLY_BUFFER];
 
-        const CommandBufferBeginInfo beginInfo(
-            CommandBufferUsageFlagBits::eOneTimeSubmit);
-        auto guard = secondarySync->begin(cmdBuf, beginInfo);
+        {
+            const CommandBufferBeginInfo beginInfo(
+                CommandBufferUsageFlagBits::eOneTimeSubmit);
+            auto guard = secondarySync->begin(cmdBuf, beginInfo);
 
-        size_t currentOffset = 0;
-        size_t tempCurrentOffset = 0;
-        for (size_t i = 0; i < dataCount; i++) {
-            const auto& info = bufferInfo[i];
-            const auto dataptr = (const uint8_t*)info.data;
+            size_t currentOffset = 0;
+            size_t tempCurrentOffset = 0;
+            for (size_t i = 0; i < dataCount; i++) {
+                const auto& info = bufferInfo[i];
+                const auto dataptr = (const uint8_t*)info.data;
 
-            const auto tempBuf = tempBuffer[i];
-            device.bindBufferMemory(tempBuf, hostVisibleMemory, tempCurrentOffset);
+                const auto tempBuf = tempBuffer[i];
+                device.bindBufferMemory(tempBuf, hostVisibleMemory, tempCurrentOffset);
 
-            const auto tempCurrentSize = tempBufferAlignedSize[i];
-            const auto mappedHandle =
-                device.mapMemory(hostVisibleMemory, tempCurrentOffset, tempCurrentSize);
-            memcpy(mappedHandle, dataptr, info.size);
-            device.unmapMemory(hostVisibleMemory);
-            tempCurrentOffset += tempCurrentSize;
+                const auto tempCurrentSize = tempBufferAlignedSize[i];
+                const auto mappedHandle =
+                    device.mapMemory(hostVisibleMemory, tempCurrentOffset, tempCurrentSize);
+                memcpy(mappedHandle, dataptr, info.size);
+                device.unmapMemory(hostVisibleMemory);
+                tempCurrentOffset += tempCurrentSize;
 
-            const auto currentBuffer = this->bufferDataHolder.get<0>(i + returnIndex);
-            device.bindBufferMemory(currentBuffer, localMem, currentOffset);
-            currentOffset += bufferAlignedSize[i];
+                const auto currentBuffer = this->bufferDataHolder.get<0>(i + returnIndex);
+                device.bindBufferMemory(currentBuffer, localMem, currentOffset);
+                currentOffset += bufferAlignedSize[i];
 
-            const BufferCopy copyInfo(0, 0, info.size);
-            cmdBuf.copyBuffer(tempBuf, currentBuffer, copyInfo);
+                const BufferCopy copyInfo(0, 0, info.size);
+                cmdBuf.copyBuffer(tempBuf, currentBuffer, copyInfo);
+            }
+
+            const SubmitInfo info({}, {}, cmdBuf);
+            secondarySync->endSubmitAndWait(info, std::move(guard));
         }
-
-        const SubmitInfo info({}, {}, cmdBuf);
-        secondarySync->endSubmitAndWait(info, std::move(guard));
 
         device.freeMemory(hostVisibleMemory);
         for (const auto buf : tempBuffer) device.destroyBuffer(buf);
@@ -1235,12 +1237,12 @@ namespace tge::graphics {
 
             {
                 std::unique_lock lock(vgm->renderInfosForRetryHolder);
-                for (const TRenderHolder renderHolder : vgm->renderInfosForRetry) {
+                for (const auto [renderHolder, target] : vgm->renderInfosForRetry) {
                     const auto& currentVector =
                         vgm->secondaryCommandBuffer.get<1>(renderHolder.internalHandle);
                     if (currentVector.empty()) continue;
                     vgm->pushRender(currentVector.size(), currentVector.data(),
-                        renderHolder);
+                        renderHolder, target);
                 }
             }
             tge::main::fireRecreate();
@@ -1602,10 +1604,13 @@ namespace tge::graphics {
             PLOG(plog::fatal) << "Size greater command buffer size!";
         }
 
-        auto currentLock = primarySync->waitAndGet();
         auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
             waitSemaphore, {});
-        checkAndRecreate(this, nextimage.result);
+        if (checkAndRecreate(this, nextimage.result)) {
+            device.destroySemaphore(waitSemaphore);
+            waitSemaphore = device.createSemaphore({});
+            return;
+        }
         this->nextImage = nextimage.value;
         const auto currentBuffer = cmdbuffer[this->nextImage];
 
@@ -1620,7 +1625,7 @@ namespace tge::graphics {
                                            ClearValue(clearColor) };
 
             const CommandBufferBeginInfo cmdBufferBeginInfo({}, nullptr);
-            currentBuffer.begin(cmdBufferBeginInfo);
+            auto currentLock = primarySync->begin(currentBuffer, cmdBufferBeginInfo);
 
             const RenderPassBeginInfo renderPassBeginInfo(
                 renderpass, framebuffer[this->nextImage],
@@ -1706,9 +1711,14 @@ namespace tge::graphics {
 
         const PresentInfoKHR presentInfo(signalSemaphore, swapchain, this->nextImage,
             nullptr);
-        primarySync->submit(submitInfo, std::move(currentLock));
 
-        const Result result = primarySync->queue.presentKHR(&presentInfo);
+        primarySync->submit(submitInfo);
+
+        Result result;
+        {
+            std::lock_guard lockGuard(primarySync->handle);
+            result = primarySync->queue.presentKHR(&presentInfo);
+        }
         checkAndRecreate(this, result);
     }
 
@@ -1763,8 +1773,8 @@ namespace tge::graphics {
             if (!holder) continue;
             toErase.push_back(holder.internalHandle);
             std::lock_guard guard(renderInfosForRetryHolder);
-            const auto iterator = std::find(renderInfosForRetry.begin(),
-                renderInfosForRetry.end(), holder);
+            const auto iterator = std::find_if(renderInfosForRetry.begin(),
+                renderInfosForRetry.end(), [=](auto t) {return t.first == holder; });
             if (iterator != renderInfosForRetry.end())
                 renderInfosForRetry.erase(iterator);
         }
