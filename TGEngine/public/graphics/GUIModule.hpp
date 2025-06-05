@@ -4,18 +4,18 @@
 
 #include "../../public/graphics/WindowModule.hpp"
 #include "../Module.hpp"
+#include "../graphics/APILayer.hpp"
+#include "../IO/IOModule.hpp"
 
 namespace tge::gui {
 
-class GUIModule : public tge::main::Module {
+class DebugGUIModule : public tge::main::Module {
  public:
-  void *pool = nullptr;
-  size_t buffer = SIZE_MAX;
-  size_t primary = SIZE_MAX;
-  void *renderpass = nullptr;
-  void *framebuffer = nullptr;
-
-  virtual ~GUIModule() = default;
+  graphics::WindowModule *winModule = nullptr;
+  graphics::APILayer* api = nullptr;
+  io::IOModule* io = nullptr;
+  
+  DebugGUIModule(io::IOModule* io) : io(io) {}
 
   main::Error init() override;
 
@@ -23,7 +23,9 @@ class GUIModule : public tge::main::Module {
 
   void destroy() override;
 
-  void recreate() override;
+  void recreate() override {
+
+  }
 
   virtual void renderGUI() = 0;
 };

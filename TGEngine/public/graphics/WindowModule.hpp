@@ -10,7 +10,7 @@
 namespace tge::graphics {
 
 struct WindowProperties {
-  bool centered = false;    // Not implemented
+  bool centered = true;     // Centeres the given window
   int x = 0;                // Ignored if centered
   int y = 0;                // Ignored if centered
   char fullscreenmode = 0;  // Not implemented

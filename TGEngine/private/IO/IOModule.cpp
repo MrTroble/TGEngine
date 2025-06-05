@@ -19,7 +19,7 @@ namespace tge::io {
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
 		const PressMode mode = action == GLFW_RELEASE ? PressMode::RELEASED : (action == GLFW_PRESS ? PressMode::CLICKED : PressMode::UNKNOWN);
-		const MouseEvent event{ (int)xpos, (int)ypos, button, mods, mode };
+		const MouseEvent event{ (int)xpos, (int)ypos, button + 1, mods, mode };
 		for (auto io : ios)	io->mouseEvent(event);
 	}
 
@@ -46,9 +46,10 @@ namespace tge::io {
 		inputY = deltaY * delta;
 		for (size_t i = 0; i < GLFW_MOUSE_BUTTON_LAST; i++)
 		{
-			if (glfwGetMouseButton(window, i) == GLFW_PRESS) {
+			const auto pressed = glfwGetMouseButton(window, i);
+			if (pressed == GLFW_PRESS) {
 				const PressMode mode = PressMode::HOLD;
-				const MouseEvent event{ (int)xpos, (int)ypos, 0, 0, mode };
+				const MouseEvent event{ (int)xpos, (int)ypos, i + 1, 0, mode };
 				mouseEvent(event);
 			}
 		}

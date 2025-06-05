@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.15)
+cmake_minimum_required (VERSION 3.24)
 set(CMAKE_CXX_STANDARD 20)
 add_compile_definitions(ENGINE_NAME="TGEngine" ENGINE_VERSION=8388608)
 
@@ -27,26 +27,18 @@ set(ENGINE_DATA
     "private/Util.cpp"
 	"private/graphics/WindowModule.cpp" 
 	"private/graphics/Vulkan/VulkanShaderModule.cpp" 
-	"private/graphics/Material.cpp"  
 	"private/IO/IOModule.cpp"
 	"private/graphics/GUIModule.cpp" 
 )
 
 add_library(TGEngine STATIC ${ENGINE_DATA})
 
-target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan)
-message(${Vulkan_INCLUDE_DIRS})
-target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui)
-target_link_libraries(TGEngine PUBLIC glfw)
-
-find_package(glm CONFIG REQUIRED)
-target_link_libraries(TGEngine PUBLIC glm::glm)
-
-find_package(glslang CONFIG REQUIRED)
-target_link_libraries(TGEngine PUBLIC glslang::OSDependent glslang::glslang glslang::MachineIndependent glslang::GenericCodeGen glslang::glslang-default-resource-limits glslang::OGLCompiler glslang::SPVRemapper glslang::SPIRV glslang::HLSL)
+message(${Vulkan_glslang_LIBRARY})
+target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui ../submodules/glm)
+target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan glfw plog::plog imgui Vulkan::glslang Vulkan::shaderc_combined Vulkan::SPIRV-Tools)
 
 find_package(plog CONFIG REQUIRED)
-target_link_libraries(TGEngine PRIVATE plog::plog imgui)
+target_link_libraries(TGEngine PRIVATE )
 
 enable_testing()
 

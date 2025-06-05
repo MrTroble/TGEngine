@@ -233,6 +233,8 @@ class APILayer : public main::Module {  // Interface
       const TDataHolder cache = TDataHolder()) = 0;
 
   [[nodiscard]] virtual APILayer* backend() { return this; }
+
+  virtual void initDebugGUI() = 0;
 };
 
 }  // namespace tge::graphics
