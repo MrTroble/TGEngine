@@ -1,9 +1,10 @@
+#include "../../public/graphics/WindowModule.hpp"
+
 #include <array>
 #include <iostream>
 #include <string>
 
 #include "../../public/Util.hpp"
-#include "../../public/graphics/WindowModule.hpp"
 
 #ifndef APPLICATION_NAME
 #define APPLICATION_NAME "unknown"
@@ -25,74 +26,69 @@
 
 namespace tge::graphics {
 
-    main::Error init(WindowModule* winModule) {
-        if (!glfwInit()) return main::Error::COULD_NOT_CREATE_WINDOW_CLASS;
-        const auto windowProperties = winModule->getWindowProperties();
+main::Error WindowModule::init() {
+  if (!glfwInit()) return main::Error::COULD_NOT_CREATE_WINDOW_CLASS;
+  const auto windowProperties = this->getWindowProperties();
 
-        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_DECORATED, true);
-        glfwWindowHint(GLFW_RESIZABLE, true);
-        glfwWindowHint(GLFW_RESIZABLE, true);
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  glfwWindowHint(GLFW_DECORATED, true);
+  glfwWindowHint(GLFW_RESIZABLE, true);
+  glfwWindowHint(GLFW_RESIZABLE, true);
 
-        GLFWwindow* window = glfwCreateWindow(windowProperties.width,
-            windowProperties.height, APPLICATION_NAME, NULL, NULL);
-        if (!window) return main::Error::COULD_NOT_CREATE_WINDOW;
-        if (!windowProperties.centered) {
-            glfwSetWindowPos(window, windowProperties.x,
-                windowProperties.y);
-        }
+  GLFWwindow* window =
+      glfwCreateWindow(windowProperties.width, windowProperties.height,
+                       APPLICATION_NAME, NULL, NULL);
+  if (!window) return main::Error::COULD_NOT_CREATE_WINDOW;
+  if (!windowProperties.centered) {
+    glfwSetWindowPos(window, windowProperties.x, windowProperties.y);
+  }
 
-        winModule->hWnd = window;
-        return main::Error::NONE;
-    }
+  this->hWnd = window;
+  return main::Error::NONE;
+}
 
-    void pool(WindowModule* winModule) {
-        glfwPollEvents();
-    }
+void WindowModule::tick(double deltatime) { glfwPollEvents(); }
 
-    void destroy(WindowModule* winModule) {
-        glfwDestroyWindow((GLFWwindow*)winModule->hWnd);
-        glfwTerminate();
-    }
+void WindowModule::destroy() {
+  const auto window = static_cast<GLFWwindow*>(this->hWnd);
+  glfwDestroyWindow(window);
+  glfwTerminate();
+}
 
-    main::Error WindowModule::init() { return tge::graphics::init(this); }
+WindowProperties WindowModule::getWindowProperties() {
+  return WindowProperties();
+}
 
-    void WindowModule::tick(double deltatime) { tge::graphics::pool(this); }
+WindowBounds WindowModule::getBounds() {
+  WindowBounds bounds;
+  const auto window = static_cast<GLFWwindow*>(this->hWnd);
+  glfwGetWindowPos(window, &bounds.x, &bounds.y);
+  glfwGetWindowSize(window, &bounds.width, &bounds.height);
+  return bounds;
+}
 
-    void WindowModule::destroy() {
-        this->closing = true;
-        tge::graphics::destroy(this);
-    }
+std::vector<const char*> WindowModule::getExtensionRequirements() {
+  uint32_t count;
+  const char** extensions = glfwGetRequiredInstanceExtensions(&count);
+  return std::vector(extensions, extensions + count);
+}
 
-    WindowProperties WindowModule::getWindowProperties() {
-        return WindowProperties();
-    }
+vk::SurfaceKHR WindowModule::getVulkanSurface(const vk::Instance instance) {
+  VkSurfaceKHR surface;
+  const auto window = static_cast<GLFWwindow*>(this->hWnd);
+  vk::Result err{glfwCreateWindowSurface(instance, window, NULL, &surface)};
+  VERROR(err);
+  return surface;
+}
 
-    WindowBounds WindowModule::getBounds() {
-        WindowBounds bounds;
-        const auto window = (GLFWwindow*)this->hWnd;
-        glfwGetWindowPos(window, &bounds.x, &bounds.y);
-        glfwGetWindowSize(window, &bounds.width, &bounds.height);
-        return bounds;
-    }
+bool WindowModule::isMinimized() {
+  const auto window = static_cast<GLFWwindow*>(this->hWnd);
+  return glfwGetWindowAttrib(window, GLFW_ICONIFIED);
+}
 
-    std::vector<const char*> WindowModule::getExtensionRequirements() {
-        uint32_t count;
-        const char** extensions = glfwGetRequiredInstanceExtensions(&count);
-        return std::vector(extensions, extensions + count);
-    }
-
-    vk::SurfaceKHR WindowModule::getVulkanSurface(const vk::Instance instance) {
-        VkSurfaceKHR surface;
-        const auto window = (GLFWwindow*)this->hWnd;
-        vk::Result err{ glfwCreateWindowSurface(instance, window, NULL, &surface) };
-        VERROR(err);
-        return surface;
-    }
-
-    bool WindowModule::isMinimized() {
-        const auto window = (GLFWwindow*)this->hWnd;
-        return glfwGetWindowAttrib(window, GLFW_ICONIFIED);
-    }
+bool WindowModule::isClosingRequested() {
+  const auto window = static_cast<GLFWwindow*>(this->hWnd);
+  return glfwWindowShouldClose(window);
+}
 
 }  // namespace tge::graphics

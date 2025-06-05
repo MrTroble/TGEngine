@@ -66,7 +66,7 @@ namespace tge::main {
 		size_t currentIndex = 0;
 		isRunning = true;
 		for (;;) {
-			if (util::exitRequest || winModule->closeRequest) break;
+			if (util::exitRequest || winModule->isClosingRequested()) break;
 			double average = 0;
 			for (const auto time : deltaTimes)
 			{

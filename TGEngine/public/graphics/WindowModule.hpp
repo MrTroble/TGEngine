@@ -27,16 +27,8 @@ struct WindowBounds {
 
 class WindowModule : public main::Module {
  public:
-  void* hInstance;
   void* hWnd;
-  void* root;
   std::vector<void*> customFn;
-  bool closeRequest = false;
-  bool closing = false;
-  std::thread osThread;
-  std::mutex osMutex;
-  std::mutex exitMutex;
-  std::mutex resizeMutex;
 
   main::Error init() override;
 
@@ -53,6 +45,8 @@ class WindowModule : public main::Module {
   vk::SurfaceKHR getVulkanSurface(const vk::Instance instance);
 
   bool isMinimized();
+
+  bool isClosingRequested();
 };
 
 }  // namespace tge::graphics
