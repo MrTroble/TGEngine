@@ -9,12 +9,13 @@ namespace tge::gui {
 
 class GUIModule : public tge::main::Module {
  public:
-  void *pool;
-  size_t buffer;
-  size_t primary;
-  void *renderpass;
+  void *pool = nullptr;
+  size_t buffer = SIZE_MAX;
+  size_t primary = SIZE_MAX;
+  void *renderpass = nullptr;
   void *framebuffer = nullptr;
-  graphics::WindowModule *winModule = nullptr;
+
+  virtual ~GUIModule() = default;
 
   main::Error init() override;
 
