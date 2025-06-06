@@ -12,6 +12,7 @@ namespace tge::io {
 		CLICKED,
 		RELEASED,
 		HOLD,
+		SCROLL,
 		UNKNOWN
 	};
 

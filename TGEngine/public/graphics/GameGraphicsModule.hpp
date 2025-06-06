@@ -99,6 +99,10 @@ class GameGraphicsModule : public main::Module {
     return nodeHolder.get<3>(holders);
   }
 
+  inline glm::mat4 getVPMatrix() { 
+      return projectionView;
+  }
+
   void addAssetResolver(
       std::function<std::vector<char>(const std::string&)>&& function) {
     assetResolver.push_back(function);
