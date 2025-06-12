@@ -1600,10 +1600,7 @@ namespace tge::graphics {
         const auto winModule = this->getGraphicsModule()->getWindowModule();
         if (winModule->isMinimized() || exitFailed) return;
 
-        if (this->nextImage > cmdbuffer.size()) {
-            PLOG(plog::fatal) << "Size greater command buffer size!";
-        }
-
+        primarySync->waitAndDisarm();
         auto nextimage = device.acquireNextImageKHR(swapchain, INVALID_SIZE_T,
             waitSemaphore, {});
         if (checkAndRecreate(this, nextimage.result)) {
