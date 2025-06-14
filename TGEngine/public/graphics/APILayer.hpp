@@ -14,227 +14,232 @@
 #include "Material.hpp"
 
 namespace tge::shader {
-class ShaderAPI;
-enum class ShaderType;
+	class ShaderAPI;
+	enum class ShaderType;
 }  // namespace tge::shader
 
 namespace tge::graphics {
 
-class GameGraphicsModule;
+	class GameGraphicsModule;
 
-enum class IndexSize { UINT16, UINT32, NONE };
+	enum class IndexSize { UINT16, UINT32, NONE };
 
-struct CacheIndex {
-  TDataHolder buffer;
-};
+	struct CacheIndex {
+		TDataHolder buffer;
+	};
 
-struct PushConstRanges {
-  std::vector<std::byte> pushConstData;
-  shader::ShaderType type;
-};
+	struct PushConstRanges {
+		std::vector<std::byte> pushConstData;
+		shader::ShaderType type;
+	};
 
-struct RenderInfo {
-  std::vector<TDataHolder> vertexBuffer;
-  TDataHolder indexBuffer;
-  TPipelineHolder materialId;
-  size_t indexCount;
-  size_t instanceCount = 1;
-  size_t indexOffset = 0;
-  IndexSize indexSize = IndexSize::UINT32;
-  std::vector<size_t> vertexOffsets;
-  shader::TBindingHolder bindingID{};
-  size_t firstInstance = 0;
-  std::vector<PushConstRanges> constRanges;
-  std::string debugName{};
-};
+	struct RenderInfo {
+		std::vector<TDataHolder> vertexBuffer;
+		TDataHolder indexBuffer;
+		TPipelineHolder materialId;
+		size_t indexCount;
+		size_t instanceCount = 1;
+		size_t indexOffset = 0;
+		IndexSize indexSize = IndexSize::UINT32;
+		std::vector<size_t> vertexOffsets;
+		shader::TBindingHolder bindingID{};
+		size_t firstInstance = 0;
+		std::vector<PushConstRanges> constRanges;
+		std::string debugName{};
+	};
 
-enum class BlitMode : uint32_t {
-    NONE,
-    LINEAR
-};
+	enum class BlitMode : uint32_t {
+		NONE,
+		LINEAR
+	};
 
-struct TextureInfo {
-  uint8_t* data = nullptr;
-  uint32_t size;
-  uint32_t width;
-  uint32_t height;
-  uint32_t channel;
-  size_t internalFormatOverride = 37;
-  uint32_t mipMapOverrider = INVALID_UINT32;
-  BlitMode blitMode = BlitMode::LINEAR;
-  std::string debugInfo{};
-};
+	struct TextureInfo {
+		uint8_t* data = nullptr;
+		uint32_t size;
+		uint32_t width;
+		uint32_t height;
+		uint32_t channel;
+		size_t internalFormatOverride = 37;
+		uint32_t mipMapOverrider = INVALID_UINT32;
+		BlitMode blitMode = BlitMode::LINEAR;
+		std::string debugInfo{};
+	};
 
-enum class FilterSetting { NEAREST, LINEAR };
+	enum class FilterSetting { NEAREST, LINEAR };
 
-enum class AddressMode {
-  REPEAT,
-  MIRROR_REPEAT,
-  CLAMP_TO_EDGE,
-  CLAMP_TO_BORDER,
-  MIRROR_CLAMP_TO_EDGE
-};
+	enum class AddressMode {
+		REPEAT,
+		MIRROR_REPEAT,
+		CLAMP_TO_EDGE,
+		CLAMP_TO_BORDER,
+		MIRROR_CLAMP_TO_EDGE
+	};
 
-struct SamplerInfo {
-  FilterSetting minFilter = FilterSetting::LINEAR;
-  FilterSetting magFilter = FilterSetting::LINEAR;
-  AddressMode uMode = AddressMode::REPEAT;
-  AddressMode vMode = AddressMode::REPEAT;
-  int anisotropy = 0;
-};
+	struct SamplerInfo {
+		FilterSetting minFilter = FilterSetting::LINEAR;
+		FilterSetting magFilter = FilterSetting::LINEAR;
+		AddressMode uMode = AddressMode::REPEAT;
+		AddressMode vMode = AddressMode::REPEAT;
+		int anisotropy = 0;
+	};
 
-struct Light {
-  glm::vec3 pos;
-  float minRatio = 0;
-  glm::vec3 color;
-  float intensity;
+	struct Light {
+		glm::vec3 pos;
+		float minRatio = 0;
+		glm::vec3 color;
+		float intensity;
 
-  Light() = default;
+		Light() = default;
 
-  Light(glm::vec3 pos, glm::vec3 color, float intensity)
-      : pos(pos), color(color), intensity(intensity) {}
-};
+		Light(glm::vec3 pos, glm::vec3 color, float intensity)
+			: pos(pos), color(color), intensity(intensity) {
+		}
+	};
 
-enum class DataType {
-  IndexData,
-  VertexData,
-  VertexIndexData,
-  Uniform,
-  All,
-  Invalid
-};
+	enum class DataType {
+		IndexData,
+		VertexData,
+		VertexIndexData,
+		Uniform,
+		All,
+		Invalid
+	};
 
-struct BufferDebugInfo {
-    std::string info;
-};
+	struct BufferDebugInfo {
+		std::string info;
+	};
 
-struct BufferInfo {
-  const void* data = nullptr;
-  size_t size = INVALID_SIZE_T;
-  DataType type = DataType::Invalid;
-  std::shared_ptr<BufferDebugInfo> debugInfo;
-};
+	struct BufferInfo {
+		const void* data = nullptr;
+		size_t size = INVALID_SIZE_T;
+		DataType type = DataType::Invalid;
+		std::shared_ptr<BufferDebugInfo> debugInfo;
+	};
 
-struct BufferChange {
-  TDataHolder holder;
-  void* data = nullptr;
-  size_t size = INVALID_SIZE_T;
-  size_t offset = 0;
-};
+	struct BufferChange {
+		TDataHolder holder;
+		void* data = nullptr;
+		size_t size = INVALID_SIZE_T;
+		size_t offset = 0;
+	};
 
-class APILayer : public main::Module {  // Interface
- protected:
-  GameGraphicsModule* graphicsModule = nullptr;
-  shader::ShaderAPI* shaderAPI;
-  std::mutex referenceCounterMutex;
+	class APILayer : public main::Module {  // Interface
+	protected:
+		GameGraphicsModule* graphicsModule = nullptr;
+		shader::ShaderAPI* shaderAPI;
+		std::mutex referenceCounterMutex;
 
- public:
-  inline void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
-    this->graphicsModule = graphicsModule;
-  }
+	public:
+		inline void setGameGraphicsModule(GameGraphicsModule* graphicsModule) {
+			this->graphicsModule = graphicsModule;
+		}
 
-  APILayer(shader::ShaderAPI* shaderAPI) : shaderAPI(shaderAPI) {}
+		APILayer(shader::ShaderAPI* shaderAPI) : shaderAPI(shaderAPI) {}
 
-  virtual ~APILayer() {}
+		virtual ~APILayer() {}
 
-  [[nodiscard]] virtual std::vector<TPipelineHolder> pushMaterials(
-      const size_t materialcount, const Material* materials) = 0;
+		[[nodiscard]] virtual std::vector<TPipelineHolder> pushMaterials(
+			const size_t materialcount, const Material* materials) = 0;
 
-  [[nodiscard]] virtual std::vector<TDataHolder> pushData(
-      const size_t dataCount, const BufferInfo* bufferInfo,
-      const std::string& debugTag = "Unkown") = 0;
+		[[nodiscard]] virtual std::vector<TDataHolder> pushData(
+			const size_t dataCount, const BufferInfo* bufferInfo,
+			const std::string& debugTag = "Unkown") = 0;
 
-  virtual void changeData(const size_t sizes,
-                          const BufferChange* changeInfos) = 0;
+		virtual void changeData(const size_t sizes,
+			const BufferChange* changeInfos) = 0;
 
-  virtual void removeRender(const size_t renderInfoCount,
-                            const TRenderHolder* renderIDs) = 0;
+		virtual void removeRender(const size_t renderInfoCount,
+			const TRenderHolder* renderIDs) = 0;
 
-  [[nodiscard]] virtual std::vector<TPipelineHolder> pushMaterials(
-      const std::span<const Material> materials) {
-    return pushMaterials(materials.size(), materials.data());
-  }
+		[[nodiscard]] virtual std::vector<TPipelineHolder> pushMaterials(
+			const std::span<const Material> materials) {
+			return pushMaterials(materials.size(), materials.data());
+		}
 
-  [[nodiscard]] std::vector<TDataHolder> pushData(
-      const std::span<const BufferInfo> bufferInfo, const std ::string& debugInfo = "Unknown") {
-    return pushData(bufferInfo.size(), bufferInfo.data(), debugInfo);
-  }
+		[[nodiscard]] std::vector<TDataHolder> pushData(
+			const std::span<const BufferInfo> bufferInfo, const std::string& debugInfo = "Unknown") {
+			return pushData(bufferInfo.size(), bufferInfo.data(), debugInfo);
+		}
 
-  void changeData(const std::span<const BufferChange> changeInfos) {
-    changeData(changeInfos.size(), changeInfos.data());
-  }
+		void changeData(const std::span<const BufferChange> changeInfos) {
+			changeData(changeInfos.size(), changeInfos.data());
+		}
 
-  void removeRender(const std::span<const TRenderHolder> renderIDs) {
-    removeRender(renderIDs.size(), renderIDs.data());
-  }
+		void removeRender(const std::span<const TRenderHolder> renderIDs) {
+			removeRender(renderIDs.size(), renderIDs.data());
+		}
 
-  virtual void hideRender(const std::span<const TRenderHolder> renderIDs, bool hide) = 0;
+		virtual void hideRender(const std::span<const TRenderHolder> renderIDs, bool hide) = 0;
 
-  virtual void removeData(const std::span<const TDataHolder> dataHolder,
-                          bool instant = false) = 0;
+		virtual void removeData(const std::span<const TDataHolder> dataHolder,
+			bool instant = false) = 0;
 
-  virtual void removeTextures(
-      const std::span<const TTextureHolder> textureHolder,
-      bool instant = false) = 0;
+		virtual void removeTextures(
+			const std::span<const TTextureHolder> textureHolder,
+			bool instant = false) = 0;
 
-  virtual void removeSampler(
-      const std::span<const TSamplerHolder> samplerHolder,
-      bool instant = false) = 0;
+		virtual void removeSampler(
+			const std::span<const TSamplerHolder> samplerHolder,
+			bool instant = false) = 0;
 
-  virtual void removeMaterials(
-      const std::span<const TPipelineHolder> pipelineHolder,
-      bool instant = false) = 0;
+		virtual void removeMaterials(
+			const std::span<const TPipelineHolder> pipelineHolder,
+			bool instant = false) = 0;
 
-  [[nodiscard]] virtual TRenderHolder pushRender(
-      const size_t renderInfoCount, const RenderInfo* renderInfos,
-      const TRenderHolder toOverride = TRenderHolder(),
-      const RenderTarget target = RenderTarget::OPAQUE_TARGET) = 0;
+		[[nodiscard]] virtual TRenderHolder pushRender(
+			const size_t renderInfoCount, const RenderInfo* renderInfos,
+			const TRenderHolder toOverride = TRenderHolder(),
+			const RenderTarget target = RenderTarget::OPAQUE_TARGET) = 0;
 
-  [[nodiscard]] virtual TSamplerHolder pushSampler(
-      const SamplerInfo& sampler) = 0;
+		[[nodiscard]] virtual TSamplerHolder pushSampler(
+			const SamplerInfo& sampler) = 0;
 
-  [[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
-      const size_t textureCount, const TextureInfo* textures) = 0;
+		[[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
+			const size_t textureCount, const TextureInfo* textures) = 0;
 
-  [[nodiscard]] virtual TRenderHolder pushRender(
-      const std::span<const RenderInfo> renderInfos,
-      const TRenderHolder toOverride = TRenderHolder(),
-      const RenderTarget target = RenderTarget::OPAQUE_TARGET) {
-    return pushRender(renderInfos.size(), renderInfos.data(), toOverride,
-                      target);
-  }
+		[[nodiscard]] virtual TRenderHolder pushRender(
+			const std::span<const RenderInfo> renderInfos,
+			const TRenderHolder toOverride = TRenderHolder(),
+			const RenderTarget target = RenderTarget::OPAQUE_TARGET) {
+			return pushRender(renderInfos.size(), renderInfos.data(), toOverride,
+				target);
+		}
 
-  [[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
-      const std::span<const TextureInfo> textures) {
-    return pushTexture(textures.size(), textures.data());
-  }
+		[[nodiscard]] virtual std::vector<TTextureHolder> pushTexture(
+			const std::span<const TextureInfo> textures) {
+			return pushTexture(textures.size(), textures.data());
+		}
 
-  [[nodiscard]] virtual size_t pushLights(const size_t lightCount,
-                                          const Light* lights,
-                                          const size_t offset = 0) = 0;
+		[[nodiscard]] virtual size_t pushLights(const size_t lightCount,
+			const Light* lights,
+			const size_t offset = 0) = 0;
 
-  [[nodiscard]] virtual size_t getAligned(const TDataHolder buffer,
-                                          const size_t toBeAligned) = 0;
+		[[nodiscard]] virtual size_t getAligned(const TDataHolder buffer,
+			const size_t toBeAligned) = 0;
 
-  [[nodiscard]] virtual size_t getAligned(const DataType type) const = 0;
+		[[nodiscard]] virtual size_t getAligned(const DataType type) const = 0;
 
-  [[nodiscard]] GameGraphicsModule* getGraphicsModule() const {
-    return graphicsModule;
-  };
+		[[nodiscard]] GameGraphicsModule* getGraphicsModule() const {
+			return graphicsModule;
+		};
 
-  [[nodiscard]] inline shader::ShaderAPI* getShaderAPI() const {
-    return this->shaderAPI;
-  }
+		[[nodiscard]] inline shader::ShaderAPI* getShaderAPI() const {
+			return this->shaderAPI;
+		}
 
-  [[nodiscard]] virtual glm::vec2 getRenderExtent() const = 0;
+		[[nodiscard]] virtual glm::vec2 getRenderExtent() const = 0;
 
-  [[nodiscard]] virtual std::pair<std::vector<char>, TDataHolder> getImageData(
-      const TTextureHolder imageId,
-      const TDataHolder cache = TDataHolder()) = 0;
+		[[nodiscard]] virtual std::pair<std::vector<char>, TDataHolder> getImageData(
+			const TTextureHolder imageId,
+			const TDataHolder cache = TDataHolder()) = 0;
 
-  [[nodiscard]] virtual APILayer* backend() { return this; }
+		[[nodiscard]] virtual APILayer* backend() { return this; }
 
-  virtual void initDebugGUI() = 0;
-};
+		[[nodiscard]] virtual TTextureHolder getFrameBufferTexture(const size_t size) {
+			return {};
+		}
+
+		virtual void initDebugGUI() = 0;
+	};
 
 }  // namespace tge::graphics

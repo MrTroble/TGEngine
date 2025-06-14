@@ -31,6 +31,7 @@ namespace tge::io {
 
 	class IOModule : public tge::main::Module {
 		tge::graphics::WindowModule* windowModule = nullptr;
+	protected:
 		double oldX = 0, oldY = 0;
 		double deltaX = 0, deltaY = 0;
 		double inputX = 0, inputY = 0;

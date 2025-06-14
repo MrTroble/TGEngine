@@ -1165,11 +1165,11 @@ namespace tge::graphics {
              ImageUsageFlagBits::eColorAttachment |
                  ImageUsageFlagBits::eInputAttachment |
                  ImageUsageFlagBits::eTransferSrc},
-            {Format::eR32Sfloat, extent,
+            {Format::eR32Sint, extent,
              ImageUsageFlagBits::eColorAttachment |
                  ImageUsageFlagBits::eInputAttachment |
                  ImageUsageFlagBits::eTransferSrc},
-            {Format::eR32G32B32A32Sfloat, extent,
+            {Format::eR8G8B8A8Snorm, extent,
              ImageUsageFlagBits::eColorAttachment |
                  ImageUsageFlagBits::eInputAttachment |
                  ImageUsageFlagBits::eTransferSrc},
@@ -1483,12 +1483,12 @@ namespace tge::graphics {
                 AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
                 ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
             AttachmentDescription(
-                {}, Format::eR32Sfloat, SampleCountFlagBits::e1,
+                {}, Format::eR32Sint, SampleCountFlagBits::e1,
                 AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
                 AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
                 ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
             AttachmentDescription(
-                {}, Format::eR32G32B32A32Sfloat, SampleCountFlagBits::e1,
+                {}, Format::eR8G8B8A8Snorm, SampleCountFlagBits::e1,
                 AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
                 AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
                 ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
@@ -1614,11 +1614,12 @@ namespace tge::graphics {
         if (true) {
             needsRefresh[this->nextImage] = 0;
             constexpr std::array clearColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+            constexpr std::array clearZero = { 0.0f, 0.0f, 0.0f, 0.0f };
             const std::array clearValue = { ClearValue(ClearDepthStencilValue(1.0f, 0)),
                                            ClearValue(clearColor),
-                                           ClearValue(clearColor),
-                                           ClearValue(clearColor),
-                                           ClearValue(clearColor),
+                                           ClearValue(clearZero),
+                                           ClearValue(clearZero),
+                                           ClearValue(clearZero),
                                            ClearValue(clearColor) };
 
             const CommandBufferBeginInfo cmdBufferBeginInfo({}, nullptr);
@@ -1847,7 +1848,7 @@ namespace tge::graphics {
         const auto oldInfo = this->textureImageHolder.get<4>(imageId);
         constexpr ImageSubresourceLayers layers(ImageAspectFlagBits::eColor, 0, 0, 1);
         const BufferImageCopy imageInfo(
-            0, 0, 0, layers, {}, { oldInfo.extent.width, oldInfo.extent.height, 1 });
+            0, oldInfo.extent.width, oldInfo.extent.height, layers, { 0, 0, 0 }, { oldInfo.extent.width, oldInfo.extent.height, 1 });
         buffer.copyImageToBuffer(currentImage, ImageLayout::eTransferSrcOptimal,
             dataBuffer, imageInfo);
 
