@@ -5,7 +5,7 @@
 
 namespace tge::graphics {
 
-enum RenderTarget { NONE = 1, OPAQUE_TARGET = 2, TRANSLUCENT_TARGET = 4 };
+enum RenderTarget { NONE = 1, OPAQUE_TARGET = 2, TRANSLUCENT_TARGET = 4};
 
 class APILayer;
 

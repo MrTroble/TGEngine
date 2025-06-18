@@ -241,6 +241,7 @@ void __implCreateDescSets(VulkanShaderPipe* shaderPipe,
   graphics::VulkanGraphicsModule* vgm =
       (graphics::VulkanGraphicsModule*)vsm->vgm;
 
+  PipelineLayoutCreateInfo layoutCreateInfo;
   if (!shaderPipe->descriptorLayoutBindings.empty()) {
     const DescriptorSetLayoutCreateInfo layoutCreate(
         {}, shaderPipe->descriptorLayoutBindings);
@@ -256,14 +257,16 @@ void __implCreateDescSets(VulkanShaderPipe* shaderPipe,
     const auto descPool = vgm->device.createDescriptorPool(descPoolCreateInfo);
     vsm->descPools.push_back(descPool);
 
-    const auto layoutCreateInfo =
-        PipelineLayoutCreateInfo({}, descLayout, shaderPipe->constranges);
-    const auto pipeLayout = vgm->device.createPipelineLayout(layoutCreateInfo);
-    vsm->pipeLayouts.push_back(pipeLayout);
-    shaderPipe->layoutID = vsm->pipeLayouts.size() - 1;
-  } else {
-    shaderPipe->layoutID = INVALID_SIZE_T;
+    layoutCreateInfo.setSetLayouts({ descLayout });
   }
+  else {
+      vsm->setLayouts.emplace_back();
+      vsm->descPools.emplace_back();
+  }
+  layoutCreateInfo.setPushConstantRanges(shaderPipe->constranges);
+  const auto pipeLayout = vgm->device.createPipelineLayout(layoutCreateInfo);
+  shaderPipe->layoutID = vsm->pipeLayouts.size();
+  vsm->pipeLayouts.push_back(pipeLayout);
 }
 
 std::unique_ptr<glslang::TShader> __implGenerateIntermediate(
@@ -341,7 +344,7 @@ std::vector<TBindingHolder> VulkanShaderModule::createBindings(
     ShaderPipe pipe, const size_t count) {
   VulkanShaderPipe* shaderPipe = (VulkanShaderPipe*)pipe;
   const auto layout = shaderPipe->layoutID;
-  if (layout == INVALID_SIZE_T) return {};
+  if (layout == INVALID_SIZE_T || shaderPipe->descriptorLayoutBindings.empty()) return {};
   auto output = bindingHolder.allocate(count);
   auto [descriptorSets, layoutsOut, pipeLayouts, status, expected] =
       output.iterator;
