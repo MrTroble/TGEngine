@@ -33,7 +33,6 @@ set(ENGINE_DATA
 
 add_library(TGEngine STATIC ${ENGINE_DATA})
 
-message(${Vulkan_glslang_LIBRARY})
 target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui ../submodules/glm)
 target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan glfw plog::plog imgui glslang SPIRV-Tools)
 
