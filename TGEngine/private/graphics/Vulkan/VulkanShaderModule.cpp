@@ -1,7 +1,6 @@
 #include "../../../public/graphics/vulkan/VulkanShaderModule.hpp"
 
-#include <glslang/MachineIndependent/localintermediate.h>
-#include <glslang/Public/ShaderLang.h>
+#include "../../../../submodules/glslang/glslang/MachineIndependent/localintermediate.h"
 #include <glslang/SPIRV/GlslangToSpv.h>
 
 #include <iostream>

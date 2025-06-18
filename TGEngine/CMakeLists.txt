@@ -35,10 +35,7 @@ add_library(TGEngine STATIC ${ENGINE_DATA})
 
 message(${Vulkan_glslang_LIBRARY})
 target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui ../submodules/glm)
-target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan glfw plog::plog imgui Vulkan::glslang Vulkan::shaderc_combined Vulkan::SPIRV-Tools)
-
-find_package(plog CONFIG REQUIRED)
-target_link_libraries(TGEngine PRIVATE )
+target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan glfw plog::plog imgui glslang SPIRV-Tools)
 
 enable_testing()
 
