@@ -35,6 +35,7 @@ struct BufferBindingData {
 struct TextureBindingData {
   graphics::TTextureHolder texture;
   graphics::TSamplerHolder sampler;
+  size_t useGeneralLayout = 0;
 };
 
 struct BindingInfo {

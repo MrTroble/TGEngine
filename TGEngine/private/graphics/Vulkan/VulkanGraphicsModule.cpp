@@ -152,7 +152,7 @@ namespace tge::graphics {
 		const std::array blendAttachment = { pOverrideState, pOverrideState,
 						pOverrideState, pOverrideState };
 
-		const std::array blendTranslutaned = { pDefaultState };
+		const std::array blendTranslutaned = { pDefaultState, pOverrideState };
 
 		for (size_t i = 0; i < materialcount; i++) {
 			const auto& material = materials[i];
@@ -1043,6 +1043,7 @@ namespace tge::graphics {
 			bindingInfos[i].binding = i;
 			bindingInfos[i].data.texture.texture = vgm->internalImageData[i + 1];
 			bindingInfos[i].data.texture.sampler = TSamplerHolder();
+			bindingInfos[i].data.texture.useGeneralLayout = i == 2 ? 1:0;
 		}
 		bindingInfos[4].type = BindingType::UniformBuffer;
 		bindingInfos[4].bindingSet = vgm->lightBindings;
@@ -1068,6 +1069,10 @@ namespace tge::graphics {
 
 		constexpr std::array blendAttachment = { PipelineColorBlendAttachmentState(
 			true, BlendFactor::eSrcAlpha, BlendFactor::eOneMinusSrcAlpha,
+			BlendOp::eAdd, BlendFactor::eOne, BlendFactor::eZero, BlendOp::eAdd,
+			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags),
+		PipelineColorBlendAttachmentState(
+			false, BlendFactor::eSrcAlpha, BlendFactor::eOneMinusSrcAlpha,
 			BlendOp::eAdd, BlendFactor::eOne, BlendFactor::eZero, BlendOp::eAdd,
 			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags) };
 
@@ -1110,7 +1115,14 @@ namespace tge::graphics {
 
 		constexpr ImageSubresourceRange range = { ImageAspectFlagBits::eColor, 0, 1, 0,
 												 1 };
+
+		waitForImageTransition(
+			commandBuffer, ImageLayout::eUndefined,
+			ImageLayout::eGeneral,
+			vgm->textureImageHolder.get<0>(vgm->internalImageData[3]), range);
+
 		for (size_t i = 1; i < vgm->internalImageData.size(); i++) {
+			if (i == 3) continue;
 			waitForImageTransition(
 				commandBuffer, ImageLayout::eUndefined,
 				ImageLayout::eShaderReadOnlyOptimal,
@@ -1486,7 +1498,7 @@ namespace tge::graphics {
 				{}, Format::eR32Sint, SampleCountFlagBits::e1,
 				AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
 				AttachmentLoadOp::eDontCare, AttachmentStoreOp::eDontCare,
-				ImageLayout::eUndefined, ImageLayout::eShaderReadOnlyOptimal),
+				ImageLayout::eUndefined, ImageLayout::eGeneral),
 			AttachmentDescription(
 				{}, Format::eR8G8B8A8Snorm, SampleCountFlagBits::e1,
 				AttachmentLoadOp::eClear, AttachmentStoreOp::eStore,
@@ -1502,17 +1514,22 @@ namespace tge::graphics {
 		constexpr std::array colorAttachments = {
 			AttachmentReference(1, ImageLayout::eColorAttachmentOptimal),
 			AttachmentReference(2, ImageLayout::eColorAttachmentOptimal),
-			AttachmentReference(3, ImageLayout::eColorAttachmentOptimal),
+			AttachmentReference(3, ImageLayout::eGeneral),
 			AttachmentReference(4, ImageLayout::eColorAttachmentOptimal) };
 
 		constexpr std::array inputAttachments = {
 			AttachmentReference(1, ImageLayout::eShaderReadOnlyOptimal),
 			AttachmentReference(2, ImageLayout::eShaderReadOnlyOptimal),
-			AttachmentReference(3, ImageLayout::eShaderReadOnlyOptimal),
+			AttachmentReference(3, ImageLayout::eGeneral),
 			AttachmentReference(4, ImageLayout::eShaderReadOnlyOptimal) };
 
 		constexpr std::array colorAttachmentsSubpass1 = {
-			AttachmentReference(5, ImageLayout::eColorAttachmentOptimal) };
+			AttachmentReference(5, ImageLayout::eColorAttachmentOptimal),
+			AttachmentReference(3, ImageLayout::eGeneral)
+		};
+		constexpr std::array colorAttachmentsSubpass2 = {
+			AttachmentReference(5, ImageLayout::eColorAttachmentOptimal)
+		};
 
 		constexpr AttachmentReference depthAttachment(
 			0, ImageLayout::eDepthStencilAttachmentOptimal);
@@ -1525,7 +1542,7 @@ namespace tge::graphics {
 			SubpassDescription({}, PipelineBindPoint::eGraphics, {},
 							   colorAttachmentsSubpass1, {}, &depthAttachment),
 			SubpassDescription({}, PipelineBindPoint::eGraphics, {},
-							   colorAttachmentsSubpass1, {},&depthAttachment) };
+							   colorAttachmentsSubpass2, {},&depthAttachment) };
 
 		constexpr auto frag1 = PipelineStageFlagBits::eColorAttachmentOutput |
 			PipelineStageFlagBits::eLateFragmentTests |

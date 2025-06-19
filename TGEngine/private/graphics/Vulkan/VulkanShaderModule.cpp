@@ -415,7 +415,7 @@ void VulkanShaderModule::bindData(const BindingInfo* info, const size_t count) {
                          : vgm->sampler[tex.sampler.internalHandle],
             !tex.texture ? vk::ImageView()
                          : vgm->textureImageHolder.get<1>(tex.texture),
-            ImageLayout::eShaderReadOnlyOptimal);
+            cinfo.data.texture.useGeneralLayout ? ImageLayout::eGeneral: ImageLayout::eShaderReadOnlyOptimal);
         set.push_back(WriteDescriptorSet(
             descriptorSet, cinfo.binding, cinfo.arrayID, 1,
             cinfo.type == BindingType::Texture ? DescriptorType::eSampledImage
