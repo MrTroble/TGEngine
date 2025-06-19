@@ -59,6 +59,8 @@ void IOModule::tick(double delta) {
   deltaY = ypos - oldY;
   inputX = deltaX * delta;
   inputY = deltaY * delta;
+  oldX = xpos;
+  oldY = ypos;
   for (size_t i = 0; i < GLFW_MOUSE_BUTTON_LAST; i++) {
     const auto pressed = glfwGetMouseButton(window, i);
     if (pressed == GLFW_PRESS) {
