@@ -123,6 +123,11 @@ namespace tge::graphics {
 			BlendOp::eAdd, BlendFactor::eZero, BlendFactor::eZero, BlendOp::eAdd,
 			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags);
 
+		const auto pToolState = PipelineColorBlendAttachmentState(
+			true, BlendFactor::eZero, BlendFactor::eOne,
+			BlendOp::eAdd, BlendFactor::eZero, BlendFactor::eZero, BlendOp::eAdd,
+			(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags);
+
 		const auto pOverrideState = PipelineColorBlendAttachmentState{ false,
 		BlendFactor::eSrcAlpha, BlendFactor::eOneMinusSrcAlpha,
 			BlendOp::eAdd, BlendFactor::eZero, BlendFactor::eZero, BlendOp::eAdd,
@@ -1513,8 +1518,8 @@ namespace tge::graphics {
 
 		constexpr std::array colorAttachments = {
 			AttachmentReference(1, ImageLayout::eColorAttachmentOptimal),
-			AttachmentReference(2, ImageLayout::eColorAttachmentOptimal),
 			AttachmentReference(3, ImageLayout::eGeneral),
+			AttachmentReference(2, ImageLayout::eColorAttachmentOptimal),
 			AttachmentReference(4, ImageLayout::eColorAttachmentOptimal) };
 
 		constexpr std::array inputAttachments = {
@@ -1859,7 +1864,7 @@ namespace tge::graphics {
 		constexpr ImageSubresourceRange range(ImageAspectFlagBits::eColor, 0, 1, 0,
 			1);
 
-		waitForImageTransition(buffer, ImageLayout::eShaderReadOnlyOptimal,
+		waitForImageTransition(buffer, ImageLayout::eGeneral,
 			ImageLayout::eTransferSrcOptimal, currentImage, range);
 
 		const auto oldInfo = this->textureImageHolder.get<4>(imageId);
@@ -1870,7 +1875,7 @@ namespace tge::graphics {
 			dataBuffer, imageInfo);
 
 		waitForImageTransition(buffer, ImageLayout::eTransferSrcOptimal,
-			ImageLayout::eShaderReadOnlyOptimal, currentImage,
+			ImageLayout::eGeneral, currentImage,
 			range);
 
 		const SubmitInfo submit({}, {}, buffer, {});
