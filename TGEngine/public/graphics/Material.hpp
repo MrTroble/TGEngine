@@ -22,5 +22,6 @@ struct Material {
   uint32_t primitiveType = INVALID_UINT32;
   bool clockwise = false;
   RenderTarget target = RenderTarget::OPAQUE_TARGET;
+  bool depthTest = true;
 };
 } // namespace tge::graphics

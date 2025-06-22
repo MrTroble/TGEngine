@@ -139,6 +139,9 @@ namespace tge::graphics {
 		const PipelineDepthStencilStateCreateInfo pipeDepthStateWithoutWrite(
 			{}, true, false, CompareOp::eLessOrEqual, false, false, {}, {}, 0, 1);
 
+		const PipelineDepthStencilStateCreateInfo pipeDepthStateOff(
+			{}, false, false, CompareOp::eLessOrEqual, false, false, {}, {}, 0, 1);
+
 		std::vector<GraphicsPipelineCreateInfo> pipelineCreateInfos;
 		pipelineCreateInfos.reserve(materialcount);
 
@@ -191,10 +194,12 @@ namespace tge::graphics {
 				: (PrimitiveTopology)(material.primitiveType),
 				false);
 
+			auto depthStateUsed = material.depthTest ? (isOpaque ? &pipeDepthState : &pipeDepthStateWithoutWrite) : &pipeDepthStateOff;
+
 			GraphicsPipelineCreateInfo gpipeCreateInfo(
 				{}, shaderStages[i], &shaderPipe->inputStateCreateInfo, &input[i], {},
 				&pipelineViewportCreateInfo, &rasterizationInfos[i],
-				&multisampleCreateInfo, isOpaque ? &pipeDepthState : &pipeDepthStateWithoutWrite,
+				&multisampleCreateInfo, depthStateUsed,
 				&colorBlendStates[i], {}, {},
 				renderpass, isOpaque ? 0 : 2);
 			shaderAPI->addToMaterial(&material, &gpipeCreateInfo);
@@ -1048,7 +1053,7 @@ namespace tge::graphics {
 			bindingInfos[i].binding = i;
 			bindingInfos[i].data.texture.texture = vgm->internalImageData[i + 1];
 			bindingInfos[i].data.texture.sampler = TSamplerHolder();
-			bindingInfos[i].data.texture.useGeneralLayout = i == 2 ? 1:0;
+			bindingInfos[i].data.texture.useGeneralLayout = i == 2 ? 1 : 0;
 		}
 		bindingInfos[4].type = BindingType::UniformBuffer;
 		bindingInfos[4].bindingSet = vgm->lightBindings;
