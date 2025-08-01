@@ -11,6 +11,8 @@ class APILayer;
 
 using Color = float[4];
 
+struct BlendFactorExt;
+
 struct Material {
 
   Material(void *costumShaderData) : costumShaderData(costumShaderData) {}
@@ -23,5 +25,6 @@ struct Material {
   bool clockwise = false;
   RenderTarget target = RenderTarget::OPAQUE_TARGET;
   bool depthTest = true;
+  std::shared_ptr<BlendFactorExt> blendFactor = nullptr; // API dependent
 };
 } // namespace tge::graphics

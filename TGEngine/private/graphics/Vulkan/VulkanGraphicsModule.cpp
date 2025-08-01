@@ -24,6 +24,7 @@
 #include "../../../public/graphics/vulkan/VulkanModuleDef.hpp"
 #include "../../../public/graphics/vulkan/VulkanShaderModule.hpp"
 #include "../../../public/graphics/vulkan/VulkanGraphicsModule.hpp"
+#include "../../../public/graphics/MaterialExt/BlendFactorExt.hpp"
 
 namespace tge::graphics {
 
@@ -162,18 +163,31 @@ namespace tge::graphics {
 
 		const std::array blendTranslutaned = { pDefaultState, pOverrideState };
 
+		std::vector<std::vector<PipelineColorBlendAttachmentState>> blendAttachments;
 		for (size_t i = 0; i < materialcount; i++) {
 			const auto& material = materials[i];
 
 			const bool isOpaque = material.target & RenderTarget::OPAQUE_TARGET;
-
-			colorBlendStates[i] = isOpaque
-				? PipelineColorBlendStateCreateInfo(
-					{}, false, LogicOp::eClear, blendAttachment) :
-				PipelineColorBlendStateCreateInfo(
-					{}, false, LogicOp::eClear, blendTranslutaned);
-
 			const auto shaderPipe = (VulkanShaderPipe*)material.costumShaderData;
+			if (material.blendFactor) {
+				std::vector<PipelineColorBlendAttachmentState> blends(isOpaque ? blendAttachment.size() : blendTranslutaned.size());
+				blends[0] =
+					PipelineColorBlendAttachmentState(true,
+						material.blendFactor->srcColorFactor, material.blendFactor->srcColorFactor,
+						BlendOp::eAdd, BlendFactor::eZero, BlendFactor::eZero, BlendOp::eAdd,
+						(ColorComponentFlags)FlagTraits<ColorComponentFlagBits>::allFlags);
+				std::fill(blends.begin() + 1, blends.end(), pOverrideState);
+				blendAttachments.emplace_back(std::move(blends));
+				colorBlendStates[i] = PipelineColorBlendStateCreateInfo(
+					{}, false, LogicOp::eClear, blendAttachments.back());
+			}
+			else {
+				colorBlendStates[i] = isOpaque
+					? PipelineColorBlendStateCreateInfo(
+						{}, false, LogicOp::eClear, blendAttachment) :
+					PipelineColorBlendStateCreateInfo(
+						{}, false, LogicOp::eClear, blendTranslutaned);
+			}
 
 			auto& currentStages = shaderStages[i];
 			currentStages.reserve(shaderPipe->shader.size());
@@ -1693,7 +1707,7 @@ namespace tge::graphics {
 
 			currentBuffer.nextSubpass(SubpassContents::eSecondaryCommandBuffers);
 
-			for (auto cTarget : { RenderTarget::TRANSLUCENT_TARGET, RenderTarget::TOOL}) {
+			for (auto cTarget : { RenderTarget::TRANSLUCENT_TARGET, RenderTarget::TOOL }) {
 				std::lock_guard lg(secondaryCommandBuffer.mutex);
 				const auto& bufferToExecute =
 					std::get<0>(secondaryCommandBuffer.internalValues);
