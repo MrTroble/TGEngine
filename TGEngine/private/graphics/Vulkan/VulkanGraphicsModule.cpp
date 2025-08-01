@@ -1693,7 +1693,7 @@ namespace tge::graphics {
 
 			currentBuffer.nextSubpass(SubpassContents::eSecondaryCommandBuffers);
 
-			{
+			for (auto cTarget : { RenderTarget::TRANSLUCENT_TARGET, RenderTarget::TOOL}) {
 				std::lock_guard lg(secondaryCommandBuffer.mutex);
 				const auto& bufferToExecute =
 					std::get<0>(secondaryCommandBuffer.internalValues);
@@ -1702,7 +1702,7 @@ namespace tge::graphics {
 				bufferOutput.reserve(bufferToExecute.size());
 				for (size_t i = 0; i < bufferToExecute.size(); i++) {
 					RenderTarget target = value[i];
-					if (target & RenderTarget::TRANSLUCENT_TARGET && !(target & RenderTarget::NONE))
+					if (target & cTarget && !(target & RenderTarget::NONE))
 						bufferOutput.push_back(bufferToExecute[i]);
 				}
 				if (!bufferOutput.empty()) {
