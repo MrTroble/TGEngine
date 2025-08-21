@@ -3,6 +3,11 @@
 #include <stdint.h>
 #include "ElementHolder.hpp"
 
+namespace tge::shader {
+	DEFINE_HOLDER(Shader);
+	using ShaderPipe = TShaderHolder;
+}
+
 namespace tge::graphics {
 
 enum RenderTarget { NONE = 1, OPAQUE_TARGET = 2, TRANSLUCENT_TARGET = 4, TOOL = 8};
@@ -15,11 +20,11 @@ struct BlendFactorExt;
 
 struct Material {
 
-  Material(void *costumShaderData) : costumShaderData(costumShaderData) {}
+  Material(shader::ShaderPipe costumShaderData) : costumShaderData(costumShaderData) {}
 
   Material() = default;
 
-  void *costumShaderData = nullptr; // API dependent
+  shader::ShaderPipe costumShaderData{};
   bool doubleSided = false;
   uint32_t primitiveType = INVALID_UINT32;
   bool clockwise = false;

@@ -318,9 +318,9 @@ namespace tge::graphics {
 		vertexShader = util::wholeFile("assets/testvec4.vert");
 		fragmentShader = util::wholeFile("assets/test.frag");
 		defaultPipe = apiLayer->getShaderAPI()->compile(
-			{ { shader::ShaderType::VERTEX, vertexShader }, { shader::ShaderType::FRAGMENT, fragmentShader } });
+			{ { shader::ShaderType::VERTEX, "testVertex4", vertexShader}, {shader::ShaderType::FRAGMENT, "testFragment", fragmentShader}});
 		glbWidget = apiLayer->getShaderAPI()->compile(
-			{ { shader::ShaderType::VERTEX, vertexShader, {"NORMAL", "UV"}}, {shader::ShaderType::FRAGMENT, fragmentShader} });
+			{ { shader::ShaderType::VERTEX, "testVertex4", vertexShader, {"NORMAL", "UV"}}, {shader::ShaderType::FRAGMENT, "testFragment", fragmentShader} });
 		const Material defMat(defaultPipe);
 		defaultMaterial = apiLayer->pushMaterials(1, &defMat)[0];
 

@@ -7,6 +7,7 @@
 #include "../GameShaderModule.hpp"
 #include "VulkanShaderPipe.hpp"
 #include "../../DataHolder.hpp"
+#include <ShaderPermute.hpp>
 
 namespace tge::shader {
 
@@ -14,6 +15,7 @@ struct BindingPipeInfo {
   size_t descSet;
   size_t pipeline;
 };
+
 
 class VulkanShaderModule : public tge::shader::ShaderAPI {
  public:
@@ -35,6 +37,7 @@ class VulkanShaderModule : public tge::shader::ShaderAPI {
   std::mutex mutex;
   // Legacy support
   std::vector<std::vector<BindingInfo>> defaultbindings;
+  permute::Permute<permute::AllCache> permuteCache;
 
   ShaderPipe loadShaderPipeAndCompile(
       const std::vector<std::string>& shadernames,
@@ -60,6 +63,10 @@ class VulkanShaderModule : public tge::shader::ShaderAPI {
   void init() override;
 
   void destroy() override;
+
+  [[nodiscard]] VulkanShaderPipe* getVulkanShaderPipe(ShaderPipe shaderPipe) {
+    return this->shaderPipes[shaderPipe.internalHandle];
+  }
 };
 
 }  // namespace tge::shader

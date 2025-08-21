@@ -33,13 +33,14 @@ set(ENGINE_DATA
 
 add_library(TGEngine STATIC ${ENGINE_DATA})
 
-target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui ../submodules/glm)
+target_include_directories(TGEngine PUBLIC ../submodules/glfw ../submodules/imgui ../submodules/glm 
+	../submodules/ShaderPermute/ShaderPermute ../submodules/ShaderPermute/submodules/glslang)
 target_link_libraries(TGEngine PUBLIC Vulkan::Vulkan glfw plog::plog imgui glslang SPIRV-Tools)
 
 enable_testing()
 
 add_executable(TGEngineTests "test/TGTests.cpp")
-target_link_libraries(TGEngineTests PRIVATE plog::plog GTest::gtest_main)
+target_link_libraries(TGEngineTests PRIVATE plog::plog gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(TGEngineTests)

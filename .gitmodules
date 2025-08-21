@@ -10,15 +10,6 @@
 [submodule "submodules/plog"]
 	path = submodules/plog
 	url = https://github.com/SergiusTheBest/plog
-[submodule "submodules/glslang"]
-	path = submodules/glslang
-	url = https://github.com/KhronosGroup/glslang/
-	branch = vulkan-sdk-1.4.309
-[submodule "submodules/SPIRV-Tools"]
-	path = submodules/SPIRV-Tools
-	url = https://github.com/KhronosGroup/SPIRV-Tools
-	branch = vulkan-sdk-1.4.309
-[submodule "submodules/SPIRV-Headers"]
-	path = submodules/SPIRV-Headers
-	url = https://github.com/KhronosGroup/SPIRV-Headers
-	branch = vulkan-sdk-1.4.309
+[submodule "submodules/ShaderPermute"]
+	path = submodules/ShaderPermute
+	url = https://github.com/MrTroble/ShaderPermute

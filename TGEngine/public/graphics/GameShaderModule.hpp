@@ -15,8 +15,6 @@ enum class SamplerIOType { SAMPLER, TEXTURE };
 
 enum class ShaderType { VERTEX, FRAGMENT, INVALID };
 
-using ShaderPipe = void*;
-
 enum BindingType {
   UniformBuffer,
   Texture,
@@ -54,6 +52,7 @@ struct BindingInfo {
 
 struct ShaderInfo {
   ShaderType language = ShaderType::INVALID;
+  std::string name;
   std::vector<char> code;
   std::vector<std::string> additionalCode;
   std::string debug;

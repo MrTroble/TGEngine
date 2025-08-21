@@ -111,6 +111,8 @@ namespace tge::graphics {
 		const size_t materialcount, const Material* materials) {
 		EXPECT(materialcount != 0 && materials != nullptr);
 
+		auto shaderApi = (VulkanShaderModule*)this->getShaderAPI();
+
 		const Rect2D scissor({ 0, 0 },
 			{ (uint32_t)viewport.width, (uint32_t)viewport.height });
 		const PipelineViewportStateCreateInfo pipelineViewportCreateInfo({}, viewport,
@@ -168,7 +170,6 @@ namespace tge::graphics {
 			const auto& material = materials[i];
 
 			const bool isOpaque = material.target & RenderTarget::OPAQUE_TARGET;
-			const auto shaderPipe = (VulkanShaderPipe*)material.costumShaderData;
 			if (material.blendFactor) {
 				std::vector<PipelineColorBlendAttachmentState> blends(isOpaque ? blendAttachment.size() : blendTranslutaned.size());
 				blends[0] =
@@ -190,6 +191,8 @@ namespace tge::graphics {
 			}
 
 			auto& currentStages = shaderStages[i];
+			
+			const auto shaderPipe = shaderApi->getVulkanShaderPipe(material.costumShaderData);
 			currentStages.reserve(shaderPipe->shader.size());
 			getOrCreate(this, shaderPipe, currentStages);
 
@@ -218,7 +221,7 @@ namespace tge::graphics {
 				renderpass, isOpaque ? 0 : 2);
 			shaderAPI->addToMaterial(&material, &gpipeCreateInfo);
 			pipelineCreateInfos.push_back(gpipeCreateInfo);
-			shaderPipes.push_back(shaderPipe);
+			shaderPipes.push_back(material.costumShaderData);
 		}
 
 		const auto piperesult =
@@ -1618,11 +1621,12 @@ namespace tge::graphics {
 		this->shaderAPI->init();
 		device.waitIdle();
 
-		const auto pipe = (VulkanShaderPipe*)shaderAPI->loadShaderPipeAndCompile(
+		const auto pipe = shaderAPI->loadShaderPipeAndCompile(
 			{ "assets/lightPass.vert", "assets/lightPass.frag" });
 		shaderPipes.push_back(pipe);
 		lightBindings = shaderAPI->createBindings(pipe)[0];
-		getOrCreate(this, pipe, lightCreateInfos);
+		auto vulkanpipe = ((VulkanShaderModule*)shaderAPI)->getVulkanShaderPipe(pipe);
+		getOrCreate(this, vulkanpipe, lightCreateInfos);
 		lightMat = Material(pipe);
 
 		BufferInfo bufferInfo;
